@@ -3274,10 +3274,10 @@ async function doLogin() {
     user = {role:'admin', name: (DB.adminPrenom||'Mamadou Bassirou') + ' ' + (DB.adminNom||'Barry')};
   } else if(curRole==='agent') {
     const ag = DB.agents.find(a => (a.num===id || a.code===id) && a.actif);
-    if(ag && await verifyPw(pw, ag.pass)) user = {role:'agent', name:ag.name, agId:ag.id};
+    if(ag && (!ag.pass || ag.pass === 'null' || await verifyPw(pw, ag.pass))) user = {role:'agent', name:ag.name, agId:ag.id};
   } else if(curRole==='sousagent') {
     const sa = DB.sousAgents.find(s => (s.num===id || s.code===id) && s.actif);
-    if(sa && await verifyPw(pw, sa.pass)) user = {role:'sousagent', name:sa.name, saId:sa.id, agId:sa.agId};
+    if(sa && (!sa.pass || sa.pass === 'null' || await verifyPw(pw, sa.pass))) user = {role:'sousagent', name:sa.name, saId:sa.id, agId:sa.agId};
   } else if(curRole==='owner') {
     const id2 = id;
     let v = null;
