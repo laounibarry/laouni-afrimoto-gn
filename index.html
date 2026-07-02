@@ -2328,63 +2328,10 @@ const DB = {
 // Ces données sont chargées uniquement si Supabase
 // ne retourne rien (mode démo / hors ligne)
 // ══════════════════════════════════════════════════
-const DEMO_AGENTS = [
-  {
-    id: 'demo-ag-001',
-    num: 'AGT-00001', code: 'AGT-00001',
-    name: 'Agence Conakry Centre', resp: 'Mamadou Barry',
-    pref: 'Conakry', city: 'Conakry', addr: 'Marché Madina, près de la pharmacie',
-    tel: '+224 620 000 001', email: 'agent@afrimoto.gn',
-    pass: 'Agent2024!',
-    solde: 500000, actif: true, peutValider: true,
-    photo: '', created_at: '2024-01-15T08:00:00Z'
-  }
-];
-
-const DEMO_SOUS_AGENTS = [
-  {
-    id: 'demo-sa-001',
-    num: 'SA-00001', code: 'SA-00001',
-    name: 'Ibrahima Sow', agId: 'demo-ag-001',
-    pref: 'Conakry', city: 'Conakry', addr: 'Ratoma',
-    tel: '+224 620 000 002', email: 'sousagent@afrimoto.gn',
-    pass: 'SousAgent2024!',
-    solde: 150000, actif: true,
-    photo: '', created_at: '2024-02-01T08:00:00Z'
-  }
-];
-
-const DEMO_CLIENTS = [
-  {
-    id: 'demo-cl-001',
-    num: 'CLT-00001',
-    prenom: 'Ousmane', nom: 'Diallo',
-    tel: '+224 620 000 003', email: 'client@afrimoto.gn',
-    user: 'ousmane.diallo',
-    pass: 'Client2024!',
-    solde: 75000, permis: 'P-2024-0001',
-    vid: 'demo-veh-001', suspendu: false,
-    created_at: '2024-03-01T08:00:00Z'
-  }
-];
-
-const DEMO_PASSAGERS = [
-  {
-    id: 'demo-ps-001',
-    num: 'PSG-00001',
-    prenom: 'Fatoumata', nom: 'Camara',
-    tel: '+224 620 000 004', email: 'passager@afrimoto.gn',
-    user: 'fatoumata.camara',
-    pass: 'Passager2024!',
-    solde: 30000,
-    piece: 'CNI-GN-2024-0042',
-    photo: '', photoPiece: '',
-    valide: true, consentement: true,
-    dateConsentement: '2024-03-15T08:00:00Z',
-    created_at: '2024-03-15T08:00:00Z'
-  }
-];
-
+const DEMO_AGENTS = [];
+const DEMO_SOUS_AGENTS = [];
+const DEMO_CLIENTS = [];
+const DEMO_PASSAGERS = [];
 const DEMO_VEHS = [
   {
     id: 'demo-veh-001',
