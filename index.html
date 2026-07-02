@@ -8182,7 +8182,9 @@ function delAlerte(id) {
 }
 
 // ── MODALS ÉDITION ──
+let _editSaveFn = null;
 function openEdit(title, fields, onSave) {
+  _editSaveFn = onSave;
   document.getElementById('m-edit-inner').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:15px;font-weight:900">${title}</div>
@@ -8191,10 +8193,10 @@ function openEdit(title, fields, onSave) {
     ${fields.map(f=>`
       <div class="fld">
         <div class="lbl">${f.label}</div>
-        <input type="${f.type||'text'}" id="edit-${f.key}" value="${f.val||''}" placeholder="${f.ph||''}"/>
+        <input type="${f.type||'text'}" id="edit-${f.key}" value="${esc(String(f.val||''))}" placeholder="${f.ph||''}"/>
       </div>`).join('')}
     <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn" style="flex:1;padding:13px" onclick="(${onSave.toString()})()">💾 Enregistrer</button>
+      <button class="btn" style="flex:1;padding:13px" onclick="if(_editSaveFn)_editSaveFn()">💾 Enregistrer</button>
       <button class="btn-ghost" style="padding:13px 16px" onclick="closeModal('m-edit')">Annuler</button>
     </div>`;
   openModal('m-edit');
