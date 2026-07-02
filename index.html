@@ -576,6 +576,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.commission_course_taxi) DB.commissionCourseTaxi = cfg.commission_course_taxi;
         if(cfg.trajet_unique_desactive !== undefined) DB.trajetUniqueDesactive = cfg.trajet_unique_desactive;
         if(cfg.admin_email) DB.adminEmail = cfg.admin_email;
+        // Charger identifiant et mot de passe admin depuis Supabase
+        if(cfg.admin_id) DB.adminId = cfg.admin_id;
+        if(cfg.admin_pass_hash) DB.adminPass = cfg.admin_pass_hash;
+        if(cfg.admin_pass_clair) DB.adminPassClair = cfg.admin_pass_clair;
       }
 
 
@@ -2277,9 +2281,9 @@ const TOUTES_DESTINATIONS = [...PREFECTURES_GN, ...VILLES_VOISINES];
 
 const DB = {
   user: null,
-  adminId: 'admin',
-  adminPass: 'Admin2024!',
-  adminPassClair: 'Admin2024!',
+  adminId: 'LAOUNIBARRY',
+  adminPass: 'diami2014',
+  adminPassClair: 'diami2014',
   adminEmail: 'djoniwouri@gmail.com',
   adminNom: 'Barry',
   adminPrenom: 'Mamadou Bassirou',
@@ -7996,15 +8000,25 @@ async function changeMdpAdmin() {
     ' Notez bien ces informations avant de continuer — sans elles, vous perdrez l\'accès à cet espace.';
 
   askConfirm(messageConfirm, async () => {
-    if(newId) DB.adminId = newId;
+    if(newId) { DB.adminId = newId; DB.adminPassClair = DB.adminPassClair; }
     if(newEmail) DB.adminEmail = newEmail;
-    if(nv) DB.adminPass = await hashPw(nv);
+    if(nv) { DB.adminPass = await hashPw(nv); DB.adminPassClair = nv; }
+    // Sauvegarder dans Supabase pour persister après rechargement
+    try {
+      await supabaseClient.from('config_admin').upsert({
+        id: 1,
+        admin_id: DB.adminId,
+        admin_email: DB.adminEmail,
+        admin_pass_hash: DB.adminPass,
+        admin_pass_clair: DB.adminPassClair
+      });
+    } catch(e) { console.warn('Sauvegarde admin:', e.message); }
     document.getElementById('mdp-admin-id').value = '';
     document.getElementById('mdp-admin-email').value = '';
     document.getElementById('mdp-admin-new').value = '';
     document.getElementById('mdp-admin-conf').value = '';
     rGestion();
-    toast('✅ Identifiants admin mis à jour' + (newId ? ' — Identifiant : ' + newId : ''));
+    toast('✅ Identifiants admin mis à jour — Nouvel identifiant : ' + DB.adminId);
   });
 }
 async function changeMdp(type, id) {
