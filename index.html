@@ -2866,16 +2866,7 @@ async function soumettreInscriptionPassager() {
     err.style.display = 'block';
     return;
   }
-  if(!photoPiece) {
-    err.textContent = '⚠️ La photo de votre pièce d\'identité est obligatoire.';
-    err.style.display = 'block';
-    return;
-  }
-  if(!photoProfil) {
-    err.textContent = '⚠️ Votre photo de profil est obligatoire.';
-    err.style.display = 'block';
-    return;
-  }
+  // Photos optionnelles - pas de blocage si absent
   if(pass.length < 6) {
     err.textContent = '⚠️ Le mot de passe doit contenir au moins 6 caractères.';
     err.style.display = 'block';
@@ -6427,12 +6418,7 @@ function saveTaxi() {
   if(DB.taxis.find(t=>nrm(t.plaque)===nrm(plaque))) {
     err.textContent='⚠️ Cette plaque est déjà enregistrée comme taxi dans le registre.'; err.style.display='block'; return;
   }
-  if(!hasPhoto) {
-    err.textContent='⚠️ La photo du conducteur est obligatoire.'; err.style.display='block';
-    document.getElementById('mt-photo-label').style.borderColor='#EF4444';
-    setTimeout(()=>{ document.getElementById('mt-photo-label').style.borderColor='rgba(239,68,68,.5)'; },1500);
-    return;
-  }
+  // Photo optionnelle — pas de blocage
 
   // ── Liaison moto par matricule/plaque — bloquer si moto volée ──
   const motoLiee = DB.vehs.find(v => nrm(v.mat||'') === nrm(plaque) || nrm(v.vin||'') === nrm(plaque));
@@ -8330,7 +8316,6 @@ async function saveAg() {
   const err=document.getElementById('agerr');
   const photoImg=document.getElementById('ag-photo-preview');
   const hasPhoto = photoImg && photoImg.style.display!=='none' && photoImg.src;
-  if(!hasPhoto){err.textContent='⚠️ La photo de profil est obligatoire.';err.style.display='block';return;}
   if(!pref){err.textContent='⚠️ Sélectionnez une préfecture / commune.';err.style.display='block';return;}
   if(!name||!city||!tel||!pass){err.textContent='⚠️ Nom, ville, téléphone et mot de passe obligatoires.';err.style.display='block';return;}
   if(DB.agents.some(a => a.tel && a.tel.replace(/\D/g,'') === tel.replace(/\D/g,''))) {
