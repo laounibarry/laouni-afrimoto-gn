@@ -9292,10 +9292,14 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 
   DB.adminPass = await hashPw(DB.adminPass);
   // Hasher les mots de passe démo
-  for(const a of DB.agents)    if(a.pass && !a.pass.startsWith('a') || a.pass?.length < 60) a.pass = await hashPw(a.pass);
+  // Ne re-hasher que les mots de passe en clair (< 60 chars) — pas ceux déjà hashés par Supabase
+  for(const a of DB.agents)     if(a.pass && a.pass.length < 60) a.pass = await hashPw(a.pass);
   for(const s of DB.sousAgents) if(s.pass && s.pass.length < 60) s.pass = await hashPw(s.pass);
-  for(const c of DB.clients)   if(c.pass && c.pass.length < 60) c.pass = await hashPw(c.pass);
-  for(const p of DB.passagers) if(p.pass && p.pass.length < 60) p.pass = await hashPw(p.pass);
+  for(const c of DB.clients)    if(c.pass && c.pass.length < 60) c.pass = await hashPw(c.pass);
+  for(const p of DB.passagers)  if(p.pass && p.pass.length < 60) p.pass = await hashPw(p.pass);
+
+  // ── Paramètres URL (QR code, taxi, Orange Money) ──
+  const urlParams = new URLSearchParams(window.location.search);
 
   // ── Mode lien direct QR code taxi ──
   const taxiParam = urlParams.get('taxi');
@@ -9310,7 +9314,6 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   }
 
   // ── Mode lien direct QR code (scan depuis l'extérieur) ──
-  const urlParams = new URLSearchParams(window.location.search);
   const vParam = urlParams.get('v');
   if(vParam) {
     const parts = decodeURIComponent(vParam).split('|');
