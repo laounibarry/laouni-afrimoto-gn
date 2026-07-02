@@ -9268,7 +9268,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   // ── Chargement des données depuis Supabase avant tout ──
   // ── Exposer les variables Supabase pour les fonctions Edge ──
   window.SUPABASE_URL = SUPABASE_URL;
-  window.SUPABASE_ANON_KEY = SUPABASE_ANON_KEY;
+  window.SUPABASE_ANON_KEY = SUPABASE_KEY; // même clé utilisée pour le client
 
   // ── Initialiser le système de sécurité ──
   SEC.loadPersistentLocks();
