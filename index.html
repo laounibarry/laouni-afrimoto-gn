@@ -1089,7 +1089,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   </div>
   <div id="tq-pref-wrap" style="display:none;margin-bottom:11px">
     <div class="qr-note-txt" style="font-size:12px;margin-bottom:8px">Sélectionnez une préfecture ou ville, ou tapez directement un quartier précis ci-dessous.</div>
-    <div id="tq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:10px"></div>
+    <div id="tq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:10px"></div>
     <input id="tq-zone" type="text" placeholder="🔍 Rechercher un quartier (ex: Kaloum, Madina...)" oninput="rTaxis()"/>
   </div>
   <input id="tq" type="text" placeholder="Nom, plaque, gilet..." style="margin-bottom:11px" oninput="rTaxis()"/>
@@ -1118,7 +1118,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn" id="btn-atr" style="display:none;font-size:13px" onclick="openModal('m-trajet')">➕ Publier</button>
   </div>
   <div class="lbl" style="margin-bottom:6px">Filtrer par préfecture / commune de départ</div>
-  <div id="trq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:8px"></div>
+  <div id="trq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:8px"></div>
   <input id="trq-ville" type="text" placeholder="Préciser la ville de départ (ex: Garambé, Afia, Popodara...)" style="margin-bottom:8px" oninput="setFiltreTrajetVille(this.value)"/>
   <input id="trq" type="text" placeholder="Départ ou arrivée..." style="margin-bottom:11px" oninput="rTrajets()"/>
   <div id="trajets-list"></div>
@@ -1144,7 +1144,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn" id="btn-aan" style="display:none;font-size:13px" onclick="openModal('m-annonce')">➕ Publier</button>
   </div>
   <div class="lbl" style="margin-bottom:6px">Filtrer par préfecture / commune</div>
-  <div id="anq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:10px"></div>
+  <div id="anq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:10px"></div>
   <div id="annonces-list"></div>
 </div>
 
@@ -1160,7 +1160,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div id="agq-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:#0A0A0A;border:1px solid rgba(249,115,22,.4);border-radius:10px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
   </div>
   <div class="lbl" style="margin-bottom:6px">Préfecture / Commune</div>
-  <div id="agq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:14px"></div>
+  <div id="agq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:14px"></div>
   <div id="agences-list"></div>
 </div>
 
@@ -1174,7 +1174,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
   </div>
   <div class="lbl" style="margin-bottom:6px">Filtrer par préfecture / commune de départ</div>
-  <div id="alq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:8px"></div>
+  <div id="alq-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:8px"></div>
   <input id="alq-ville" type="text" placeholder="Préciser la ville de départ (ex: Garambé, Afia, Popodara...)" style="margin-bottom:11px" oninput="setFiltreAlerteVille(this.value)"/>
   <div id="alertes-list"></div>
 </div>
@@ -1971,7 +1971,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="tr-tel" placeholder="+224 6xx xxx xxx"/></div>
     <div class="fld">
       <div class="lbl">Préfecture / Commune de départ *</div>
-      <div id="tr-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:6px"></div>
+      <div id="tr-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:6px"></div>
       <input type="hidden" id="tr-pref" value=""/>
       <input type="text" id="tr-dep" placeholder="Précisez le quartier ou la ville"/>
     </div>
@@ -2072,7 +2072,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <input type="hidden" id="cz-taxi-id" value=""/>
     <div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">Sélectionnez votre nouvelle zone de service. Vous pouvez la changer à tout moment, même plusieurs fois par jour.</div>
-    <div id="cz-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:12px"></div>
+    <div id="cz-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:12px"></div>
     <div class="fld"><div class="lbl">Précision (quartier, arrêt...)</div><input type="text" id="cz-precision" placeholder="Ex: Marché Madina"/></div>
     <div id="czerr" class="warn" style="display:none"></div>
     <button class="btn-blue" style="width:100%;padding:13px" onclick="confirmerChangerZone()">✅ Confirmer ma nouvelle zone</button>
@@ -2103,7 +2103,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 
     <div class="fld">
       <div class="lbl">Préfecture / Commune *</div>
-      <div id="an-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:6px"></div>
+      <div id="an-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:6px"></div>
       <input type="hidden" id="an-pref" value=""/>
       <input type="text" id="an-ville" placeholder="Quartier ou ville précise"/>
     </div>
@@ -2155,7 +2155,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <!-- Préfecture de départ — sélecteur défilant -->
     <div class="fld">
       <div class="lbl">Préfecture / Commune de départ *</div>
-      <div id="al-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:6px"></div>
+      <div id="al-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:6px"></div>
       <input type="hidden" id="al-pref" value=""/>
       <input type="text" id="al-dep" placeholder="Précisez le quartier ou la ville (ex: Kaloum, Madina...)"/>
     </div>
@@ -2906,6 +2906,7 @@ function renderPrefSelector(containerId, hiddenId, depInputId, selected) {
     CAPITALES_VOISINES.map(p => `
     <button type="button" class="pref-chip pref-chip-intl${selected===p?' act':''}" data-pref="${p}" onclick="selectPref('${containerId}','${hiddenId}','${depInputId}','${p.replace(/'/g,"\\'")}')">🌍 ${p}</button>
   `).join('');
+  addPrefArrows(el);
 }
 function selectPref(containerId, hiddenId, depInputId, pref) {
   document.getElementById(hiddenId).value = pref;
@@ -2922,6 +2923,27 @@ function renderPrefSelectorGN(containerId, hiddenId, depInputId, selected) {
   el.innerHTML = PREFECTURES_GN.map(p => `
     <button type="button" class="pref-chip${selected===p?' act':''}" data-pref="${p}" onclick="selectPref('${containerId}','${hiddenId}','${depInputId}','${p.replace(/'/g,"\\'")}')">${p}</button>
   `).join('');
+  addPrefArrows(el);
+}
+
+function addPrefArrows(el) {
+  if(!el || el.parentElement.querySelector('.pref-arr')) return;
+  const parent = el.parentElement;
+  parent.style.position = 'relative';
+  const btnL = document.createElement('button');
+  btnL.className = 'pref-arr';
+  btnL.type = 'button';
+  btnL.textContent = '‹';
+  btnL.style.cssText = 'position:absolute;left:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#f97316;color:#fff;border:none;font-size:15px;line-height:1;cursor:pointer;z-index:5;box-shadow:0 2px 6px rgba(249,115,22,.4);display:flex;align-items:center;justify-content:center;padding:0';
+  btnL.onclick = (e) => { e.preventDefault(); el.scrollBy({left:-150,behavior:'smooth'}); };
+  const btnR = document.createElement('button');
+  btnR.type = 'button';
+  btnR.textContent = '›';
+  btnR.style.cssText = 'position:absolute;right:0;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#f97316;color:#fff;border:none;font-size:15px;line-height:1;cursor:pointer;z-index:5;box-shadow:0 2px 6px rgba(249,115,22,.4);display:flex;align-items:center;justify-content:center;padding:0';
+  btnR.onclick = (e) => { e.preventDefault(); el.scrollBy({left:150,behavior:'smooth'}); };
+  el.style.margin = '0 26px';
+  parent.insertBefore(btnL, el);
+  parent.appendChild(btnR);
 }
 
 // ── Filtres préfecture + ville pour recherche (trajets/alertes) ──
@@ -8351,7 +8373,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="fld"><div class="lbl">Responsable (nom, prénom)</div><input type="text" id="ag-resp" placeholder="Ex: Mamadou Diallo"/></div>
       <div class="fld">
         <div class="lbl">Préfecture / Commune *</div>
-        <div id="ag-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:6px"></div>
+        <div id="ag-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px;margin-bottom:6px"></div>
         <input type="hidden" id="ag-pref" value=""/>
       </div>
       <div class="fld"><div class="lbl">Adresse précise (quartier, repère)</div><input type="text" id="ag-addr" placeholder="Ex: Marché Madina, près de la pharmacie"/></div>
