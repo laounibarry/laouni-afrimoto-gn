@@ -1625,6 +1625,39 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 
 <!-- RECHERCHE AUTOMATIQUE DE TAXI (PASSAGER) -->
 <!-- MODAL RECHARGE SOLDE -->
+<!-- MODAL CHANGER MOT DE PASSE -->
+<div id="m-chg-mdp" class="modal">
+  <div class="mbox fu" style="max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:900">🔑 Changer mon mot de passe</div>
+      <button class="btn-ghost" style="padding:5px 11px;font-size:13px" onclick="closeModal('m-chg-mdp')">✕</button>
+    </div>
+    <div class="fld">
+      <div class="lbl">Ancien mot de passe *</div>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="chg-mdp-ancien" placeholder="Votre mot de passe actuel" style="flex:1"/>
+        <button class="btn-ghost" style="padding:0 12px;font-size:16px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button>
+      </div>
+    </div>
+    <div class="fld">
+      <div class="lbl">Nouveau mot de passe *</div>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="chg-mdp-new" placeholder="Min. 6 caractères" style="flex:1"/>
+        <button class="btn-ghost" style="padding:0 12px;font-size:16px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button>
+      </div>
+    </div>
+    <div class="fld">
+      <div class="lbl">Confirmer le nouveau mot de passe *</div>
+      <input type="password" id="chg-mdp-confirm" placeholder="Répétez le nouveau mot de passe"/>
+    </div>
+    <div id="chg-mdp-err" class="warn" style="display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn" style="flex:1;padding:13px" onclick="validerChangerMdp()">✅ Changer le mot de passe</button>
+      <button class="btn-ghost" style="padding:13px 16px" onclick="closeModal('m-chg-mdp')">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <div id="m-recharge" class="modal">
   <div class="mbox fu" style="max-width:480px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -3337,14 +3370,23 @@ function openProfilAgent() {
   if(!ag) return;
 
   const el = document.getElementById('profil-agent-content');
+  const agId = ag.id;
   el.innerHTML = `
     <div style="text-align:center;margin-bottom:16px">
       ${ag.photo
         ? `<img src="${ag.photo}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #f97316;margin-bottom:10px"/>`
         : `<div style="width:90px;height:90px;border-radius:50%;background:rgba(249,115,22,.12);display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 10px">📍</div>`}
       <div style="font-family:'Poppins',sans-serif;font-size:17px;font-weight:800">${esc(ag.name)}</div>
-      <div style="font-family:monospace;font-size:14px;color:#f97316;font-weight:700;margin-top:3px">${esc(ag.code||ag.num||'')}</div>
-      ${ag.pref ? `<div style="font-size:12px;margin-top:4px;opacity:.7">📍 ${esc(ag.pref)}</div>` : ''}
+      <div style="font-size:11px;margin-top:4px;opacity:.7">📍 ${esc(ag.pref||'')}</div>
+    </div>
+
+    <!-- Numéro unique masquable -->
+    <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:9px;opacity:.6;letter-spacing:1px">MON NUMÉRO UNIQUE</div>
+        <div id="ag-num-display" style="font-family:monospace;font-size:16px;font-weight:900;color:#EAB308;margin-top:2px">${esc(ag.code||ag.num||'')}</div>
+      </div>
+      <button onclick="toggleNumVisible('ag-num-display','${esc(ag.code||ag.num||'')}')" style="background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">👁️ Masquer</button>
     </div>
 
     <div class="sect" style="margin-top:0">Informations générales</div>
@@ -3353,7 +3395,6 @@ function openProfilAgent() {
     ${ag.addr ? `<div class="row"><span style="font-size:12px;opacity:.7">Adresse</span><span style="font-size:13px;font-weight:600">${esc(ag.addr)}</span></div>` : ''}
     ${ag.tel ? `<div class="row"><span style="font-size:12px;opacity:.7">Téléphone</span><a href="tel:${esc(ag.tel)}" style="font-size:13px;font-weight:700;color:#f97316;text-decoration:none">📞 ${esc(ag.tel)}</a></div>` : ''}
     ${ag.email ? `<div class="row"><span style="font-size:12px;opacity:.7">Email</span><span style="font-size:13px;font-weight:600">${esc(ag.email)}</span></div>` : ''}
-    ${ag.lieuNaissance ? `<div class="row"><span style="font-size:12px;opacity:.7">Lieu de naissance</span><span style="font-size:13px;font-weight:600">${esc(ag.lieuNaissance)}</span></div>` : ''}
 
     <div class="sect">Solde</div>
     <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:14px;text-align:center">
@@ -3367,11 +3408,12 @@ function openProfilAgent() {
     ${ag.pieceNum ? `<div class="row"><span style="font-size:12px;opacity:.7">Numéro</span><span style="font-size:13px;font-weight:600;font-family:monospace">${esc(ag.pieceNum)}</span></div>` : ''}
     ${ag.pieceDelivrance ? `<div class="row"><span style="font-size:12px;opacity:.7">Délivrance</span><span style="font-size:13px;font-weight:600">${fd(ag.pieceDelivrance)}</span></div>` : ''}
     ${ag.pieceExpiration ? `<div class="row"><span style="font-size:12px;opacity:.7">Expiration</span><span style="font-size:13px;font-weight:600">${fd(ag.pieceExpiration)}</span></div>` : ''}
-    ${ag.piecePhoto ? `<div style="margin-top:10px;text-align:center"><img src="${ag.piecePhoto}" style="max-width:100%;border-radius:10px;border:1px solid rgba(249,115,22,.3)" onclick="document.getElementById('photo-grande-img').src=this.src;openModal('m-photo-grande')"/></div>` : ''}
+    ${ag.piecePhoto ? `<div style="margin-top:10px;text-align:center"><img src="${ag.piecePhoto}" style="max-width:100%;border-radius:10px;border:1px solid rgba(249,115,22,.3)"/></div>` : ''}
     ` : ''}
 
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn" style="flex:1;padding:12px" onclick="closeModal('m-profil-agent');openModal('m-logout')">🔐 Déconnecter</button>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-direction:column">
+      ${!isAdmin() ? `<button class="btn" style="padding:12px;font-size:13px" onclick="closeModal('m-profil-agent');openChangerMdp('agent','${agId}')">🔑 Changer mon mot de passe</button>` : ''}
+      <button class="btn-ghost" style="padding:12px" onclick="closeModal('m-profil-agent');openModal('m-logout')">🔐 Déconnecter</button>
     </div>
   `;
   openModal('m-profil-agent');
@@ -3485,6 +3527,43 @@ function setClientTab(t) {
 // ── Espace passager : voir les taxis en service par zone et envoyer une demande de course ──
 let filtrePassagerZone = '';
 function setFiltrePassagerZone(z) { filtrePassagerZone = z || ''; rPassagerListe(); }
+// ════════════════════════════════════════════════
+// CARTE PROFIL — réutilisable pour tous les espaces
+// ════════════════════════════════════════════════
+function renderProfilCard(opts) {
+  // opts: { photo, emoji, nom, num, role, tel, email, ville, solde, extra }
+  const photo = opts.photo
+    ? `<img src="${opts.photo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #f97316;margin-bottom:8px"/>`
+    : `<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#f97316,#ea6c00);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 8px">${opts.emoji||'👤'}</div>`;
+
+  return `
+  <div style="background:linear-gradient(135deg,#1A0800,#2D0E00);border-radius:16px;padding:18px;margin-bottom:14px;text-align:center">
+    ${photo}
+    <div style="font-family:'Poppins',sans-serif;font-size:17px;font-weight:900;color:#fff">${esc(opts.nom||'—')}</div>
+    ${opts.role ? `<div style="display:inline-block;background:rgba(249,115,22,.2);border:1px solid rgba(249,115,22,.4);color:#f97316;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;margin-top:4px">${opts.role}</div>` : ''}
+    <div style="font-family:monospace;font-size:13px;color:#EAB308;font-weight:700;margin-top:6px">${esc(opts.num||'')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;text-align:left">
+      ${opts.tel ? `<div style="background:rgba(255,255,255,.06);border-radius:8px;padding:8px">
+        <div style="font-size:9px;color:rgba(245,222,200,.6);letter-spacing:1px">TÉLÉPHONE</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-top:2px">${esc(opts.tel)}</div>
+      </div>` : ''}
+      ${opts.email ? `<div style="background:rgba(255,255,255,.06);border-radius:8px;padding:8px">
+        <div style="font-size:9px;color:rgba(245,222,200,.6);letter-spacing:1px">EMAIL</div>
+        <div style="font-size:11px;font-weight:600;color:#fff;margin-top:2px;word-break:break-all">${esc(opts.email)}</div>
+      </div>` : ''}
+      ${opts.ville ? `<div style="background:rgba(255,255,255,.06);border-radius:8px;padding:8px">
+        <div style="font-size:9px;color:rgba(245,222,200,.6);letter-spacing:1px">VILLE</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-top:2px">${esc(opts.ville)}</div>
+      </div>` : ''}
+      ${opts.solde !== undefined ? `<div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:8px">
+        <div style="font-size:9px;color:rgba(245,222,200,.6);letter-spacing:1px">SOLDE</div>
+        <div style="font-size:13px;font-weight:900;color:#f97316;margin-top:2px;font-family:'Poppins',sans-serif">${fmt(opts.solde)}</div>
+      </div>` : ''}
+    </div>
+    ${opts.extra || ''}
+  </div>`;
+}
+
 function rPassager() {
   if(!DB.user || DB.user.role !== 'passager') return;
   const ps = DB.passagers.find(x=>x.id===DB.user.id);
@@ -3492,12 +3571,13 @@ function rPassager() {
   if(!ps) { el.innerHTML='<div class="empty">Compte introuvable</div>'; return; }
 
   el.innerHTML =
-    '<div style="text-align:center;padding:14px 0 10px">' +
-      '<div style="font-size:32px;margin-bottom:5px">🧍</div>' +
-      '<div style="font-size:18px;font-weight:900;color:var(--text2)">' + esc(ps.prenom) + ' ' + esc(ps.nom) + '</div>' +
-      '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(ps.tel) + '</div>' +
-      '<div style="font-family:monospace;font-size:16px;color:#EAB308;font-weight:700;margin-top:5px">' + ps.num + '</div>' +
-    '</div>' +
+    renderProfilCard({
+      photo: ps.photo||'', emoji:'🧍',
+      nom: (ps.prenom||'') + ' ' + (ps.nom||''),
+      num: ps.num, role: 'Passager',
+      tel: ps.tel, email: ps.email||'',
+      solde: ps.solde||0
+    }) +
     '<div style="background:linear-gradient(135deg,#f97316,#ea6c00);border-radius:14px;padding:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">' +
       '<div>' +
         '<div style="font-size:11px;color:rgba(255,255,255,.8);margin-bottom:2px">Mon solde</div>' +
@@ -3510,9 +3590,22 @@ function rPassager() {
     '<button class="btn" style="width:100%;padding:13px;margin-bottom:14px;font-size:14px" onclick="demarrerRechercheAutomatique()">⚡ Recherche automatique (le plus proche)</button>' +
     '<div class="sect" style="margin-top:0">Ou choisir un taxi vous-même</div>' +
     '<div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">Les taxis en service sont triés du plus proche au plus loin. Choisissez celui que vous voulez et envoyez votre demande — vous pourrez ensuite l\'appeler directement pour confirmer.</div>' +
-    '<div id="psg-pref-list" style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:10px"></div>' +
+    '<div id="psg-pref-list" style="display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px"></div>' +
     '<div id="psg-taxis-list"></div>' +
-    '<div style="margin-top:24px;padding-top:14px;border-top:1px solid rgba(239,68,68,.15);text-align:center">' +
+
+    // Numéro unique masquable + MDP
+    '<div class="card" style="margin-top:14px;margin-bottom:8px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-size:10px;color:var(--text3);letter-spacing:1px">MON NUMÉRO UNIQUE</div>' +
+          '<div id="ps-num-display" style="font-family:monospace;font-size:16px;font-weight:900;color:#EAB308;margin-top:2px">' + ps.num + '</div>' +
+        '</div>' +
+        '<button onclick="toggleNumVisible(\'ps-num-display\',\'' + ps.num + '\')" style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">👁️ Masquer</button>' +
+      '</div>' +
+      '<button onclick="openChangerMdp(\'passager\',\'' + ps.id + '\')" style="width:100%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔑 Changer mon mot de passe</button>' +
+    '</div>' +
+
+    '<div style="margin-top:12px;padding-top:14px;border-top:1px solid rgba(239,68,68,.15);text-align:center">' +
       '<button style="background:transparent;border:none;color:#EF4444;font-size:11px;text-decoration:underline;cursor:pointer" onclick="demanderSuppressionComptePassager()">🗑️ Supprimer mon compte</button>' +
     '</div>';
   renderPrefFilterAvecVoisins('psg-pref-list', filtrePassagerZone, 'setFiltrePassagerZone');
@@ -3815,7 +3908,6 @@ function rClient() {
       '<div style="font-size:32px;margin-bottom:5px">👤</div>' +
       '<div style="font-size:18px;font-weight:900;color:var(--text2)">' + cl.prenom + ' ' + cl.nom + '</div>' +
       '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + cl.tel + '</div>' +
-      '<div style="font-family:monospace;font-size:16px;color:#EAB308;font-weight:700;margin-top:5px">' + cl.num + '</div>' +
     '</div>' +
 
     // Solde + bouton recharge
@@ -3827,16 +3919,16 @@ function rClient() {
       '<button onclick="openRecharge()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer">💳 Recharger</button>' +
     '</div>' +
 
-    // Num unique + changer MDP
+    // Num unique masquable + changer MDP
     '<div class="card" style="margin-bottom:12px">' +
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔒 Numéro unique permanent (identifiant de connexion)</div>' +
-      '<div style="font-family:monospace;font-size:20px;font-weight:900;color:#EAB308;letter-spacing:2px;margin-bottom:10px">' + cl.num + '</div>' +
-      '<div class="lbl" style="margin-bottom:6px">Changer mon mot de passe</div>' +
-      '<div style="display:flex;gap:8px">' +
-        '<input type="password" id="cl-new-pw" placeholder="Nouveau mot de passe" style="flex:1"/>' +
-        '<button class="btn-ghost" style="flex-shrink:0;padding:0 12px;font-size:18px" onclick="this.previousElementSibling.type=this.previousElementSibling.type===\'password\'?\'text\':\'password\'">👁️</button>' +
-        '<button class="btn" style="flex-shrink:0;padding:10px 13px" onclick="clientChangeMdp()">💾</button>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-size:10px;color:var(--text3);letter-spacing:1px">MON NUMÉRO UNIQUE</div>' +
+          '<div id="cl-num-display" style="font-family:monospace;font-size:18px;font-weight:900;color:#EAB308;margin-top:2px">' + cl.num + '</div>' +
+        '</div>' +
+        '<button onclick="toggleNumVisible(\'cl-num-display\',\'' + cl.num + '\')" style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer">👁️ Masquer</button>' +
       '</div>' +
+      '<button onclick="openChangerMdp(\'client\',\'' + cl.id + '\')" style="width:100%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔑 Changer mon mot de passe</button>' +
     '</div>' +
 
     // Tabs
@@ -4141,20 +4233,22 @@ function rSousAgent() {
   const hasSolde = solde > 0;
 
   el.innerHTML =
-    // En-tête
-    '<div style="text-align:center;padding:16px 0 12px">' +
-      '<div style="font-size:36px;margin-bottom:6px">👥</div>' +
-      '<div style="font-size:20px;font-weight:900;color:var(--text2)">' + sa.name + '</div>' +
-      '<div style="font-size:12px;color:var(--text2);margin-top:3px">Code : <span style="font-family:monospace;color:#EAB308">' + sa.code + '</span></div>' +
-    '</div>' +
-
-    // Solde
-    '<div class="card" style="text-align:center;margin-bottom:16px;border-color:' + (hasSolde?'rgba(249,115,22,.3)':'rgba(239,68,68,.3)') + '">' +
-      '<div class="lbl">Votre solde disponible</div>' +
-      '<div style="font-size:36px;font-weight:900;color:' + (hasSolde?'#f97316':'#EF4444') + ';margin:8px 0">' + fmt(solde) + '</div>' +
-      (!hasSolde?'<div style="font-size:11px;color:#EF4444">⚠️ Solde insuffisant — contactez votre agent</div>':
-        '<div style="font-size:11px;color:var(--text2)">Disponible pour recharger vos clients</div>') +
-    '</div>' +
+    renderProfilCard({
+      photo: sa.photo||'', emoji:'👥',
+      nom: sa.name,
+      num: sa.code, role: 'Sous-agent',
+      tel: sa.tel||'', email: sa.email||'',
+      ville: sa.city||'', solde: sa.solde||0,
+      extra: `
+        <div style="margin-top:10px;background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:10px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:9px;color:rgba(245,222,200,.6);letter-spacing:1px">MON NUMÉRO UNIQUE</div>
+            <div id="sa-num-display" style="font-family:monospace;font-size:15px;font-weight:900;color:#EAB308;margin-top:2px">${esc(sa.code)}</div>
+          </div>
+          <button onclick="toggleNumVisible('sa-num-display','${esc(sa.code)}')" style="background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">👁️ Masquer</button>
+        </div>
+        <button onclick="openChangerMdp('sousagent','${sa.id}')" style="width:100%;margin-top:8px;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:#f97316;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔑 Changer mon mot de passe</button>`
+    }) +
 
     // Barre de recherche client
     '<div class="sect" style="margin-top:0">🔍 Rechercher un client à recharger</div>' +
@@ -5181,9 +5275,62 @@ function toggleStolen(id) {
   rVehs(); rHome();
 }
 
-// ════════════════════════════════════════════════
-// RECHARGE SOLDE
-// ════════════════════════════════════════════════
+// ── Afficher/Masquer le numéro unique ──
+function toggleNumVisible(elId, valeur) {
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const btn = el.nextElementSibling || el.parentElement.querySelector('button');
+  if(el.textContent === '••••••••') {
+    el.textContent = valeur;
+    if(btn) btn.textContent = '👁️ Masquer';
+  } else {
+    el.textContent = '••••••••';
+    if(btn) btn.textContent = '👁️ Afficher';
+  }
+}
+
+// ── Modal changer mot de passe ──
+let changerMdpContext = null;
+function openChangerMdp(type, id) {
+  changerMdpContext = { type, id };
+  document.getElementById('chg-mdp-err').style.display = 'none';
+  document.getElementById('chg-mdp-ancien').value = '';
+  document.getElementById('chg-mdp-new').value = '';
+  document.getElementById('chg-mdp-confirm').value = '';
+  openModal('m-chg-mdp');
+}
+
+async function validerChangerMdp() {
+  const ancien = document.getElementById('chg-mdp-ancien').value.trim();
+  const nv = document.getElementById('chg-mdp-new').value.trim();
+  const conf = document.getElementById('chg-mdp-confirm').value.trim();
+  const err = document.getElementById('chg-mdp-err');
+  if(!ancien||!nv||!conf){err.textContent='⚠️ Remplissez tous les champs.';err.style.display='block';return;}
+  if(nv.length<6){err.textContent='⚠️ Le nouveau mot de passe doit avoir au moins 6 caractères.';err.style.display='block';return;}
+  if(nv!==conf){err.textContent='⚠️ Les mots de passe ne correspondent pas.';err.style.display='block';return;}
+  if(!changerMdpContext) return;
+  const {type, id} = changerMdpContext;
+  let obj = null;
+  if(type==='agent')     obj = DB.agents.find(a=>a.id===id);
+  if(type==='sousagent') obj = DB.sousAgents.find(s=>s.id===id);
+  if(type==='client')    obj = DB.clients.find(c=>c.id===id);
+  if(type==='passager')  obj = DB.passagers.find(p=>p.id===id);
+  if(!obj){err.textContent='⚠️ Compte introuvable.';err.style.display='block';return;}
+  // Vérifier ancien MDP
+  const ancienOk = obj.pass === DB.adminPassClair // cas admin
+    || await verifyPw(ancien, obj.pass);
+  if(!ancienOk){err.textContent='❌ Ancien mot de passe incorrect.';err.style.display='block';return;}
+  // Sauvegarder nouveau
+  obj.pass = await hashPw(nv);
+  if(type==='agent')     sbSaveAgent(obj);
+  if(type==='sousagent') sbSaveSousAgent(obj);
+  if(type==='client')    sbSaveClient(obj);
+  if(type==='passager')  sbSavePassager(obj);
+  closeModal('m-chg-mdp');
+  toast('✅ Mot de passe changé avec succès !');
+}
+
+
 let rechCible = null;
 
 function openRecharge() {
