@@ -436,6 +436,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
 @keyframes defileBandeau{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+/* Scrollbar préfectures visible sur PC */
+[id$="-pref-list"]::-webkit-scrollbar{height:4px}
+[id$="-pref-list"]::-webkit-scrollbar-track{background:var(--gray-100);border-radius:2px}
+[id$="-pref-list"]::-webkit-scrollbar-thumb{background:var(--orange);border-radius:2px}
+[id$="-pref-list"]{scrollbar-width:thin;scrollbar-color:var(--orange) var(--gray-100);padding-bottom:6px !important}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
 /* ══════════════ RESPONSIVE — TABLETTE (≥768px) ══════════════ */
@@ -1907,7 +1912,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <img id="mt-photo-preview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px"/>
         <div id="mt-photo-ph" style="text-align:center">
           <div style="font-size:32px">📷</div>
-          <div style="font-size:11px;color:#EF4444;font-weight:700;margin-top:5px">PHOTO OBLIGATOIRE</div>
+          <div style="font-size:11px;color:#9CA3AF;font-weight:600;margin-top:5px">PHOTO (optionnel)</div>
           <div style="font-size:10px;color:var(--text2);margin-top:2px">JPG · PNG · conducteur avec gilet</div>
         </div>
         <input type="file" accept="image/*" id="mt-photo-input" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewTaxiPhoto(this)"/>
@@ -8242,7 +8247,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="sect" style="margin-top:0">Photo de profil *</div>
       <label id="ag-photo-label" style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(239,68,68,.5);border-radius:50%;width:100px;height:100px;cursor:pointer;overflow:hidden;margin:0 auto 16px;background:rgba(239,68,68,.04);position:relative">
         <img id="ag-photo-preview" src="" style="display:none;width:100%;height:100%;object-fit:cover"/>
-        <div id="ag-photo-ph" style="text-align:center;font-size:11px;color:#EF4444;font-weight:700;padding:8px">📷<br>OBLIGATOIRE</div>
+        <div id="ag-photo-ph" style="text-align:center;font-size:11px;color:#9CA3AF;font-weight:600;padding:8px">📷<br>Optionnel</div>
         <input type="file" accept="image/*" id="ag-photo-input" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewAgPhoto(this)"/>
       </label>
       <div class="fld"><div class="lbl">Nom de l'agence *</div><input type="text" id="ag-name" placeholder="Agence Conakry"/></div>
