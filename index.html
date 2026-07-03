@@ -3723,7 +3723,7 @@ function rPassager() {
     '</div>' +
 
     '<div style="margin-top:12px;padding-top:14px;border-top:1px solid rgba(239,68,68,.15);text-align:center">' +
-      '<button style="background:transparent;border:none;color:#EF4444;font-size:11px;text-decoration:underline;cursor:pointer" onclick="demanderSuppressionComptePassager()">🗑️ Supprimer mon compte</button>' +
+      '<div style="font-size:11px;color:#9CA3AF;text-align:center">🔒 Pour supprimer votre compte, rendez-vous chez un agent agréé muni de votre pièce d\'identité.</div>' +
     '</div>';
   renderPrefFilterAvecVoisins('psg-pref-list', filtrePassagerZone, 'setFiltrePassagerZone');
   obtenirPositionPassager();
@@ -4056,7 +4056,7 @@ function rClient() {
     '</div>' +
     '<div id="client-tab-content"></div>' +
     '<div style="margin-top:24px;padding-top:14px;border-top:1px solid rgba(239,68,68,.15);text-align:center">' +
-      '<button style="background:transparent;border:none;color:#EF4444;font-size:11px;text-decoration:underline;cursor:pointer" onclick="demanderSuppressionCompteClient()">🗑️ Supprimer mon compte</button>' +
+      '<div style="font-size:11px;color:#9CA3AF;text-align:center">🔒 Pour supprimer votre compte, rendez-vous chez un agent agréé muni de votre pièce d\'identité.</div>' +
     '</div>';
 
   if(!cl.permis && clientTab === 'trajet') clientTab = 'vente';
@@ -5467,10 +5467,11 @@ function openRecharge() {
     if(!ps) return;
     rechCible = { type:'passager', id:ps.id, nom:ps.prenom+' '+ps.nom, solde:ps.solde||0 };
   } else return;
-  document.getElementById('rech-solde-val').textContent = fmt(rechCible.solde) + ' GNF';
-  document.getElementById('rech-om-montant').value = '';
-  document.getElementById('rech-om-ref').value = '';
-  document.getElementById('rech-err').style.display = 'none';
+  const _set = (id, fn) => { const el = document.getElementById(id); if(el) fn(el); };
+  _set('rech-solde-val', el => el.textContent = fmt(rechCible.solde) + ' GNF');
+  _set('rech-om-montant', el => el.value = '');
+  _set('rech-om-ref', el => el.value = '');   // élément absent dans certaines versions → ne plante plus
+  _set('rech-err', el => el.style.display = 'none');
   setRechMode('om');
   const liste = document.getElementById('rech-agents-liste');
   const points = [
