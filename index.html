@@ -680,6 +680,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       fraisEnreg:r.frais_enregistrement||r.fraisEnreg||0,
       valide:r.valide!==false,
       vis:r.vis||{owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false},
+      cg:r.carte_grise||r.cg||'',
+      dachat:r.date_achat||r.dachat||'',
+      volDate:r.vol_date||r.volDate||'',
+      volCrime:(r.vol_crime!==undefined&&r.vol_crime!==null)?r.vol_crime:r.volCrime,
+      volTypeCrime:r.vol_type_crime||r.volTypeCrime||'',
+      volVille:r.vol_ville||r.volVille||'',
       reg:r.reg||r.date_enregistrement||'',
       hist:r.hist||r.historique_proprietaires||r.historique||[],
       stolen:r.vole||r.stolen||false,
@@ -702,7 +708,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   }
   function mapAnnonce(r) {
     return { id:r.id, titre:r.titre||'', texte:r.texte||'', type:r.type||'info',
-      actif:r.actif!==false, date:r.created_at||r.date||'', created_at:r.created_at };
+      actif:r.actif!==false, prix:r.prix||0, contact:r.contact||'',
+      pref:r.prefecture||r.pref||'', ville:r.ville||'', photo:r.photo_url||r.photo||null,
+      desc:r.description||r.desc||'', clientId:r.client_id||r.clientId||null,
+      vehId:r.veh_id||r.vehId||null, statut:r.statut||'active',
+      date:r.date||r.created_at||'', created_at:r.created_at };
   }
   function mapAlerte(r) {
     return { id:r.id, mat:r.matricule||r.mat||'', desc:r.description||r.desc||'',
@@ -881,6 +891,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       frais_enregistrement:v.fraisEnreg||0,
       type:v.type||'moto',                 // n'était pas sauvegardé → voitures/taxis rechargés en 'moto'
       valide:v.valide!==false,             // n'était pas sauvegardé → état de validation perdu
+      carte_grise:v.cg||null,
+      date_achat:v.dachat||null,
+      vol_date:v.volDate||null,
+      vol_crime:(v.volCrime===undefined?null:v.volCrime),
+      vol_type_crime:v.volTypeCrime||null,
+      vol_ville:v.volVille||null,
       photo_url:v.photo||null,
       date_enregistrement:v.reg||null,
       historique_proprietaires:v.hist||[] };
@@ -888,6 +904,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       telephone:'phone', adresse:'addr', contact_secours:'secours',
       couleur:'color', categorie_id:'cat_id', vole:'stolen', annee:'year',
       frais_enregistrement:'frais', photo_url:'photo',
+      carte_grise:'cg', date_achat:'dachat',
       date_enregistrement:'reg', historique_proprietaires:'hist' };
     await sbUpsertSouple('vehicules', row, alts);
   }
@@ -914,9 +931,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   const sbSaveTrajet = sbIgnoreErr(_sbSaveTrajet, 'sbSaveTrajet');
 
   async function _sbSaveAnnonce(a) {
-    const row = { id:a.id, titre:a.titre||'', texte:a.texte||'', type:a.type||'info', actif:a.actif!==false };
-    const {error} = await supabaseClient.from('annonces').upsert(row, {onConflict:'id'});
-    if(error) console.warn('sbSaveAnnonce:', error.message||error.details);
+    const row = { id:a.id, titre:a.titre||'', texte:a.texte||'', type:a.type||'info', actif:a.actif!==false,
+      prix:a.prix||0, contact:a.contact||null, prefecture:a.pref||null, ville:a.ville||null,
+      photo_url:a.photo||null, description:a.desc||null, client_id:a.clientId||null,
+      veh_id:a.vehId||null, statut:a.statut||'active', date:a.date||null };
+    const alts = { prefecture:'pref', photo_url:'photo', description:'desc' };
+    await sbUpsertSouple('annonces', row, alts);
   }
   const sbSaveAnnonce = sbIgnoreErr(_sbSaveAnnonce, 'sbSaveAnnonce');
 
@@ -1841,12 +1861,14 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         </div>
 
         <div class="fld" style="margin-bottom:10px">
-          <div class="lbl">Ou saisir un montant (GNF)</div>
-          <input type="number" id="rech-om-montant" placeholder="Min. 10 000 GNF" min="10000" step="1000"/>
+          <div class="lbl" style="color:#92400E;font-weight:700">Ou saisir un montant (GNF)</div>
+          <input type="number" id="rech-om-montant" placeholder="Min. 10 000 GNF" min="10000" step="1000"
+            style="background:#fff;color:#111;border:1.5px solid #FDBA74;font-weight:800;font-size:16px;caret-color:#FF6600"/>
         </div>
         <div class="fld">
-          <div class="lbl">Votre numéro Orange Money *</div>
-          <input type="tel" id="rech-om-tel" placeholder="+224 6XX XXX XXX"/>
+          <div class="lbl" style="color:#92400E;font-weight:700">Votre numéro Orange Money *</div>
+          <input type="tel" id="rech-om-tel" placeholder="+224 6XX XXX XXX"
+            style="background:#fff;color:#111;border:1.5px solid #FDBA74;font-weight:800;font-size:16px;caret-color:#FF6600"/>
         </div>
 
         <div id="rech-om-montant-display" style="text-align:center;font-size:22px;font-weight:900;color:#FF6600;font-family:'Poppins',sans-serif;margin:10px 0;display:none"></div>
@@ -2230,6 +2252,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:15px;font-weight:900">🏷️ Publier une annonce</div>
       <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="closeModal('m-annonce')">✕</button>
+    </div>
+    <div class="fld" id="an-veh-bloc" style="display:none">
+      <div class="lbl">Véhicule concerné par la vente *</div>
+      <div id="an-veh-liste" style="display:flex;flex-direction:column;gap:6px"></div>
+      <input type="hidden" id="an-veh" value=""/>
     </div>
     <div class="fld"><div class="lbl">Titre *</div><input type="text" id="an-titre" placeholder="Yamaha YBR125 à vendre..."/></div>
 
@@ -2729,10 +2756,35 @@ function askConfirm(message, onYes) {
 }
 
 // ── Récupération de compte par email (identifiant ou mot de passe oublié) ──
-// NOTE IMPORTANTE : aucun email ne peut être réellement envoyé tant que le site fonctionne
-// en simple fichier HTML sans serveur. Une fois Supabase branché, cette fonction sera complétée
-// pour déclencher un vrai envoi (numéro unique rappelé, ou lien de réinitialisation du mot de passe).
-function rechercherCompteParEmail() {
+// L'envoi passe par EmailJS (https://www.emailjs.com — gratuit jusqu'à 200 emails/mois).
+// ⚙️ CONFIGURATION : remplir les 3 valeurs ci-dessous après création du compte EmailJS.
+const EMAILJS_CONFIG = {
+  serviceId:  '',   // ex: 'service_abc123'
+  templateId: '',   // ex: 'template_xyz789'
+  publicKey:  ''    // ex: 'AbCdEfGhIjKlMnOp'
+};
+async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, instruction) {
+  if(!EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateId || !EMAILJS_CONFIG.publicKey) return false;
+  try {
+    const rep = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_CONFIG.serviceId,
+        template_id: EMAILJS_CONFIG.templateId,
+        user_id: EMAILJS_CONFIG.publicKey,
+        template_params: {
+          to_email: destinataire,
+          identifiant: identifiant,
+          type_compte: typeCompte,
+          instruction: instruction
+        }
+      })
+    });
+    return rep.ok;
+  } catch(e) { console.error('EmailJS:', e); return false; }
+}
+async function rechercherCompteParEmail() {
   const email = document.getElementById('recup-email').value.trim();
   const err = document.getElementById('recup-err');
   const resultat = document.getElementById('recup-resultat');
@@ -2772,18 +2824,30 @@ function rechercherCompteParEmail() {
 
   // L'instruction de récupération diffère selon qui peut réellement réinitialiser le mot de passe de ce compte
   const instruction = typeCompte === 'admin'
-    ? 'Comme vous êtes l\'administrateur, personne d\'autre ne peut réinitialiser ce mot de passe à votre place. Si vous avez encore accès à une session admin ouverte ailleurs (autre appareil, autre onglet), changez-le depuis Gestion → Mots de passe. Sinon, ce mot de passe ne peut être récupéré que directement dans le code de l\'application — contactez votre développeur.'
+    ? 'Si vous avez encore une session admin ouverte ailleurs, changez le mot de passe depuis Gestion → Mots de passe. Sinon, contactez votre développeur.'
     : (typeCompte === 'agent' || typeCompte === 'sousagent')
     ? 'Contactez l\'administration avec cet identifiant pour réinitialiser votre mot de passe.'
     : 'Contactez un agent ou l\'administration avec cet identifiant pour réinitialiser votre mot de passe.';
 
+  // SÉCURITÉ : l'identifiant n'est JAMAIS affiché à l'écran (sinon n'importe qui connaissant
+  // l'email d'un client pourrait obtenir son numéro unique). Il est envoyé UNIQUEMENT par email.
   resultat.innerHTML =
-    '<div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:12px;font-size:12px">' +
-    '⏳ <b>Compte trouvé.</b> L\'envoi automatique par email n\'est pas encore actif sur cette version du site. ' +
-    'Votre identifiant est <b style="font-family:monospace;color:#EAB308">' + identifiant + '</b> — notez-le précieusement. ' +
-    instruction +
-    '</div>';
+    '<div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:12px;font-size:12px">⏳ Vérification en cours...</div>';
   resultat.style.display = 'block';
+
+  const envoye = await envoyerEmailRecuperation(email, identifiant, typeCompte, instruction);
+
+  if(envoye) {
+    resultat.innerHTML =
+      '<div class="qr-note-txt" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;font-size:12px">' +
+      '📧 <b>Email envoyé !</b> Si cette adresse correspond à un compte, vous y trouverez votre numéro unique et la marche à suivre. Pensez à vérifier vos courriers indésirables.' +
+      '</div>';
+  } else {
+    resultat.innerHTML =
+      '<div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:12px;font-size:12px">' +
+      '⚠️ L\'envoi d\'email est momentanément indisponible. Rendez-vous chez un agent agréé muni de votre pièce d\'identité pour récupérer votre numéro unique ou réinitialiser votre mot de passe.' +
+      '</div>';
+  }
 }
 
 // ── Accès dédiés et discrets pour Admin et Agent/Sous-agent (séparés du modal de connexion public) ──
@@ -2818,6 +2882,10 @@ function openModal(id) {
     setRole('owner');
   }
   // Initialiser sélecteur préfecture
+  if(id === 'm-annonce' && !(DB.user && DB.user.role === 'client')) {
+    const b = document.getElementById('an-veh-bloc'); if(b) b.style.display = 'none';
+    const h = document.getElementById('an-veh'); if(h) h.value = '';
+  }
   if(id === 'm-alerte') renderPrefSelector('al-pref-list','al-pref','al-dep','');
   if(id === 'm-trajet') renderPrefSelector('tr-pref-list','tr-pref','tr-dep','');
   if(id === 'm-ag') renderPrefSelector('ag-pref-list','ag-pref','ag-city','');
@@ -2958,9 +3026,41 @@ function supprimerDefinitivement(corbeilleId) {
     rGestion();
   });
 }
+// ── Numéro unique PERSONNES : Lettre(s) du rôle + 7 chiffres + initiales Nom+Prénom ──
+// A=Agent, C=Client, P=Passager, S-A=Sous-agent. Ex: C1234567DM (Diallo Mamadou)
+function initialesDe(a, b) {
+  const lettre = s => {
+    const c = (s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z]/g,'');
+    return c.charAt(0) || 'X';
+  };
+  if(b === undefined) { // un seul champ type "Prénom Nom" → initiales des deux premiers mots
+    const mots = (a||'').trim().split(/\s+/);
+    return lettre(mots[0]) + lettre(mots[1] || mots[0]);
+  }
+  return lettre(a) + lettre(b);
+}
+function tousLesNumsExistants() {
+  return new Set([
+    ...DB.vehs, ...DB.taxis, ...DB.clients, ...DB.passagers, ...DB.agents, ...DB.sousAgents
+  ].map(x => x && x.num).filter(Boolean));
+}
+function genNumPersonne(type, liste, nom, prenom) {
+  const prefix = {agent:'A', client:'C', passager:'P', sa:'S-A'}[type] || 'X';
+  const ini = initialesDe(nom, prenom);
+  const allNums = tousLesNumsExistants();
+  liste.forEach(x => { if(x && x.num) allNums.add(x.num); });
+  let num;
+  do {
+    const rand = crypto.getRandomValues(new Uint32Array(1))[0] % 9000000 + 1000000; // 7 chiffres
+    num = prefix + rand + ini;
+  } while(allNums.has(num));
+  return num;
+}
+
 function genNum(type, liste) {
   const prefix = PREFIXES[type] || 'XXX';
-  const allNums = new Set(liste.map(x => x.num).filter(Boolean));
+  const allNums = tousLesNumsExistants();
+  liste.forEach(x => { if(x && x.num) allNums.add(x.num); });
   let num;
   do {
     // 5 chiffres aléatoires crypto-sécurisés
@@ -3026,7 +3126,7 @@ async function soumettreInscriptionPassager() {
     err.style.display = 'block';
     return;
   }
-  const num = genNum('passager', DB.passagers);
+  const num = genNumPersonne('passager', DB.passagers, nom, prenom);
   const hashedPass = await hashPw(pass);
   const newPs = {
     id: gid(), num, prenom, nom, tel, email, piece, photoPiece, photoProfil, user: userLogin, pass: hashedPass,
@@ -4257,9 +4357,36 @@ function openClientVente(type) {
   if(!cl) return;
   const frais = 10000;
   if(cl.solde < frais) { toast('Solde insuffisant (min '+fmt(frais)+')', true); return; }
-  // Pré-remplir le titre selon type
-  document.getElementById('an-titre').value = type==='moto' ? 'Moto à vendre — ' : 'Voiture à vendre — ';
+  // La vente porte obligatoirement sur un véhicule ENREGISTRÉ appartenant au client.
+  const mesVehs = DB.vehs.filter(v => v.clientId===cl.id && ((type==='voiture') ? v.type==='voiture' : v.type!=='voiture'));
+  if(!mesVehs.length) {
+    toast('⚠️ Aucun(e) ' + (type==='voiture'?'voiture':'moto') + ' enregistré(e) à votre nom. Faites d\'abord enregistrer votre véhicule chez un agent agréé.', true);
+    return;
+  }
+  const vendables = mesVehs.filter(v => !v.stolen);
+  if(!vendables.length) {
+    toast('🚨 Vente interdite : votre ' + (type==='voiture'?'voiture est déclarée volée':'moto est déclarée volée') + '.', true);
+    return;
+  }
+  const liste = document.getElementById('an-veh-liste');
+  document.getElementById('an-veh').value = '';
+  liste.innerHTML = mesVehs.map(v => v.stolen
+    ? `<div style="padding:10px 12px;border-radius:9px;border:1px solid rgba(239,68,68,.5);opacity:.6;font-size:12px">🚨 ${esc(v.mat)} — ${esc(v.brand)} ${esc(v.model)} <b style="color:#EF4444">VOLÉE · VENTE INTERDITE</b></div>`
+    : `<div class="an-veh-opt" data-vid="${v.id}" onclick="choisirVehVente('${v.id}')" style="padding:10px 12px;border-radius:9px;border:1.5px solid rgba(249,115,22,.3);cursor:pointer;font-size:12px">${v.type==='voiture'?'🚗':'🏍️'} ${esc(v.mat)} — ${esc(v.brand)} ${esc(v.model)}</div>`
+  ).join('');
+  document.getElementById('an-veh-bloc').style.display = '';
+  if(vendables.length === 1) choisirVehVente(vendables[0].id);
+  else document.getElementById('an-titre').value = type==='moto' ? 'Moto à vendre — ' : 'Voiture à vendre — ';
   openModal('m-annonce');
+}
+function choisirVehVente(vid) {
+  document.getElementById('an-veh').value = vid;
+  document.querySelectorAll('.an-veh-opt').forEach(el => {
+    el.style.borderColor = el.dataset.vid === vid ? '#22C55E' : 'rgba(249,115,22,.3)';
+    el.style.background = el.dataset.vid === vid ? 'rgba(34,197,94,.08)' : 'transparent';
+  });
+  const v = DB.vehs.find(x => x.id === vid);
+  if(v) document.getElementById('an-titre').value = (v.type==='voiture'?'Voiture':'Moto') + ' à vendre — ' + (v.brand||'') + ' ' + (v.model||'');
 }
 
 // ── Chauffeur démarre la course (après confirmation passager par QR) ──
@@ -4635,6 +4762,9 @@ function rOwner() {
       '<div style="border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:14px;margin-bottom:14px">' +
         '<div style="font-weight:700;font-size:14px;color:#EF4444;margin-bottom:4px">🚨 Déclarer ma moto volée</div>' +
         '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Alerte immédiate à tous les agents. Choisissez le type de vol :</div>' +
+        '<div class="lbl">📍 Ville où le vol a eu lieu *</div>' +
+        '<input type="text" id="vole-ville" placeholder="Ex: Conakry, Labé, Kindia..." style="margin-bottom:8px"/>' +
+        '<div id="vole-ville-err" class="warn" style="display:none;margin-bottom:8px"></div>' +
         '<div style="display:flex;gap:8px">' +
           '<button id="btn-vole-crime" class="btn-red" style="flex:1;padding:12px;font-size:13px;border-radius:8px;font-weight:700;cursor:pointer">⚔️ Avec crime<br><span style="font-size:10px;font-weight:400">Agression, menace...</span></button>' +
           '<button id="btn-vole-sans" class="btn-gold" style="flex:1;padding:12px;font-size:13px;border-radius:8px;font-weight:700;cursor:pointer">🔓 Sans crime<br><span style="font-size:10px;font-weight:400">Disparue, subtilisée...</span></button>' +
@@ -4678,7 +4808,13 @@ function rOwner() {
     document.getElementById('btn-vole-crime').addEventListener('click', function() {
       document.getElementById('vole-crime-detail').style.display = '';
     });
-    document.getElementById('btn-vole-sans').addEventListener('click', function() { ownerVol(vid, false); });
+    document.getElementById('btn-vole-sans').addEventListener('click', function() {
+      const ville = document.getElementById('vole-ville').value.trim();
+      const vErr = document.getElementById('vole-ville-err');
+      if(!ville) { vErr.textContent = '⚠️ Indiquez la ville où le vol a eu lieu.'; vErr.style.display = 'block'; return; }
+      vErr.style.display = 'none';
+      ownerVol(vid, false, '', ville);
+    });
     document.getElementById('vole-type-crime').addEventListener('change', function() {
       document.getElementById('vole-autre-wrap').style.display = this.value === 'Autre' ? '' : 'none';
     });
@@ -4688,7 +4824,9 @@ function rOwner() {
       if(!sel) { err.textContent = '⚠️ Sélectionnez un type de crime.'; err.style.display = 'block'; return; }
       const typeCrime = sel === 'Autre' ? document.getElementById('vole-type-crime-autre').value.trim() : sel;
       if(sel === 'Autre' && !typeCrime) { err.textContent = '⚠️ Précisez le type de crime.'; err.style.display = 'block'; return; }
-      ownerVol(vid, true, typeCrime);
+      const ville = document.getElementById('vole-ville').value.trim();
+      if(!ville) { err.textContent = '⚠️ Indiquez la ville où le vol a eu lieu.'; err.style.display = 'block'; return; }
+      ownerVol(vid, true, typeCrime, ville);
     });
     ['owner','phone','addr','vin','photo','photoP'].forEach(key => {
       const btn = document.getElementById('vis-' + key);
@@ -4697,7 +4835,7 @@ function rOwner() {
   }
 }
 
-function ownerVol(vid, avecCrime, typeCrime) {
+function ownerVol(vid, avecCrime, typeCrime, ville) {
   const v = DB.vehs.find(x => x.id === vid);
   if(!v) return;
   v.stolen = true;
@@ -4705,6 +4843,12 @@ function ownerVol(vid, avecCrime, typeCrime) {
   v.volCrime = avecCrime;
   v.volTypeCrime = avecCrime ? typeCrime : '';
   v.volDate = new Date().toISOString();
+  v.volVille = ville || '';
+  // Suspension automatique de toute annonce de vente active portant sur ce véhicule
+  DB.annonces.filter(a => a.vehId === vid && a.statut === 'active').forEach(a => {
+    a.statut = 'suspendue';
+    sbSaveAnnonce(a);
+  });
   sbSaveVehicule(v);
   const typeVol = avecCrime ? '⚔️ avec crime (' + typeCrime + ')' : '🔓 sans crime (subtilisée)';
   logMvt('enreg', '🚨 Vol déclaré ' + typeVol + ' — ' + v.mat, 0, v.owner, 'Registre');
@@ -5090,7 +5234,8 @@ function processSearch(qn) {
   let v = DB.vehs.find(v =>
     nrm(v.mat)===qMat || nrm(v.mat)===qn ||
     nrm(v.vin)===qn ||
-    nrm(v.code)===qCode || nrm(v.code)===qn
+    nrm(v.code)===qCode || nrm(v.code)===qn ||
+    nrm(v.num||'')===qCode || nrm(v.num||'')===qn
   );
   // Chercher taxi
   let t = DB.taxis.find(t =>
@@ -5131,6 +5276,11 @@ function processSearch(qn) {
       html += '<div style="font-size:13px;color:#EF4444;font-weight:700;margin-bottom:10px">' +
         (v.volCrime ? '⚔️ Avec crime' + (v.volTypeCrime?' — '+esc(v.volTypeCrime):'') : '🔓 Sans crime') + '</div>';
     }
+    if(v.stolen && (v.volDate || v.volVille)) {
+      html += '<div style="font-size:12px;color:#EF4444;font-weight:700;margin-bottom:10px">🚨 Vol déclaré' +
+        (v.volDate ? ' le ' + new Date(v.volDate).toLocaleDateString('fr-FR') : '') +
+        (v.volVille ? ' à ' + esc(v.volVille) : '') + '</div>';
+    }
 
     if((showPhoto && v.photo) || (showPhotoP && v.photoP)) {
       html += '<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
@@ -5140,6 +5290,8 @@ function processSearch(qn) {
     }
     html += '<div style="font-size:13px;margin-bottom:4px"><b>' + v.brand + ' ' + v.model + '</b> · ' + v.color + (v.year?' · '+v.year:'') + '</div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Matricule : <b style="color:#EAB308">' + (v.mat || '—') + '</b></div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Enregistré le : <b style="color:var(--text2)">' + (v.reg ? new Date(v.reg).toLocaleDateString('fr-FR') : '—') + '</b></div>';
+    if(v.cg) html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">N° Carte grise : <b style="color:var(--text2);font-family:monospace">' + esc(v.cg) + '</b></div>';
     if(showOwner)  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Propriétaire : <b style="color:var(--text2)">' + v.owner + '</b></div>';
     if(showPhone)  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Téléphone : <b style="color:var(--text2)"><a href="tel:'+esc(v.phone)+'" style="color:inherit;text-decoration:none">'+esc(v.phone)+'</a></b></div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">📞 N° Secours : <b style="color:var(--text2)">' + (v.secours ? '<a href="tel:'+esc(v.secours)+'" style="color:inherit;text-decoration:none">'+esc(v.secours)+'</a>' + (v.lienSecours?' ('+esc(v.lienSecours)+')':'') : '—') + '</b></div>';
@@ -5251,7 +5403,7 @@ function startScan(mode) {
               const raw = codes[0].rawValue;
               stopScan();
               document.getElementById('sr').innerHTML = '';
-              processSearch(nrm(raw));
+              processSearch(nrm(extraireDonneesQR(raw)));
               toast('📷 QR scanné !');
             }
           } catch(e) {}
@@ -5270,7 +5422,7 @@ function startScan(mode) {
               const code = jsQR(imgData.data, imgData.width, imgData.height);
               if(code) {
                 stopScan();
-                processSearch(nrm(code.data));
+                processSearch(nrm(extraireDonneesQR(code.data)));
                 toast('📷 QR scanné !');
               }
             }
@@ -5286,6 +5438,17 @@ function startScan(mode) {
       toast(msg, true);
       sv.style.display = 'none';
     });
+}
+
+// Le QR encode une URL du site (?v=AMG-XXXXX%7CMATRICULE%7CVIN) : scanné depuis
+// l'extérieur, l'app décode l'URL au chargement. Le scanner INTERNE doit faire pareil,
+// sinon la recherche reçoit l'URL brute avec %7C et ne trouve rien.
+function extraireDonneesQR(brut) {
+  let s = String(brut || '').trim();
+  const m = /[?&](?:v|qr)=([^&#]+)/i.exec(s);
+  if(m) s = m[1];
+  try { s = decodeURIComponent(s); } catch(e) {}
+  return s;
 }
 
 function stopScan() {
@@ -5740,6 +5903,7 @@ function afficherFichePubliqueQR(v) {
           <div style="font-size:56px;margin-bottom:8px">🚨</div>
           <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px">VÉHICULE VOLÉ</div>
           <div style="font-size:13px;color:rgba(255,255,255,.85)">Ce véhicule a été déclaré volé — Ne pas acheter</div>
+          ${v.volDate || v.volVille ? `<div style="margin-top:8px;font-size:13px;font-weight:700;color:#fff">🚨 Vol déclaré${v.volDate?' le '+new Date(v.volDate).toLocaleDateString('fr-FR'):''}${v.volVille?' à '+esc(v.volVille):''}</div>` : ''}
           <div style="margin-top:12px;background:rgba(0,0,0,.2);border-radius:8px;padding:8px 14px;display:inline-block;font-size:12px;color:#fff">
             📞 Police : 117 &nbsp;·&nbsp; Gendarmerie : 122
           </div>
@@ -5767,6 +5931,7 @@ function afficherFichePubliqueQR(v) {
       </div>
       ${showVin && v.vin ? row('N° Châssis', `<span style="font-family:monospace">${esc(v.vin)}</span>`) : ''}
       ${row('Enregistré le', v.reg ? new Date(v.reg).toLocaleDateString('fr-FR') : '')}
+      ${v.cg ? row('N° Carte grise', `<span style="font-family:monospace">${esc(v.cg)}</span>`) : ''}
       ${row('N° Registre', `<span style="color:#f97316;font-family:monospace">${esc(v.num||'')}</span>`)}
     </div>
 
@@ -6144,7 +6309,7 @@ function showVeh(id) {
     ${rows}
     ${hist?`<div class="sect">Historique propriétaires</div>${hist}`:''}
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button class="btn-gold" style="flex:1;padding:10px;font-size:13px" onclick="genPDF('${v.id}')">📄 PDF</button>
+      ${(isAdmin() || isAgent() || (DB.user && DB.user.role==='client' && v.clientId===DB.user.id)) ? `<button class="btn-gold" style="flex:1;padding:10px;font-size:13px" onclick="genPDF('${v.id}')">📄 PDF</button>` : ''}
       ${canEdit()?`<button class="${v.stolen?'btn-ghost':'btn-red'}" style="flex:1;padding:10px;font-size:13px" onclick="toggleStolen('${v.id}');closeModal('m-veh')">${v.stolen?'🔓 Annuler vol':'🚨 Déclarer volée'}</button>`:''}
     </div>
   `;
@@ -6317,6 +6482,7 @@ async function saveMoto() {
   // Récupérer infos proprio (client existant ou saisie manuelle)
   let owner, phone, addr, secours, lienSecours;
   let cltIdFinal = cltId;
+  let nouveauClientAPreparer = null; // créé uniquement après toutes les validations
   if(cltId) {
     const cl = DB.clients.find(c=>c.id===cltId);
     if(!cl) { err.textContent='⚠️ Client introuvable.'; err.style.display='block'; return; }
@@ -6348,19 +6514,10 @@ async function saveMoto() {
     }
     owner = prenom + ' ' + nom;
     const email = document.getElementById('mm-owner-email').value.trim();
-    // Identifiant cosmétique généré automatiquement (affichage interne uniquement — la vraie connexion
-    // utilise le N° unique CLT-XXXXX, pas ce champ). Suffixe numérique ajouté en cas de doublon.
-    let ownerUser = nrm(prenom) + '.' + nrm(nom);
-    let suffixe = 1;
-    while(DB.clients.some(c => nrm(c.user) === ownerUser)) { suffixe++; ownerUser = nrm(prenom) + '.' + nrm(nom) + suffixe; }
-    // Le nouveau compte client est créé ici, avec mot de passe immédiatement haché (cohérent avec la sécurité du reste de l'app)
-    const newClient = {
-      id: gid(), num: genNum('client', DB.clients), prenom, nom, tel: phone, email,
-      user: ownerUser, pass: await hashPw(ownerPass), permis: '', solde: 0, vid: null
-    };
-    DB.clients.push(newClient);
-    sbSaveClient(newClient);
-    cltIdFinal = newClient.id;
+    // IMPORTANT : le compte client n'est PLUS créé ici. Il sera créé seulement après TOUTES
+    // les vérifications (matricule/VIN en doublon, solde agent...). Avant, chaque tentative
+    // refusée créait un compte client orphelin dans la base.
+    nouveauClientAPreparer = { prenom, nom, email, ownerPass };
   }
 
   const vin = document.getElementById('mm-vin').value.trim();
@@ -6402,9 +6559,24 @@ async function saveMoto() {
     logMvt('enreg','Enregistrement '+curVehType+' '+mat+' — Admin direct (exempté de débit)',0,'Administrateur','Système');
   }
 
+  // ── Toutes les validations sont passées : créer maintenant le compte client si nécessaire ──
+  if(nouveauClientAPreparer) {
+    const np = nouveauClientAPreparer;
+    let ownerUser = nrm(np.prenom) + '.' + nrm(np.nom);
+    let suffixe = 1;
+    while(DB.clients.some(c => nrm(c.user) === ownerUser)) { suffixe++; ownerUser = nrm(np.prenom) + '.' + nrm(np.nom) + suffixe; }
+    const newClient = {
+      id: gid(), num: genNumPersonne('client', DB.clients, np.nom, np.prenom), prenom: np.prenom, nom: np.nom, tel: phone, email: np.email,
+      user: ownerUser, pass: await hashPw(np.ownerPass), permis: '', solde: 0, vid: null
+    };
+    DB.clients.push(newClient);
+    sbSaveClient(newClient);
+    cltIdFinal = newClient.id;
+  }
+
   const dachat = document.getElementById('mm-dachat').value;
   const num = genNum('veh', DB.vehs);
-  // Code d'accès = CLT-XXXXX du client (toujours existant désormais, nouveau ou trouvé)
+  // Code d'accès = numéro unique du client (toujours existant désormais, nouveau ou trouvé)
   const code = DB.clients.find(c=>c.id===cltIdFinal).num;
 
   const newV = {
@@ -7192,6 +7364,17 @@ function saveAnnonce() {
   if(!titre||!contact){err.textContent='⚠️ Titre et contact obligatoires.';err.style.display='block';return;}
   const clientId = DB.user ? DB.user.id : null;
 
+  // BLOCAGE VENTE VÉHICULE VOLÉ : le client doit désigner lequel de ses véhicules il vend,
+  // et un véhicule déclaré volé ne peut JAMAIS être mis en vente. Contrôlé AVANT le débit des frais.
+  let vehId = null;
+  if(DB.user && DB.user.role === 'client') {
+    vehId = document.getElementById('an-veh').value;
+    if(!vehId) { err.textContent='⚠️ Sélectionnez le véhicule concerné par la vente.'; err.style.display='block'; return; }
+    const vv = DB.vehs.find(x => x.id === vehId);
+    if(!vv || vv.clientId !== DB.user.id) { err.textContent='⚠️ Véhicule introuvable ou ne vous appartenant pas.'; err.style.display='block'; return; }
+    if(vv.stolen) { err.textContent='🚨 Ce véhicule est déclaré VOLÉ — mise en vente interdite.'; err.style.display='block'; return; }
+  }
+
   // Débit automatique des frais de publication (client connecté uniquement — staff publie librement)
   if(DB.user && DB.user.role==='client') {
     const cl = DB.clients.find(x=>x.id===DB.user.id);
@@ -7205,7 +7388,7 @@ function saveAnnonce() {
   }
 
   const newAnnonce = {
-    id:gid(), titre, prix, contact, pref, ville, photo,
+    id:gid(), titre, prix, contact, pref, ville, photo, vehId,
     desc:document.getElementById('an-desc').value.trim(),
     date:new Date().toISOString().split('T')[0],
     clientId, statut:'active'
@@ -8611,7 +8794,7 @@ async function saveAg() {
     err.textContent='⚠️ Ce numéro de téléphone est déjà utilisé par un autre agent.'; err.style.display='block'; return;
   }
   const pieceImg = document.getElementById('ag-piece-preview');
-  const num = genNum('agent', DB.agents);
+  const num = genNumPersonne('agent', DB.agents, resp || name);
   const newAg = {
     id:gid(), num, name, resp, pref, addr, city,
     code: num,
@@ -9017,7 +9200,7 @@ async function saveSA() {
   if(DB.sousAgents.some(s => s.tel && s.tel.replace(/\D/g,'') === tel.replace(/\D/g,''))) {
     err.textContent='⚠️ Ce numéro de téléphone est déjà utilisé par un autre sous-agent.'; err.style.display='block'; return;
   }
-  const num = genNum('sa', DB.sousAgents);
+  const num = genNumPersonne('sa', DB.sousAgents, name);
   const photo = getPic('sa-photo-prev');
   const newSA = {id:gid(), num, name, tel, code:num, pass: await hashPw(pass), agId, photo, solde:0, actif:true};
   DB.sousAgents.push(newSA);
@@ -9228,6 +9411,11 @@ function addTarif() {
 // PDF
 // ════════════════════════════════════════════════
 function genPDF(vid) {
+  // Le PDF détaillé (données du propriétaire) est réservé au staff et au client propriétaire —
+  // jamais accessible depuis l'espace public.
+  const _v = DB.vehs.find(x=>x.id===vid);
+  const _autorise = isAdmin() || isAgent() || (DB.user && DB.user.role==='client' && _v && _v.clientId===DB.user.id);
+  if(!_autorise) { toast('⛔ Fiche PDF réservée aux agents et au propriétaire', true); return; }
   const v=DB.vehs.find(x=>x.id===vid); if(!v) return;
   const ag=DB.agents.find(a=>a.id===v.agId);
   const tf=DB.tarifs.find(t=>t.id===v.cat);
@@ -9256,17 +9444,38 @@ function genPDF(vid) {
   tr td:first-child{color:#555;width:140px}tr td:last-child{font-weight:600}
   .footer{margin-top:20px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:center;line-height:1.8}
   .warn{background:#fff3cd;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;font-size:12px;color:#92400e;margin-top:14px}
+  .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-28deg);text-align:center;opacity:.09;z-index:0;pointer-events:none;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wm .wm-ico{font-size:170px;line-height:1}
+  .wm .wm-t1{font-size:38px;font-weight:900;letter-spacing:8px;color:#0A0A0A}
+  .wm .wm-t2{font-size:15px;font-weight:700;letter-spacing:5px;color:#0A0A0A;margin-top:4px}
+  .contenu{position:relative;z-index:1}
+  .sigs{display:flex;gap:50px;margin-top:44px;position:relative;z-index:1}
+  .sig{flex:1;text-align:center}
+  .sig-line{border-bottom:1.5px solid #333;height:58px;margin-bottom:6px}
+  .sig-lbl{font-size:11px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:1px}
+  .sig-nom{font-size:11px;color:#666;margin-top:2px}
   @media print{.np{display:none}}</style></head><body>
+  <!-- Filigrane anti-falsification : logo en grand superposé au centre du document -->
+  <div class="wm">
+    <div class="wm-ico">🛡️</div>
+    <div class="wm-t1">LAOUNI AFRIMOTO</div>
+    <div class="wm-t2">DOCUMENT OFFICIEL · GUINÉE</div>
+  </div>
+  <div class="contenu">
   <div class="top"><div><h1>🛡 LAOUNI AFRIMOTO GN</h1>
   <div class="sub">Registre sécurisé de trajets et véhicules à moteur en Guinée</div>
   <div class="badge">🏍 MOTO ENREGISTRÉE</div></div></div>
   <table>${rows}</table>
   ${v.stolen?'<div class="warn">🚨 MOTO DÉCLARÉE VOLÉE — Ne pas acheter. Police: 117</div>':''}
+  <div class="sigs">
+    <div class="sig"><div class="sig-line"></div><div class="sig-lbl">Signature de l'agent</div><div class="sig-nom">${ag?ag.name:'—'}</div></div>
+    <div class="sig"><div class="sig-line"></div><div class="sig-lbl">Signature du client (propriétaire)</div><div class="sig-nom">${v.owner||'—'}</div></div>
+  </div>
   <div class="footer">Document officiel Laouni AfriMoto GN · Émis le ${new Date().toLocaleDateString('fr-FR')} · Police: 117 · Gendarmerie: 122</div>
   <div class="np" style="text-align:center;margin-top:18px">
   <button onclick="window.print()" style="background:#0A0A0A;color:#fff;border:none;padding:9px 22px;border-radius:6px;font-size:13px;cursor:pointer;margin-right:8px">🖨️ Imprimer / PDF</button>
   <button onclick="window.close()" style="background:#eee;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer">Fermer</button>
-  </div></body></html>`);
+  </div></div></body></html>`);
   w.document.close();
 }
 
