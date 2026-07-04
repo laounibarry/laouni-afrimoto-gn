@@ -744,7 +744,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   // ── Helper : ignore silencieusement les erreurs sandbox/iframe ──
   function sbIgnoreErr(fn, label) {
     return async function(...args) {
-      try { await fn(...args); }
+      try { return await fn(...args); }
       catch(e) {
         const msg = e ? (e.message || String(e)) : '';
         const isSandbox = (e && e.name === 'DataCloneError') ||
@@ -824,6 +824,14 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           continue;
         }
       }
+      // Doublon (contrainte d'unicité de la base) : message compréhensible
+      const dup = /duplicate key value violates unique constraint "([^"]+)"/.exec(msg);
+      if(dup) {
+        const champ = dup[1].replace(table + '_', '').replace(/_key$/, '').replace('_', ' ');
+        console.error('❌ Doublon ' + table + ':', msg);
+        if(typeof toast === 'function') toast('⚠️ Doublon refusé : un enregistrement ' + table + ' existe déjà avec le même « ' + champ + ' »', true);
+        return false;
+      }
       console.error('❌ Sauvegarde ' + table + ' échouée:', msg, error);
       if(typeof toast === 'function') toast('⚠️ SAUVEGARDE ' + table.toUpperCase() + ' ÉCHOUÉE — ' + msg.slice(0,200), true);
       return false;
@@ -873,7 +881,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       pass_hash:ps.pass||null };  // ← CRUCIAL : le mot de passe n'était jamais sauvegardé → connexion impossible après rechargement
     const alts = { telephone:'tel', user_login:'login', piece_identite:'piece',
       photo_url:'photo', photo_piece_url:'photo_piece', date_consentement:'consentement_le' };
-    await sbUpsertSouple('passagers', row, alts);
+    return await sbUpsertSouple('passagers', row, alts);
   }
   const sbSavePassager = sbIgnoreErr(_sbSavePassager, 'sbSavePassager');
 
@@ -3072,6 +3080,11 @@ function genNum(type, liste) {
 
 // ── Inscription d'un nouveau compte passager : nécessite validation par un agent/admin avant activation ──
 async function soumettreInscriptionPassager() {
+  // Anti double-clic : un double-tap sur "S'inscrire" créait deux envois simultanés,
+  // le premier passait, le second était rejeté en doublon et laissait un fantôme en mémoire.
+  if(window.__inscrPsEnCours) return;
+  window.__inscrPsEnCours = true;
+  setTimeout(() => { window.__inscrPsEnCours = false; }, 5000);
   const prenom = document.getElementById('insp-prenom').value.trim();
   const nom = document.getElementById('insp-nom').value.trim();
   const tel = document.getElementById('insp-tel').value.trim();
@@ -3133,8 +3146,18 @@ async function soumettreInscriptionPassager() {
     valide: false, dateInscription: new Date().toISOString(),
     consentementDonneLe: new Date().toISOString()
   };
+  // La sauvegarde doit RÉUSSIR avant d'annoncer le succès — sinon l'inscription
+  // semblerait acceptée alors qu'elle n'existe pas dans la base (compte fantôme).
+  err.textContent = '⏳ Enregistrement en cours...';
+  err.style.display = 'block';
+  const sauvegardeOk = await sbSavePassager(newPs);
+  err.style.display = 'none';
+  if(sauvegardeOk === false) {
+    err.textContent = '⚠️ Votre inscription n\'a pas pu être enregistrée (compte similaire déjà existant ou problème de connexion). Si vous vous êtes déjà inscrit, attendez la validation par un agent.';
+    err.style.display = 'block';
+    return;
+  }
   DB.passagers.push(newPs);
-  sbSavePassager(newPs);
   closeModal('m-inscription-passager');
   // Pas de QR code pour un passager — affichage simple du numéro unique obtenu
   askConfirm(
@@ -6472,6 +6495,9 @@ function printQR() {
 }
 
 async function saveMoto() {
+  if(window.__saveMotoEnCours) return; // anti double-clic
+  window.__saveMotoEnCours = true;
+  setTimeout(() => { window.__saveMotoEnCours = false; }, 6000);
   const mat = document.getElementById('mm-mat').value.trim();
   const brand = document.getElementById('mm-brand').value.trim();
   const model = document.getElementById('mm-model').value.trim();
