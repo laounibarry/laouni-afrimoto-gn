@@ -614,6 +614,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       _triDate(DB.mouvements, 'date');
       _triDate(DB.demandesCourse, 'date');
 
+      // Suspension automatique des enregistrements non renouvelés
+      try { verifierMisesAJour(); } catch(e) { console.warn('verifierMisesAJour:', e && e.message); }
+
       // Synchroniser les catégories locales vers la table 'categories' de Supabase
       // (sinon la clé étrangère vehicules.cat_id rejette les catégories inconnues
       // et la catégorie du véhicule est perdue à l'enregistrement)
@@ -635,6 +638,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.bandeau_vitesse) DB.bandeauVitesse = cfg.bandeau_vitesse;
         if(cfg.photos_enreg) DB.photosEnreg = Object.assign({moto:'optionnel',proprio:'optionnel',facture:'optionnel',cg:'optionnel',piece:'optionnel'}, cfg.photos_enreg);
         if(cfg.commission_course_taxi) DB.commissionCourseTaxi = cfg.commission_course_taxi;
+        if(cfg.renouvellement) DB.renouvellement = Object.assign({moto:'anniversaire', taxi:'mensuel'}, cfg.renouvellement);
+        if(cfg.tarifs_maj) DB.tarifsMaj = Object.assign({taxi:25000}, cfg.tarifs_maj);
         if(cfg.trajet_unique_desactive !== undefined) DB.trajetUniqueDesactive = cfg.trajet_unique_desactive;
         if(cfg.admin_email) DB.adminEmail = cfg.admin_email;
         // Charger identifiant et mot de passe admin depuis Supabase
@@ -710,6 +715,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       volTypeCrime:r.vol_type_crime||r.volTypeCrime||'',
       volVille:r.vol_ville||r.volVille||'',
       reg:r.reg||r.date_enregistrement||'',
+      derniereMaj:r.derniere_maj||r.derniereMaj||'',
+      suspenduAuto:(r.suspendu_auto!==undefined&&r.suspendu_auto!==null)?r.suspendu_auto:(r.suspenduAuto||false),
       hist:r.hist||r.historique_proprietaires||r.historique||[],
       stolen:r.vole||r.stolen||r.statut==='vole'||false,
       type:r.type||'moto',
@@ -721,7 +728,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       tel:r.telephone||r.tel||'', photo:r.photo_url||r.photo||'', gilet:r.gilet||false,
       statut:r.statut||'actif', position:r.position||null, agentId:r.agent_id||r.agentId||null,
       fraisEnreg:r.frais_enregistrement||r.fraisEnreg||0, code:r.code||'',
-      ville:r.ville||'', created_at:r.created_at };
+      ville:r.ville||'', zone:r.zone||'', motoId:r.moto_id||r.motoId||null,
+      valide:(r.valide!==undefined&&r.valide!==null)?r.valide:true,
+      derniereMaj:r.derniere_maj||r.derniereMaj||'',
+      suspenduAuto:(r.suspendu_auto!==undefined&&r.suspendu_auto!==null)?r.suspendu_auto:(r.suspenduAuto||false),
+      created_at:r.created_at };
   }
   function mapTrajet(r) {
     return { id:r.id, depart:r.depart||'', arrivee:r.arrivee||'', date:r.date_depart||r.date||'',
@@ -925,6 +936,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       frais_enregistrement:v.fraisEnreg||0,
       type:v.type||'moto',                 // n'était pas sauvegardé → voitures/taxis rechargés en 'moto'
       valide:v.valide!==false,             // n'était pas sauvegardé → état de validation perdu
+      derniere_maj:v.derniereMaj||null, suspendu_auto:v.suspenduAuto||false,
       carte_grise:v.cg||null,
       date_achat:v.dachat||null,
       vol_date:v.volDate||null,
@@ -955,7 +967,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     const row = { id:t.id, num:t.num||'', plaque:t.plaque||'', nom_chauffeur:t.nom||'',
       telephone:t.tel||null, photo_url:t.photo||null, gilet:t.gilet||false, statut:t.statut||'actif',
       position:t.position||null, agent_id:t.agentId||null, frais_enregistrement:t.fraisEnreg||0,
-      code:t.code||'', ville:t.ville||'' };
+      code:t.code||'', ville:t.ville||'', zone:t.zone||null, moto_id:t.motoId||null,
+      valide:t.valide!==false,
+      derniere_maj:t.derniereMaj||null, suspendu_auto:t.suspenduAuto||false };
     const alts = { nom_chauffeur:'nom', telephone:'tel', photo_url:'photo', frais_enregistrement:'frais' };
     await sbUpsertSouple('taxis', row, alts);
   }
@@ -1021,7 +1035,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       frais_trajet_defaut:DB.fraisTrajetDefaut, bandeau_actif:DB.bandeauActif,
       bandeau_texte:DB.bandeauTexte, bandeau_vitesse:DB.bandeauVitesse,
       commission_course_taxi:DB.commissionCourseTaxi, trajet_unique_desactive:DB.trajetUniqueDesactive,
-      photos_enreg:DB.photosEnreg||null };
+      photos_enreg:DB.photosEnreg||null,
+      renouvellement:DB.renouvellement||null, tarifs_maj:DB.tarifsMaj||null };
     try {
       return await sbUpsertSouple('config_admin', row, {});
     } catch(e) { console.warn('sbSaveConfig:', e && e.message); return false; }
@@ -1402,6 +1417,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('courses')" id="gt-courses" style="font-size:12px;padding:7px 11px">🚕 Courses</button>
     <button class="btn-ghost" onclick="setGestTab('validation')" id="gt-validation" style="font-size:12px;padding:7px 11px">⏳ Validation</button>
     <button class="btn-ghost" onclick="setGestTab('corbeille')" id="gt-corbeille" style="font-size:12px;padding:7px 11px">🗑️ Corbeille</button>
+    <button class="btn-ghost" onclick="setGestTab('suppression')" id="gt-suppression" style="font-size:12px;padding:7px 11px">🧹 Suppression</button>
     <button class="btn-ghost" onclick="setGestTab('recharges')" id="gt-recharges" style="font-size:12px;padding:7px 11px">🟠 Recharges</button>
     <button class="btn-ghost" onclick="setGestTab('journal')" id="gt-journal" style="font-size:12px;padding:7px 11px">📋 Journal accès</button>
     <button class="btn-ghost" onclick="setGestTab('securite')" id="gt-securite" style="font-size:12px;padding:7px 11px">🔒 Sécurité</button>
@@ -1546,6 +1562,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div style="display:flex;gap:8px">
       <button class="btn-gold" style="flex:1;padding:11px;font-size:13px" onclick="printQR()">🖨️ Imprimer QR</button>
       <button id="qr-btn-fiche" class="btn-gold" style="flex:1;padding:11px;font-size:13px;display:none" onclick="fichePdfEnregistrement()">📄 Fiche PDF</button>
+      <button id="qr-btn-email" class="btn-gold" style="flex:1;padding:11px;font-size:13px;display:none" onclick="envoyerRecapManuel()">📧 Envoyer récap</button>
       <button class="btn" style="flex:1;padding:11px;font-size:13px" onclick="closeModal('m-qr')">✅ Terminer</button>
     </div>
   </div>
@@ -1778,22 +1795,26 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div style="font-size:12px;line-height:1.6;color:var(--text2)">
       <div class="sect" style="margin-top:0">Quelles données nous collectons</div>
-      <p>Selon le type de compte, nous collectons : nom, prénom, téléphone, adresse email, adresse postale, numéro et photo de pièce d'identité, photo de profil, informations sur votre véhicule (marque, modèle, matricule, numéro de châssis), et, lors d'une demande de course, votre position géographique au moment précis de la demande.</p>
+      <p>Selon le type de compte, nous collectons : nom, prénom, date et lieu de naissance, téléphone, adresse email, adresse postale, numéro et photo de pièce d'identité, photo de profil, contact de secours (nom et téléphone d'un proche que vous désignez), informations et photos de votre véhicule (marque, modèle, matricule, numéro de châssis, photo du véhicule, facture d'achat, carte grise), historique de vos recharges et transactions sur la plateforme (avec la référence de paiement Orange Money le cas échéant), et, lors d'une demande de course, votre position géographique au moment précis de la demande. Votre mot de passe n'est jamais conservé en clair : il est stocké sous forme chiffrée (hachée), illisible même par l'administration.</p>
 
       <div class="sect">Pourquoi nous les collectons</div>
-      <p>Ces informations servent à sécuriser le registre des véhicules contre le vol, vérifier l'identité des passagers avant la mise en relation avec un chauffeur, permettre la connexion à votre espace personnel, et faciliter le contact entre passagers et chauffeurs lors d'une course.</p>
+      <p>Ces informations servent à sécuriser le registre des véhicules contre le vol, vérifier l'identité des passagers avant la mise en relation avec un chauffeur, permettre la connexion à votre espace personnel, faciliter le contact entre passagers et chauffeurs lors d'une course, et vous envoyer par email les confirmations d'enregistrement, récapitulatifs et informations de récupération de compte que vous demandez.</p>
+
+      <div class="sect">Où vos données sont hébergées et qui y a accès techniquement</div>
+      <p>Vos données sont stockées dans une base de données sécurisée hébergée par Supabase, et le site est servi par Vercel. Lorsqu'un email de confirmation ou de récupération vous est envoyé, votre adresse email et le contenu du message transitent par le service d'envoi EmailJS, uniquement le temps de l'acheminement. Nous ne vendons ni ne louons vos données à personne.</p>
 
       <div class="sect">Combien de temps nous les conservons</div>
-      <p>Les informations de votre compte sont conservées tant que ce compte existe. Les positions géographiques liées à une demande de course sont automatiquement supprimées après 48 heures. Les éléments supprimés (comptes, véhicules, annonces...) restent récupérables pendant 48 heures dans une corbeille administrateur, puis sont effacés définitivement et automatiquement.</p>
+      <p>Les informations de votre compte sont conservées tant que ce compte existe. Les positions géographiques liées à une demande de course sont automatiquement supprimées après 48 heures. Les annonces de vente expirent automatiquement après 30 jours. Les éléments supprimés (comptes, véhicules, annonces...) restent récupérables pendant 48 heures dans une corbeille administrateur, puis sont effacés définitivement et automatiquement.</p>
 
       <div class="sect">Qui peut consulter vos données</div>
-      <p>Vos informations sensibles (pièce d'identité, photo) sont accessibles uniquement à l'administration, dans le cadre strict de la vérification de votre compte. Chaque consultation de ces documents par un membre du personnel est enregistrée et horodatée.</p>
+      <p>Vos documents confidentiels (pièce d'identité, facture d'achat, carte grise) sont visibles uniquement par vous-même, l'agent en charge de votre dossier et l'administration — jamais par le public. Chaque consultation de ces documents par un membre du personnel est enregistrée et horodatée dans un journal d'accès.</p>
+      <p>La fiche publique de vérification (accessible par QR code, matricule ou numéro de châssis) affiche la marque, le modèle et le statut du véhicule (dont une éventuelle déclaration de vol, avec la ville et la date du vol pour aider à son identification). Le téléphone, l'adresse, le numéro de châssis complet et les photos ne sont montrés au public que si vous avez choisi de les rendre visibles dans les réglages de confidentialité de votre véhicule.</p>
 
       <div class="sect">Vos droits</div>
-      <p>Vous pouvez à tout moment demander la suppression de votre compte et de vos données depuis votre espace personnel. Vous pouvez aussi contacter l'administration pour toute question sur les informations que nous détenons à votre sujet.</p>
+      <p>Vous pouvez à tout moment : demander la suppression de votre compte et de vos données depuis votre espace personnel (récupérable 48 heures, puis définitif) ; régler la visibilité publique de vos informations véhicule ; modifier votre mot de passe ; ou contacter l'administration pour toute question, correction ou copie des informations que nous détenons à votre sujet.</p>
 
       <div class="sect">Paiements</div>
-      <p>Le règlement des trajets et courses s'effectue directement en espèces entre passager et chauffeur. La plateforme ne traite et ne stocke aucune donnée bancaire.</p>
+      <p>Le règlement des trajets et courses s'effectue directement en espèces entre passager et chauffeur. La plateforme ne traite et ne stocke aucune donnée bancaire. Pour les recharges de solde via Orange Money, seule la référence de la transaction est conservée à des fins de vérification.</p>
     </div>
     <button class="btn" style="width:100%;padding:13px;margin-top:16px" onclick="closeModal('m-confidentialite')">J'ai compris</button>
   </div>
@@ -2051,7 +2072,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <div class="fld"><div class="lbl">Lieu de naissance</div><input type="text" id="mm-lieunais" placeholder="Labé"/></div>
       </div>
       <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="mm-phone" placeholder="+224 6xx xxx xxx"/></div>
-      <div class="fld"><div class="lbl">Email <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel — pour récupération de compte</span></div><input type="email" id="mm-owner-email" placeholder="exemple@email.com" autocomplete="off"/></div>
+      <div class="fld"><div class="lbl">Email <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel — pour récapitulatif et récupération de compte</span></div><input type="email" id="mm-owner-email" placeholder="exemple@email.com" autocomplete="off"/></div>
       <div class="fld"><div class="lbl">Mot de passe *</div><div style="display:flex;gap:6px"><input type="password" id="mm-owner-pass" style="flex:1" autocomplete="off"/><button class="btn-ghost" style="flex-shrink:0;padding:0 10px;font-size:16px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button></div></div>
       <div class="fld"><div class="lbl">Adresse</div><input type="text" id="mm-addr" placeholder="Quartier, Ville"/></div>
       <div class="grid2">
@@ -2430,6 +2451,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 
     <div class="fld"><div class="lbl">Nom / Point de vente *</div><input type="text" id="sa-name" placeholder="Point Recharge Kaloum"/></div>
     <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="sa-tel" placeholder="+224 6xx xxx xxx"/></div>
+    <div class="fld"><div class="lbl">Email (pour la confirmation)</div><input type="email" id="sa-email" placeholder="exemple@gmail.com"/></div>
     <div class="grid2">
       <div class="fld"><div class="lbl">Code d'accès *</div><input type="text" id="sa-code" placeholder="SA-004"/></div>
       <div class="fld"><div class="lbl">Mot de passe *</div><div style="display:flex;gap:8px"><input type="password" id="sa-pass" placeholder="••••••" style="flex:1"/><button class="btn-ghost" style="flex-shrink:0;padding:0 12px;font-size:18px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button></div></div>
@@ -2517,6 +2539,8 @@ const DB = {
   demandesCourse: [],
   // Photos du formulaire d'enregistrement : 'obligatoire' ou 'optionnel' — modifiable par l'admin (page Tarifs)
   photosEnreg: { moto:'optionnel', proprio:'optionnel', facture:'optionnel', cg:'optionnel', piece:'optionnel' },
+  renouvellement: { moto:'anniversaire', taxi:'mensuel' },   // périodes de mise à jour (mensuel | 6mois | anniversaire) — décidées par l'admin
+  tarifsMaj: { taxi: 25000 },                // prix de mise à jour par catégorie (clé = id catégorie) + 'taxi'
   corbeille: [],
   journalAccesSensibles: [],
   vehs: [],
@@ -2817,8 +2841,8 @@ function askConfirm(message, onYes) {
 // ⚙️ CONFIGURATION : remplir les 3 valeurs ci-dessous après création du compte EmailJS.
 const EMAILJS_CONFIG = {
   serviceId:  'service_0rvox9x',
-  templateId: 'template_4k60hjj',
-  templateRecapId: '',   // à remplir : 2e modèle EmailJS « récapitulatif d'enregistrement » (variables : to_email, titre, contenu)
+  templateId: 'template_zd8wymi',
+  templateRecapId: 'template_6uq04fr',   // modèle confirmations/récapitulatifs (variables : to_email, titre, contenu)
   publicKey:  'awxu35zCxrmJzkyOZ'
 };
 async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, instruction) {
@@ -3208,6 +3232,17 @@ async function soumettreInscriptionPassager() {
     return;
   }
   DB.passagers.push(newPs);
+  envoyerEmailConfirmation(email, 'Confirmation d\'inscription passager — Laouni AfriMoto', [
+    'Bienvenue ' + prenom + ' ' + nom + ' !',
+    '',
+    'VOTRE NUMÉRO UNIQUE (identifiant de connexion) : ' + num,
+    'Téléphone : ' + tel,
+    '',
+    'Statut : ⏳ En attente de validation par un agent.',
+    'Vous pourrez vous connecter dès que votre pièce d\'identité aura été validée.',
+    '',
+    '— Laouni AfriMoto · Registre sécurisé · Guinée'
+  ]).then(ok => { if(ok) toast('📧 Confirmation envoyée par email'); });
   closeModal('m-inscription-passager');
   // Pas de QR code pour un passager — affichage simple du numéro unique obtenu
   askConfirm(
@@ -4807,6 +4842,7 @@ function rOwner() {
           (v.photo ? '<div style="flex:1"><div class="lbl">📸 Moto</div><img src="' + v.photo + '" style="width:100%;height:110px;object-fit:cover;border-radius:9px;border:1px solid rgba(249,115,22,.3)"/></div>' : '') +
           (v.photoP ? '<div><div class="lbl">🪪 Vous</div><img src="' + v.photoP + '" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid rgba(249,115,22,.4)"/></div>' : '') +
         '</div>' : '') +
+      majProprioHtml(v) +
       docsProprioHtml(v) +
 
       // Infos véhicule
@@ -5372,6 +5408,8 @@ function processSearch(qn) {
       if(showPhotoP && v.photoP) html += '<div><div class="lbl">🪪 Propriétaire</div><img src="' + v.photoP + '" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid ' + (v.stolen?'#EF4444':'rgba(249,115,22,.4)') + '"/></div>';
       html += '</div>';
     }
+    if(v.statut === 'suspendu') html += '<div style="background:#EAB308;color:#111;font-weight:800;text-align:center;border-radius:10px;padding:10px;margin-bottom:10px">⏸️ ENREGISTREMENT SUSPENDU — mise à jour requise (espace client ou chez un agent)</div>';
+    if(staffView) html += staffMajFicheHtml(v, false);
     if(staffView) html += docsProprioHtml(v);
     html += '<div style="font-size:13px;margin-bottom:4px"><b>' + v.brand + ' ' + v.model + '</b> · ' + v.color + (v.year?' · '+v.year:'') + '</div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Matricule : <b style="color:#EAB308">' + (v.mat || '—') + '</b></div>';
@@ -5935,6 +5973,19 @@ async function confirmerDevenirTaxi() {
 
   DB.taxis.push(newTaxi);
   sbSaveTaxi(newTaxi);
+  { const clTx = DB.clients.find(cc => cc.id === v.clientId);
+    envoyerEmailConfirmation(clTx && clTx.email, 'Confirmation moto-taxi — ' + v.mat.toUpperCase(), [
+      'Votre moto est maintenant enregistrée comme MOTO-TAXI.',
+      '',
+      'Conducteur : ' + nomConducteur,
+      'Moto : ' + v.mat.toUpperCase(),
+      'Gilet n° : ' + gilet,
+      newTaxi.zone ? 'Zone : ' + newTaxi.zone : null,
+      'Statut : ' + (newTaxi.valide ? '✅ Validé' : '⏳ En attente de validation'),
+      '',
+      '— Laouni AfriMoto · Registre sécurisé · Guinée'
+    ]).then(ok => { if(ok) toast('📧 Confirmation envoyée au client'); });
+  }
   logMvt('enreg', '🚕 Moto ' + v.mat + ' → taxi · Gilet ' + gilet, 0, DB.user ? DB.user.name : 'Admin', nomConducteur);
   closeModal('m-devenir-taxi');
   rVehs();
@@ -6127,6 +6178,11 @@ function afficherFichePubliqueTaxi(t) {
       </div>
     </div>
 
+    ${t.statut==='suspendu' && !suspect ? `
+      <div style="margin:16px;background:#EAB308;color:#111;font-weight:800;text-align:center;border-radius:12px;padding:12px">
+        ⏸️ TAXI SUSPENDU — mise à jour requise
+      </div>` : ''}
+    ${(DB.user && ['admin','agent'].includes(DB.user.role)) ? `<div style="margin:0 16px 16px">` + staffMajFicheHtml(t, true) + `</div>` : ''}
     <!-- STATUT -->
     <div style="margin:16px;border-radius:16px;overflow:hidden">
       ${suspect ? `
@@ -6277,6 +6333,11 @@ function afficherFichePubliqueTaxi(t) {
       </div>
     </div>
 
+    ${t.statut==='suspendu' && !suspect ? `
+      <div style="margin:16px;background:#EAB308;color:#111;font-weight:800;text-align:center;border-radius:12px;padding:12px">
+        ⏸️ TAXI SUSPENDU — mise à jour requise
+      </div>` : ''}
+    ${(DB.user && ['admin','agent'].includes(DB.user.role)) ? `<div style="margin:0 16px 16px">` + staffMajFicheHtml(t, true) + `</div>` : ''}
     <!-- STATUT -->
     <div style="margin:16px;border-radius:16px;overflow:hidden">
       ${suspect ? `
@@ -6537,6 +6598,7 @@ function openAddMoto() {
 // ════ QR CODE ════
 function showQR(data, titre, infosHtml, note) {
   const _bfiche = document.getElementById('qr-btn-fiche'); if(_bfiche) _bfiche.style.display = 'none';
+  const _bmail = document.getElementById('qr-btn-email'); if(_bmail) _bmail.style.display = 'none';
   // URL canonique officielle du site — toujours propre peu importe le nom du fichier local.
   // En développement (fichier local), on utilise window.location comme fallback.
   const siteUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
@@ -6571,6 +6633,24 @@ function showQR(data, titre, infosHtml, note) {
   openModal('m-qr');
 }
 
+// ══ Email de confirmation générique (tous les formulaires) ══
+async function envoyerEmailConfirmation(email, titre, lignes) {
+  try {
+    if(!email || !EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateRecapId || !EMAILJS_CONFIG.publicKey) return false;
+    const rep = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_CONFIG.serviceId,
+        template_id: EMAILJS_CONFIG.templateRecapId,
+        user_id: EMAILJS_CONFIG.publicKey,
+        template_params: { to_email: email, titre: titre, contenu: lignes.filter(x => x !== null).join('\n') }
+      })
+    });
+    return rep.ok;
+  } catch(e) { console.warn('Email confirmation:', e && e.message); return false; }
+}
+
 // ══ Email récapitulatif automatique au client après enregistrement ══
 async function envoyerEmailRecapEnregistrement(v) {
   try {
@@ -6582,6 +6662,7 @@ async function envoyerEmailRecapEnregistrement(v) {
     const lignes = [
       'NUMÉRO UNIQUE : ' + v.num,
       'Code d\'accès client : ' + v.code,
+      cl && cl.user ? 'Identifiant de connexion client : ' + cl.user : null,
       '',
       '── PROPRIÉTAIRE ──',
       'Nom : ' + (v.owner||'—'),
@@ -6605,23 +6686,20 @@ async function envoyerEmailRecapEnregistrement(v) {
       'Statut : ' + (v.valide ? '✅ Validé' : '⏳ En attente de validation par l\'administration'),
       '',
       'Vérification publique : https://laouni-securite-ultime.com?v=' + encodeURIComponent(v.num + '|' + (v.mat||'') + '|' + (v.vin||''))
-    ].filter(x => x !== null);
-    const rep = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_id: EMAILJS_CONFIG.serviceId,
-        template_id: EMAILJS_CONFIG.templateRecapId,
-        user_id: EMAILJS_CONFIG.publicKey,
-        template_params: {
-          to_email: email,
-          titre: 'Confirmation d\'enregistrement — ' + (v.mat || v.vin || v.num),
-          contenu: lignes.join('\n')
-        }
-      })
-    });
-    return rep.ok;
+    ];
+    return await envoyerEmailConfirmation(email, 'Confirmation d\'enregistrement — ' + (v.mat || v.vin || v.num), lignes);
   } catch(e) { console.warn('Email récap:', e && e.message); return false; }
+}
+
+// ══ Envoi manuel du récapitulatif (bouton du modal QR) ══
+async function envoyerRecapManuel() {
+  const v = DB.vehs.find(x => x.id === window._dernierVehFiche);
+  if(!v) { toast('Véhicule introuvable', true); return; }
+  const cl = DB.clients.find(cc => cc.id === v.clientId);
+  if(!cl || !cl.email) { toast('⚠️ Le client n\'a pas d\'adresse email enregistrée', true); return; }
+  toast('⏳ Envoi en cours…');
+  const ok = await envoyerEmailRecapEnregistrement(v);
+  toast(ok ? '📧 Récapitulatif envoyé à ' + cl.email : '⚠️ Échec de l\'envoi — vérifiez la connexion', !ok);
 }
 
 // ══ Fiche PDF récapitulative (imprimable / enregistrable en PDF) ══
@@ -6859,6 +6937,7 @@ async function saveMoto() {
     photo:getPic('mm-pp'), photoP:getPic('mm-ppp'),
     photoFacture:getPic('mm-pfa'), photoCG:getPic('mm-pcg'),
     photoPiece:getPic('mm-ppi'),
+    derniereMaj:new Date().toISOString(), suspenduAuto:false,
     dateNaissance:(document.getElementById('mm-datenais')||{}).value||'',
     lieuNaissance:((document.getElementById('mm-lieunais')||{}).value||'').trim(),
     // Validation admin obligatoire avant que l'enregistrement soit effectif et visible publiquement,
@@ -6926,6 +7005,7 @@ async function saveMoto() {
   // Bouton « Fiche PDF » dans le modal QR + email récapitulatif automatique au client
   window._dernierVehFiche = newV.id;
   const _bfq = document.getElementById('qr-btn-fiche'); if(_bfq) _bfq.style.display='';
+  const _bmq = document.getElementById('qr-btn-email'); if(_bmq) _bmq.style.display='';
   envoyerEmailRecapEnregistrement(newV).then(ok => { if(ok) toast('📧 Récapitulatif envoyé par email au client'); });
 }
 
@@ -7202,6 +7282,20 @@ function saveTaxi() {
   };
   DB.taxis.push(newTaxi);
   sbSaveTaxi(newTaxi);
+  { const motoTx = motoLiee || null;
+    const clTx = motoTx ? DB.clients.find(cc => cc.id === motoTx.clientId) : null;
+    envoyerEmailConfirmation(clTx && clTx.email, 'Confirmation enregistrement taxi — ' + plaque.toUpperCase(), [
+      'Un taxi a été enregistré sur Laouni AfriMoto.',
+      '',
+      'Conducteur : ' + nom,
+      'Plaque : ' + plaque.toUpperCase(),
+      'Gilet n° : ' + gilet,
+      newTaxi.zone ? 'Zone : ' + newTaxi.zone : null,
+      'Statut : ' + (newTaxi.valide ? '✅ Validé' : '⏳ En attente de validation'),
+      '',
+      '— Laouni AfriMoto · Registre sécurisé · Guinée'
+    ]).then(ok => { if(ok) toast('📧 Confirmation envoyée au client'); });
+  }
   if(agId) { const ag = DB.agents.find(a=>a.id===agId); if(ag) sbSaveAgent(ag); }
   if(isAdmin()) logMvt('enreg','Enregistrement taxi '+plaque.toUpperCase()+' — Gilet '+gilet, 0);
 
@@ -7982,7 +8076,7 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','validation','corbeille','journal'].forEach(x=>{
+  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','validation','corbeille','journal','recharges','securite','suppression'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
@@ -8033,8 +8127,10 @@ function rGestion() {
             </div>
             <div style="font-size:12px;color:var(--text2)">${v.brand} ${v.model} · ${v.color}</div>
             <div style="font-size:11px;color:var(--text2)">👤 ${esc(v.owner)} · <a href="tel:${esc(v.phone)}" style="color:#f97316;font-weight:700;text-decoration:none">📞 ${esc(v.phone)}</a></div>
+            ${infoMajHtml(v,false)}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn" style="font-size:10px;padding:5px 8px" onclick="majStaff('veh','${v.id}')" title="Mise à jour">🔄</button>
             <button class="btn-blue" style="font-size:10px;padding:5px 8px" onclick="editVeh('${v.id}')">✏️</button>
             <button class="${v.statut==='suspendu'?'btn-ghost':'btn-gold'}" style="font-size:10px;padding:5px 8px" onclick="suspendVeh('${v.id}')">${v.statut==='suspendu'?'✅':'⏸️'}</button>
             <button class="${v.stolen?'btn-ghost':'btn-red'}" style="font-size:10px;padding:5px 8px" onclick="toggleStolen('${v.id}')">${v.stolen?'🔓':'🚨'}</button>
@@ -8055,8 +8151,10 @@ function rGestion() {
             <div style="font-weight:700;font-size:13px">${t.nom} <span class="tag ${t.statut==='actif'?'tag-green':t.statut==='vole'?'tag-red':'tag-gold'}" style="font-size:9px">${t.statut.toUpperCase()}</span></div>
             <div style="font-size:11px;color:#EAB308">${t.plaque} · Gilet: ${t.gilet}</div>
             <div style="font-size:11px;color:var(--text2)">${t.zone||''}</div>
+            ${infoMajHtml(t,true)}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn" style="font-size:10px;padding:5px 8px" onclick="majStaff('taxi','${t.id}')" title="Mise à jour">🔄</button>
             <button class="btn-blue" style="font-size:10px;padding:5px 8px" onclick="editTaxi('${t.id}')">✏️</button>
             <button class="${t.statut==='suspendu'?'btn-ghost':'btn-gold'}" style="font-size:10px;padding:5px 8px" onclick="toggleTaxi('${t.id}')">${t.statut==='suspendu'?'✅':'⏸️'}</button>
             <button class="${t.statut==='vole'?'btn-ghost':'btn-red'}" style="font-size:10px;padding:5px 8px" onclick="toggleTaxiVol('${t.id}')">${t.statut==='vole'?'🔓':'🚨'}</button>
@@ -8470,6 +8568,9 @@ function rGestion() {
           </div>`;
         }).join('') : '') +
       ((!vehsAttente.length && !taxisAttente.length) ? '<div class="empty">✅<br>Aucun enregistrement en attente</div>' : '');
+  } else if(gestTab==='suppression') {
+    html += rSuppressionMasse();
+
   } else if(gestTab==='corbeille') {
     let list = q ? DB.corbeille.filter(c=>nrm(c.label).includes(q)) : DB.corbeille;
     html = `
@@ -8694,6 +8795,254 @@ function toggleAgentPeutVoirCourses(id) {
   updateNav();
 }
 // Suppression de toutes les courses d'une période — RÉSERVÉ ADMIN
+// ════ MISE À JOUR PÉRIODIQUE DES ENREGISTREMENTS ════
+// Taxis : chaque mois. Motos : période choisie par l'admin (mensuel / 6 mois / anniversaire).
+// Sans mise à jour payée avant l'échéance → statut SUSPENDU automatique.
+function periodeMoisMaj(estTaxi) {
+  const r = DB.renouvellement || {};
+  const p = estTaxi ? (r.taxi || 'mensuel') : (r.moto || 'anniversaire');
+  return p==='mensuel' ? 1 : p==='6mois' ? 6 : 12;
+}
+function prixMajDe(x, estTaxi) {
+  const tm = DB.tarifsMaj || {};
+  if(estTaxi) return Number(tm.taxi || 0);
+  return Number(tm[x.cat || x.catId] || 0);
+}
+function echeanceMaj(x, estTaxi) {
+  const base = x.derniereMaj || x.created_at || null;
+  if(!base) return null;
+  const d = new Date(base);
+  if(isNaN(d)) return null;
+  const e = new Date(d);
+  e.setMonth(e.getMonth() + periodeMoisMaj(estTaxi));
+  return e;
+}
+function verifierMisesAJour() {
+  let nb = 0;
+  (DB.vehs||[]).forEach(v => {
+    if(v.valide === false || v.stolen || v.statut === 'vole') return;
+    const e = echeanceMaj(v, false); if(!e) return;
+    const retard = new Date() > e;
+    if(retard && v.statut !== 'suspendu') { v.statut = 'suspendu'; v.suspenduAuto = true; sbSaveVehicule(v); nb++; }
+    else if(!retard && v.statut === 'suspendu' && v.suspenduAuto) { v.statut = 'actif'; v.suspenduAuto = false; sbSaveVehicule(v); nb++; }
+  });
+  (DB.taxis||[]).forEach(t => {
+    if(t.valide === false || t.statut === 'vole') return;
+    const e = echeanceMaj(t, true); if(!e) return;
+    const retard = new Date() > e;
+    if(retard && t.statut !== 'suspendu') { t.statut = 'suspendu'; t.suspenduAuto = true; sbSaveTaxi(t); nb++; }
+    else if(!retard && t.statut === 'suspendu' && t.suspenduAuto) { t.statut = 'actif'; t.suspenduAuto = false; sbSaveTaxi(t); nb++; }
+  });
+  if(nb) console.log('🔄 Mises à jour périodiques : ' + nb + ' statut(s) actualisé(s)');
+}
+function infoMajHtml(x, estTaxi) {
+  const e = echeanceMaj(x, estTaxi);
+  if(!e) return '';
+  const retard = new Date() > e;
+  return '<div style="font-size:10px;color:' + (retard ? '#EF4444;font-weight:800' : 'var(--text2)') + '">🔄 Prochaine mise à jour : ' + e.toLocaleDateString('fr-FR') + (retard ? ' — EN RETARD' : '') + '</div>';
+}
+function appliquerMaj(x, estTaxi, prix, par) {
+  x.derniereMaj = new Date().toISOString();
+  if(x.statut === 'suspendu' && x.suspenduAuto) x.statut = 'actif';
+  x.suspenduAuto = false;
+  if(estTaxi) sbSaveTaxi(x); else sbSaveVehicule(x);
+  logMvt('enreg', '🔄 Mise à jour enregistrement ' + (estTaxi ? 'taxi ' + (x.plaque||'') : (x.mat||x.vin||'')), prix, par || 'Admin', estTaxi ? (x.nom||'') : (x.owner||''));
+  const e = echeanceMaj(x, estTaxi);
+  toast('✅ Mise à jour effectuée — prochaine échéance : ' + (e ? e.toLocaleDateString('fr-FR') : ''));
+}
+function majStaff(kind, id) {
+  const estTaxi = kind === 'taxi';
+  const x = estTaxi ? DB.taxis.find(t => t.id === id) : DB.vehs.find(v => v.id === id);
+  if(!x) { toast('Élément introuvable', true); return; }
+  if(DB.user && DB.user.role === 'sousagent') { toast('Réservé aux agents et à l\'administration', true); return; }
+  const prix = prixMajDe(x, estTaxi);
+  let debit = 0, ag = null;
+  if(!isAdmin()) {
+    ag = DB.agents.find(a => a.id === (DB.user && DB.user.agId));
+    if(!ag) { toast('Agent introuvable', true); return; }
+    debit = Math.round(prix * (((DB.commissions||{}).enregAgent) || 0) / 100);
+    if(ag.solde < debit) { toast('⚠️ Solde insuffisant — ' + fmt(debit) + ' requis', true); return; }
+  }
+  askConfirm('Mettre à jour cet enregistrement ?\n\nPrix client (espèces) : ' + fmt(prix) + (debit ? '\nDébit de votre solde : ' + fmt(debit) : ''), () => {
+    if(ag && debit) { ag.solde -= debit; sbSaveAgent(ag); updateNav(); }
+    appliquerMaj(x, estTaxi, prix, ag ? ag.name : 'Admin');
+    if(typeof rGestion === 'function') try { rGestion(); } catch(e) {}
+  });
+}
+function majClient(kind, id) {
+  const estTaxi = kind === 'taxi';
+  const x = estTaxi ? DB.taxis.find(t => t.id === id) : DB.vehs.find(v => v.id === id);
+  if(!x) { toast('Élément introuvable', true); return; }
+  const cl = (DB.user && DB.user.role === 'client') ? DB.clients.find(cc => cc.id === DB.user.id) : null;
+  if(!cl) { toast('Réservé à l\'espace client', true); return; }
+  const prix = prixMajDe(x, estTaxi);
+  if((cl.solde||0) < prix) { toast('⚠️ Solde insuffisant (' + fmt(prix) + ' requis) — rechargez votre solde ou rendez-vous chez un agent', true); return; }
+  askConfirm('Mettre à jour votre enregistrement pour ' + fmt(prix) + ' (débité de votre solde) ?', () => {
+    cl.solde = (cl.solde||0) - prix;
+    sbSaveClient(cl);
+    appliquerMaj(x, estTaxi, prix, ((cl.prenom||'')+' '+(cl.nom||'')).trim());
+    updateNav();
+    if(typeof rClientContent === 'function') try { rClientContent(); } catch(e) {}
+  });
+}
+function majProprioHtml(v) {
+  const bloc = (x, estTaxi, titre) => {
+    const e = echeanceMaj(x, estTaxi); if(!e) return '';
+    const retard = new Date() > e;
+    const prix = prixMajDe(x, estTaxi);
+    return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (retard ? '#EF4444' : 'rgba(249,115,22,.25)') + '">' +
+      '<div class="sect" style="margin-top:0">🔄 ' + titre + '</div>' +
+      '<div style="font-size:12px;margin-bottom:8px">' + (retard
+        ? '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + e.toLocaleDateString('fr-FR') + '</b>'
+        : 'Prochaine échéance : <b>' + e.toLocaleDateString('fr-FR') + '</b>') + '</div>' +
+      '<button class="btn" style="width:100%;padding:11px" onclick="majClient(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Mettre à jour maintenant — ' + fmt(prix) + '</button>' +
+      '<div class="qr-note-txt" style="font-size:10px;margin-top:6px">Payable avec votre solde, ou en espèces chez un agent.</div>' +
+    '</div>';
+  };
+  let html = bloc(v, false, 'Mise à jour de l\'enregistrement');
+  const tx = (DB.taxis||[]).find(t => t.motoId === v.id || nrm(t.plaque||'') === nrm(v.mat||''));
+  if(tx && tx.statut !== 'vole') html += bloc(tx, true, 'Mise à jour taxi');
+  return html;
+}
+function staffMajFicheHtml(x, estTaxi) {
+  const e = echeanceMaj(x, estTaxi);
+  return '<div class="card" style="margin-bottom:14px">' +
+    '<div class="sect" style="margin-top:0">🔄 Mise à jour de l\'enregistrement</div>' +
+    (e ? '<div style="font-size:12px;margin-bottom:8px">Échéance : <b style="color:' + (new Date()>e?'#EF4444':'inherit') + '">' + e.toLocaleDateString('fr-FR') + '</b>' + (new Date()>e ? ' — <b style="color:#EF4444">EN RETARD</b>' : '') + '</div>' : '') +
+    '<button class="btn" style="width:100%;padding:11px" onclick="majStaff(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Encaisser la mise à jour — ' + fmt(prixMajDe(x, estTaxi)) + '</button>' +
+  '</div>';
+}
+function majRenouvellementPeriode(type, val) {
+  DB.renouvellement = DB.renouvellement || {};
+  DB.renouvellement[type] = val;
+  sbSaveConfig();
+  toast('✅ Période ' + (type==='taxi' ? 'taxis' : 'motos/voitures') + ' : ' + ({mensuel:'tous les mois','6mois':'tous les 6 mois',anniversaire:'à chaque anniversaire'}[val]||val));
+  verifierMisesAJour();
+}
+function majTarifMaj(cle, val) {
+  DB.tarifsMaj = DB.tarifsMaj || {};
+  DB.tarifsMaj[cle] = Math.max(0, parseInt(val) || 0);
+  sbSaveConfig();
+}
+
+// ════ SUPPRESSION EN MASSE (ADMIN) ════
+const REGISTRES_SUPPR = {
+  clients:   { liste:'clients',        table:'clients',         corbeille:true,  nom:'clients',
+               label:x=>((x.prenom||'')+' '+(x.nom||'')).trim()+' · '+(x.num||''), date:x=>x.created_at||'' },
+  vehs:      { liste:'vehs',           table:'vehicules',       corbeille:true,  nom:'motos & voitures',
+               label:x=>((x.mat||x.vin||'?').toUpperCase())+' · '+(x.owner||''), date:x=>x.created_at||x.reg||'' },
+  passagers: { liste:'passagers',      table:'passagers',       corbeille:true,  nom:'passagers',
+               label:x=>((x.prenom||'')+' '+(x.nom||'')).trim()+' · '+(x.num||''), date:x=>x.created_at||x.dateInscription||'' },
+  taxis:     { liste:'taxis',          table:'taxis',           corbeille:true,  nom:'taxis',
+               label:x=>(x.nom||'?')+' · '+(x.plaque||'')+' · Gilet '+(x.gilet||'?'), date:x=>x.created_at||x.reg||'' },
+  trajets:   { liste:'trajets',        table:'trajets',         corbeille:true,  nom:'trajets',
+               label:x=>(x.depart||'?')+' → '+(x.arrivee||'?')+(x.date?' · '+x.date:''), date:x=>x.created_at||x.date||'' },
+  courses:   { liste:'demandesCourse', table:'demandes_course', corbeille:false, nom:'courses',
+               label:x=>'Course '+(x.depart||'?')+' → '+(x.arrivee||'?')+' · '+(x.statut||''), date:x=>x.created_at||x.date||'' },
+  annonces:  { liste:'annonces',       table:'annonces',        corbeille:true,  nom:'annonces',
+               label:x=>(((x.titre||x.desc||'Annonce')+'').slice(0,42))+' · '+fmt(x.prix||0), date:x=>x.created_at||x.date||'' },
+  historique:{ liste:'mouvements',     table:'mouvements',      corbeille:false, nom:'mouvements de l\'historique',
+               label:x=>((x.desc||'Mouvement')+'').slice(0,55), date:x=>x.date||x.created_at||'' }
+};
+let supprSel = new Set();
+
+function _itemsSupprFiltres() {
+  const type = (document.getElementById('suppr-type')||{}).value || window._supprType || 'courses';
+  const d1 = (document.getElementById('suppr-d1')||{}).value || '';
+  const d2 = (document.getElementById('suppr-d2')||{}).value || '';
+  const cfg = REGISTRES_SUPPR[type] || REGISTRES_SUPPR.courses;
+  let items = (DB[cfg.liste]||[]).slice();
+  if(d1) items = items.filter(x => { const d = String(cfg.date(x)||''); return d && d.slice(0,10) >= d1; });
+  if(d2) items = items.filter(x => { const d = String(cfg.date(x)||''); return d && d.slice(0,10) <= d2; });
+  return { type, cfg, items, d1, d2 };
+}
+
+function rSuppressionMasse() {
+  if(!isAdmin()) return '<div class="card" style="text-align:center;padding:22px;color:var(--text2)">🔒 Réservé à l\'administrateur.</div>';
+  const { type, cfg, items, d1, d2 } = _itemsSupprFiltres();
+  window._supprType = type;
+  const idsVisibles = new Set(items.map(x => x.id));
+  supprSel = new Set([...supprSel].filter(id => idsVisibles.has(id)));
+  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🧍 Passagers',taxis:'🚕 Taxis',trajets:'🛣️ Trajets',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)'};
+  return '<div class="card">' +
+    '<div class="sect" style="margin-top:0">🧹 Suppression en masse — Admin</div>' +
+    '<div class="grid2" style="margin-bottom:8px">' +
+      '<div class="fld"><div class="lbl">Registre</div>' +
+        '<select id="suppr-type" onchange="supprSel.clear();window._supprType=this.value;rGestion()">' +
+          Object.keys(opts).map(k => '<option value="'+k+'"'+(k===type?' selected':'')+'>'+opts[k]+'</option>').join('') +
+        '</select></div>' +
+      '<div class="fld"><div class="lbl">Période (optionnel — du / au)</div>' +
+        '<div style="display:flex;gap:6px">' +
+          '<input type="date" id="suppr-d1" value="'+d1+'" onchange="rGestion()" style="flex:1"/>' +
+          '<input type="date" id="suppr-d2" value="'+d2+'" onchange="rGestion()" style="flex:1"/>' +
+        '</div></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">' +
+        '<input type="checkbox" '+(items.length && items.every(x=>supprSel.has(x.id))?'checked':'')+' onchange="supprToutSel(this.checked)"/> Tout sélectionner ('+items.length+')' +
+      '</label>' +
+      '<span style="font-size:12px;color:var(--text2)"><b id="suppr-compte">'+supprSel.size+'</b> sélectionné(s)</span>' +
+    '</div>' +
+    '<div style="max-height:340px;overflow-y:auto;border:1px solid rgba(249,115,22,.2);border-radius:10px;padding:6px">' +
+      (items.length ? items.map(x =>
+        '<label style="display:flex;align-items:center;gap:10px;padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;font-size:12px">' +
+          '<input type="checkbox" '+(supprSel.has(x.id)?'checked':'')+' onchange="supprToggle(\''+x.id+'\', this.checked)"/>' +
+          '<span style="flex:1">'+esc(cfg.label(x))+'</span>' +
+          '<span style="color:var(--text3);font-size:10px;flex-shrink:0">'+String(cfg.date(x)||'').slice(0,10)+'</span>' +
+        '</label>').join('')
+      : '<div style="text-align:center;padding:18px;color:var(--text3);font-size:12px">Aucun élément'+(d1||d2?' dans cette période':'')+'</div>') +
+    '</div>' +
+    '<div class="qr-note-txt" style="font-size:10px;margin:8px 0">' +
+      (cfg.corbeille ? '♻️ Les éléments supprimés vont dans la corbeille (récupérables 48h).' : '⚠️ Suppression DÉFINITIVE et immédiate pour ce registre (pas de corbeille).') +
+    '</div>' +
+    '<button class="btn-red" style="width:100%;padding:12px" onclick="executerSuppressionMasse()">🗑️ Supprimer la sélection (<span id="suppr-compte-btn">'+supprSel.size+'</span>)</button>' +
+  '</div>';
+}
+
+function supprToggle(id, on) {
+  if(on) supprSel.add(id); else supprSel.delete(id);
+  const c1 = document.getElementById('suppr-compte');     if(c1) c1.textContent = supprSel.size;
+  const c2 = document.getElementById('suppr-compte-btn'); if(c2) c2.textContent = supprSel.size;
+}
+
+function supprToutSel(on) {
+  const { items } = _itemsSupprFiltres();
+  supprSel = on ? new Set(items.map(x => x.id)) : new Set();
+  rGestion();
+}
+
+function executerSuppressionMasse() {
+  if(!isAdmin()) { toast('Réservé à l\'administrateur', true); return; }
+  const { type, cfg } = _itemsSupprFiltres();
+  const ids = [...supprSel];
+  if(!ids.length) { toast('⚠️ Aucun élément sélectionné', true); return; }
+  askConfirm(
+    'Supprimer ' + ids.length + ' élément(s) du registre « ' + cfg.nom + ' » ?\n\n' +
+    (cfg.corbeille ? '♻️ Récupérables pendant 48h dans la corbeille.' : '⚠️ ATTENTION : suppression DÉFINITIVE et immédiate !'),
+    () => {
+      let nOk = 0;
+      ids.forEach(id => {
+        const item = (DB[cfg.liste]||[]).find(x => x.id === id);
+        if(!item) return;
+        if(cfg.corbeille) {
+          const corbItem = { id: gid(), type: cfg.liste, data: item, listeOrigine: cfg.liste,
+            label: cfg.label(item), dateSuppr: new Date().toISOString(),
+            supprimePar: DB.user ? (DB.user.name || DB.user.role) : 'Admin' };
+          DB.corbeille.unshift(corbItem);
+          sbSaveCorbeille(corbItem);
+        }
+        DB[cfg.liste] = DB[cfg.liste].filter(x => x.id !== id);
+        sbDeleteItem(cfg.table, id);
+        nOk++;
+      });
+      supprSel.clear();
+      logMvt('enreg', '🧹 Suppression en masse — ' + nOk + ' élément(s) · registre ' + cfg.nom, 0, DB.user ? DB.user.name : 'Admin', '');
+      toast('🗑️ ' + nOk + ' élément(s) supprimé(s)' + (cfg.corbeille ? ' (corbeille 48h)' : ' définitivement'));
+      rGestion(); rHome();
+    }
+  );
+}
+
 function supprimerCoursesPeriode() {
   if(!isAdmin()) { toast('⛔ Réservé à l\'administrateur', true); return; }
   const du = document.getElementById('crs-du').value;
@@ -9148,6 +9497,18 @@ async function saveAg() {
   };
   DB.agents.push(newAg);
   sbSaveAgent(newAg);
+  envoyerEmailConfirmation(email, 'Création de votre compte agent — Laouni AfriMoto', [
+    'Bonjour ' + (resp || name) + ',',
+    '',
+    'Votre agence « ' + name + ' » a été créée sur Laouni AfriMoto.',
+    'NUMÉRO UNIQUE / IDENTIFIANT DE CONNEXION : ' + num,
+    city ? 'Ville : ' + city : null,
+    'Solde initial : ' + fmt(newAg.solde),
+    '',
+    'Connectez-vous avec cet identifiant et le mot de passe défini à la création de votre compte.',
+    '',
+    '— Laouni AfriMoto · Registre sécurisé · Guinée'
+  ]).then(ok => { if(ok) toast('📧 Confirmation envoyée à l\'agent'); });
   closeModal('m-ag'); rGestion(); updateNav();
   toast('✅ Agent créé — ' + name + ' · ID : ' + num);
 }
@@ -9538,9 +9899,21 @@ async function saveSA() {
   }
   const num = genNumPersonne('sa', DB.sousAgents, name);
   const photo = getPic('sa-photo-prev');
-  const newSA = {id:gid(), num, name, tel, code:num, pass: await hashPw(pass), agId, photo, solde:0, actif:true};
+  const emailSA = (document.getElementById('sa-email') ? document.getElementById('sa-email').value : '').trim();
+  const newSA = {id:gid(), num, name, tel, email:emailSA, code:num, pass: await hashPw(pass), agId, photo, solde:0, actif:true};
   DB.sousAgents.push(newSA);
   sbSaveSousAgent(newSA);
+  envoyerEmailConfirmation(emailSA, 'Création de votre compte sous-agent — Laouni AfriMoto', [
+    'Bonjour ' + name + ',',
+    '',
+    'Votre compte sous-agent a été créé sur Laouni AfriMoto.',
+    'NUMÉRO UNIQUE / IDENTIFIANT DE CONNEXION : ' + num,
+    'Téléphone : ' + tel,
+    '',
+    'Connectez-vous avec cet identifiant et le mot de passe défini à la création de votre compte.',
+    '',
+    '— Laouni AfriMoto · Registre sécurisé · Guinée'
+  ]).then(ok => { if(ok) toast('📧 Confirmation envoyée au sous-agent'); });
   closeModal('m-sousagent'); rSA(); rGestion(); rRecharge();
   toast('✅ Sous-agent ' + name + ' créé ! ID : ' + num);
 }
@@ -9556,7 +9929,7 @@ function openModal_SA() {
 const _openModal = openModal;
 window.openModal = function(id) {
   if(id==='m-sousagent') {
-    ['sa-name','sa-tel','sa-code','sa-pass'].forEach(x=>{const e=document.getElementById(x);if(e)e.value='';});
+    ['sa-name','sa-tel','sa-email','sa-code','sa-pass'].forEach(x=>{const e=document.getElementById(x);if(e)e.value='';});
     const err=document.getElementById('saerr'); if(err) err.style.display='none';
     // Reset photo preview
     const prev=document.getElementById('sa-photo-prev'); if(prev){prev.src='';prev.style.display='none';}
@@ -9719,6 +10092,37 @@ function rTarifs() {
         </div>`).join('')}
       <div style="margin-bottom:-4px">
         <div style="font-size:11px;color:var(--text2);text-align:center">Les modifications sont appliquées immédiatement à toutes les prochaines opérations.</div>
+      </div>
+    </div>
+
+    <div class="sect">🔄 Mise à jour périodique des enregistrements</div>
+    <div class="info-gold" style="margin-bottom:10px">💡 Sans mise à jour payée avant l'échéance, la moto, la voiture ou le taxi passe automatiquement en statut SUSPENDU. Les périodes ci-dessous sont à votre choix. Le client paie depuis son espace (solde) ou en espèces chez un agent.</div>
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(249,115,22,.1)">
+        <div style="font-weight:600;font-size:13px">Période motos / voitures</div>
+        <select style="width:190px;padding:8px 10px;font-size:13px" onchange="majRenouvellementPeriode('moto', this.value)">
+          <option value="mensuel" ${(DB.renouvellement||{}).moto==='mensuel'?'selected':''}>Tous les mois</option>
+          <option value="6mois" ${(DB.renouvellement||{}).moto==='6mois'?'selected':''}>Tous les 6 mois</option>
+          <option value="anniversaire" ${(DB.renouvellement||{}).moto!=='mensuel'&&(DB.renouvellement||{}).moto!=='6mois'?'selected':''}>Chaque anniversaire</option>
+        </select>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(249,115,22,.1)">
+        <div style="font-weight:600;font-size:13px">Période taxis</div>
+        <select style="width:190px;padding:8px 10px;font-size:13px" onchange="majRenouvellementPeriode('taxi', this.value)">
+          <option value="mensuel" ${(DB.renouvellement||{}).taxi!=='6mois'&&(DB.renouvellement||{}).taxi!=='anniversaire'?'selected':''}>Tous les mois</option>
+          <option value="6mois" ${(DB.renouvellement||{}).taxi==='6mois'?'selected':''}>Tous les 6 mois</option>
+          <option value="anniversaire" ${(DB.renouvellement||{}).taxi==='anniversaire'?'selected':''}>Chaque anniversaire</option>
+        </select>
+      </div>
+      <div style="font-weight:700;font-size:11px;margin-bottom:8px;color:var(--text2);letter-spacing:.5px">PRIX DE LA MISE À JOUR (GNF) — fixé par catégorie</div>
+      ${DB.tarifs.map(t=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="font-size:12px">${esc(t.label)}</div>
+          <input type="number" min="0" value="${(DB.tarifsMaj||{})[t.id]||0}" style="width:130px;padding:8px;text-align:center;font-weight:800" onchange="majTarifMaj('${t.id}', this.value)"/>
+        </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid rgba(249,115,22,.1);padding-top:10px">
+        <div style="font-size:12px">🚕 Taxi</div>
+        <input type="number" min="0" value="${(DB.tarifsMaj||{}).taxi||0}" style="width:130px;padding:8px;text-align:center;font-weight:800" onchange="majTarifMaj('taxi', this.value)"/>
       </div>
     </div>
 
