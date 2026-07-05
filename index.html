@@ -196,7 +196,7 @@
 var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1})},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(o*r,n*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}(function(){return qrcode});
 /* ═══ VERSION & NETTOYAGE CACHE ═══
    Supprime tout ancien service worker / cache PWA qui servirait une vieille version du site. */
-window.AFRIMOTO_VERSION = 'v4.5 — 04/07/2026';
+window.AFRIMOTO_VERSION = 'v4.6 — 05/07/2026';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 try {
   if('serviceWorker' in navigator) {
@@ -574,21 +574,21 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         { data: journalAccesSensibles },
         { data: configRows },
       ] = await Promise.all([
-        supabaseClient.from('agents').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('sous_agents').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('clients').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('passagers').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('vehicules').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('taxis').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('trajets').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('annonces').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('alertes').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('mouvements').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('corbeille').select('*').order('date_suppr', {ascending:false}),
-        supabaseClient.from('demandes_course').select('*').order('created_at', {ascending:false}),
-        supabaseClient.from('avis_chauffeurs').select('*').order('created_at', {ascending:false}),
+        supabaseClient.from('agents').select('*'),
+        supabaseClient.from('sous_agents').select('*'),
+        supabaseClient.from('clients').select('*'),
+        supabaseClient.from('passagers').select('*'),
+        supabaseClient.from('vehicules').select('*'),
+        supabaseClient.from('taxis').select('*'),
+        supabaseClient.from('trajets').select('*'),
+        supabaseClient.from('annonces').select('*'),
+        supabaseClient.from('alertes').select('*'),
+        supabaseClient.from('mouvements').select('*'),
+        supabaseClient.from('corbeille').select('*'),
+        supabaseClient.from('demandes_course').select('*'),
+        supabaseClient.from('avis_chauffeurs').select('*'),
         supabaseClient.from('chauffeurs_bloques_par_nom').select('*'),
-        supabaseClient.from('journal_acces_sensibles').select('*').order('created_at', {ascending:false}),
+        supabaseClient.from('journal_acces_sensibles').select('*'),
         supabaseClient.from('config_admin').select('*').limit(1),
       ]);
 
@@ -609,6 +609,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       DB.chauffeursBloquesParNom = (chauffeursBloquesParNom||[]).map(x=>x.nom||x.name||x);
       DB.journalAccesSensibles = (journalAccesSensibles||[]).map(x=>({...x}));
 
+      // Tri côté client (le tri serveur échouait silencieusement quand created_at manquait)
+      const _triDate = (arr, champ) => (arr||[]).sort((a,b) => new Date(b[champ]||0) - new Date(a[champ]||0));
+      _triDate(DB.mouvements, 'date');
+      _triDate(DB.demandesCourse, 'date');
+
       // Synchroniser les catégories locales vers la table 'categories' de Supabase
       // (sinon la clé étrangère vehicules.cat_id rejette les catégories inconnues
       // et la catégorie du véhicule est perdue à l'enregistrement)
@@ -628,6 +633,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.bandeau_actif !== undefined) DB.bandeauActif = cfg.bandeau_actif;
         if(cfg.bandeau_texte) DB.bandeauTexte = cfg.bandeau_texte;
         if(cfg.bandeau_vitesse) DB.bandeauVitesse = cfg.bandeau_vitesse;
+        if(cfg.photos_enreg) DB.photosEnreg = Object.assign({moto:'optionnel',proprio:'optionnel',facture:'optionnel',cg:'optionnel',piece:'optionnel'}, cfg.photos_enreg);
         if(cfg.commission_course_taxi) DB.commissionCourseTaxi = cfg.commission_course_taxi;
         if(cfg.trajet_unique_desactive !== undefined) DB.trajetUniqueDesactive = cfg.trajet_unique_desactive;
         if(cfg.admin_email) DB.adminEmail = cfg.admin_email;
@@ -650,6 +656,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       pref:r.prefecture||r.pref||'', addr:r.adresse||r.addr||'', city:r.ville||r.city||'',
       tel:r.telephone||r.tel||'', pass:r.pass_hash||r.pass||'', solde:r.solde||0,
       photo:r.photo_url||r.photo||'', actif:r.actif!==false, code:r.code||r.num,
+      peutValider:r.peut_valider||r.peutValider||false,
+      peutVoirCourses:r.peut_voir_courses||r.peutVoirCourses||false,
       email:r.email||'', created_at:r.created_at };
   }
   function mapSousAgent(r) {
@@ -686,6 +694,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       agId:r.agent_id||r.agId||r.agentId||null,
       permis:r.permis||'',
       photo:r.photo_url||r.photo||'', gilet:r.gilet||false,
+      photoP:r.photo_proprietaire_url||r.photoP||'',
+      photoFacture:r.photo_facture_url||r.photoFacture||'',
+      photoCG:r.photo_cg_url||r.photoCG||'',
+      photoPiece:r.photo_piece_url||r.photoPiece||'',
+      dateNaissance:r.date_naissance||r.dateNaissance||'',
+      lieuNaissance:r.lieu_naissance||r.lieuNaissance||'',
       fraisEnreg:r.frais_enregistrement||r.fraisEnreg||0,
       valide:r.valide!==false,
       vis:r.vis||{owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false},
@@ -856,6 +870,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       prefecture:ag.pref||null, adresse:ag.addr||null, ville:ag.city||'', code:ag.code||ag.num||'',
       telephone:ag.tel||null, email:ag.email||null, solde:ag.solde||0,
       actif:ag.actif!==false, peut_valider:ag.peutValider||false,
+      peut_voir_courses:ag.peutVoirCourses||false,
       photo_url:ag.photo||null, pass_hash:ag.pass||null };
     const alts = { nom:'name', responsable:'resp', prefecture:'pref', adresse:'addr',
       ville:'city', telephone:'tel', photo_url:'photo' };
@@ -917,15 +932,22 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       vol_type_crime:v.volTypeCrime||null,
       vol_ville:v.volVille||null,
       photo_url:v.photo||null,
+      photo_proprietaire_url:v.photoP||null,
+      photo_facture_url:v.photoFacture||null,
+      photo_cg_url:v.photoCG||null,
+      photo_piece_url:v.photoPiece||null,
+      date_naissance:v.dateNaissance||null,
+      lieu_naissance:v.lieuNaissance||null,
       date_enregistrement:v.reg||null,
       historique_proprietaires:v.hist||[] };
     const alts = { matricule:'mat', marque:'brand', modele:'model', proprietaire:'owner',
       telephone:'phone', adresse:'addr', contact_secours:'secours',
       couleur:'color', categorie_id:'cat_id', vole:'stolen', annee:'year',
       frais_enregistrement:'frais', photo_url:'photo',
+      photo_proprietaire_url:'photoP', photo_facture_url:'photoFacture', photo_cg_url:'photoCG', photo_piece_url:'photoPiece',
       carte_grise:'cg', date_achat:'dachat',
       date_enregistrement:'reg', historique_proprietaires:'hist' };
-    await sbUpsertSouple('vehicules', row, alts);
+    return await sbUpsertSouple('vehicules', row, alts);
   }
   const sbSaveVehicule = sbIgnoreErr(_sbSaveVehicule, 'sbSaveVehicule');
 
@@ -998,7 +1020,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     const row = { id:1, tarifs:DB.tarifs, commissions:DB.commissions, regles_zones:DB.reglesZones,
       frais_trajet_defaut:DB.fraisTrajetDefaut, bandeau_actif:DB.bandeauActif,
       bandeau_texte:DB.bandeauTexte, bandeau_vitesse:DB.bandeauVitesse,
-      commission_course_taxi:DB.commissionCourseTaxi, trajet_unique_desactive:DB.trajetUniqueDesactive };
+      commission_course_taxi:DB.commissionCourseTaxi, trajet_unique_desactive:DB.trajetUniqueDesactive,
+      photos_enreg:DB.photosEnreg||null };
     try {
       return await sbUpsertSouple('config_admin', row, {});
     } catch(e) { console.warn('sbSaveConfig:', e && e.message); return false; }
@@ -1519,9 +1542,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div id="qr-code-display" style="font-family:monospace;font-size:13px;color:#EAB308;margin-bottom:8px;font-weight:700"></div>
     <div style="font-size:11px" class="qr-note-txt" id="qr-note"></div>
-    <div style="font-size:9px;opacity:.45;margin-top:6px">AfriMoto v4.5</div>
+    <div style="font-size:9px;opacity:.45;margin-top:6px">AfriMoto v4.6</div>
     <div style="display:flex;gap:8px">
       <button class="btn-gold" style="flex:1;padding:11px;font-size:13px" onclick="printQR()">🖨️ Imprimer QR</button>
+      <button id="qr-btn-fiche" class="btn-gold" style="flex:1;padding:11px;font-size:13px;display:none" onclick="fichePdfEnregistrement()">📄 Fiche PDF</button>
       <button class="btn" style="flex:1;padding:11px;font-size:13px" onclick="closeModal('m-qr')">✅ Terminer</button>
     </div>
   </div>
@@ -2022,6 +2046,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <div class="fld"><div class="lbl">Prénom *</div><input type="text" id="mm-owner-prenom" placeholder="Mamadou"/></div>
         <div class="fld"><div class="lbl">Nom *</div><input type="text" id="mm-owner-nom" placeholder="Diallo"/></div>
       </div>
+      <div class="grid2">
+        <div class="fld"><div class="lbl">Date de naissance</div><input type="date" id="mm-datenais"/></div>
+        <div class="fld"><div class="lbl">Lieu de naissance</div><input type="text" id="mm-lieunais" placeholder="Labé"/></div>
+      </div>
       <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="mm-phone" placeholder="+224 6xx xxx xxx"/></div>
       <div class="fld"><div class="lbl">Email <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel — pour récupération de compte</span></div><input type="email" id="mm-owner-email" placeholder="exemple@email.com" autocomplete="off"/></div>
       <div class="fld"><div class="lbl">Mot de passe *</div><div style="display:flex;gap:6px"><input type="password" id="mm-owner-pass" style="flex:1" autocomplete="off"/><button class="btn-ghost" style="flex-shrink:0;padding:0 10px;font-size:16px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button></div></div>
@@ -2063,10 +2091,32 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-pp','mm-pp-ph')"/>
         </label>
       </div>
-      <div><div class="lbl">🪪 Propriétaire</div>
+      <div><div class="lbl" id="mm-ppp-lbl">🪪 Propriétaire</div>
         <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
           <img id="mm-ppp" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-ppp-ph">📷</span>
           <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-ppp','mm-ppp-ph')"/>
+        </label>
+      </div>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div><div class="lbl" id="mm-pfa-lbl">🧾 Facture</div>
+        <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+          <img id="mm-pfa" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-pfa-ph">📷</span>
+          <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-pfa','mm-pfa-ph')"/>
+        </label>
+      </div>
+      <div><div class="lbl" id="mm-pcg-lbl">📄 Carte grise</div>
+        <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+          <img id="mm-pcg" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-pcg-ph">📷</span>
+          <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-pcg','mm-pcg-ph')"/>
+        </label>
+      </div>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div><div class="lbl" id="mm-ppi-lbl">🪪 Pièce d'identité</div>
+        <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+          <img id="mm-ppi" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-ppi-ph">📷</span>
+          <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-ppi','mm-ppi-ph')"/>
         </label>
       </div>
     </div>
@@ -2465,6 +2515,8 @@ const DB = {
   // validation obligatoire par un agent/admin avant activation.
   passagers: [],
   demandesCourse: [],
+  // Photos du formulaire d'enregistrement : 'obligatoire' ou 'optionnel' — modifiable par l'admin (page Tarifs)
+  photosEnreg: { moto:'optionnel', proprio:'optionnel', facture:'optionnel', cg:'optionnel', piece:'optionnel' },
   corbeille: [],
   journalAccesSensibles: [],
   vehs: [],
@@ -2766,6 +2818,7 @@ function askConfirm(message, onYes) {
 const EMAILJS_CONFIG = {
   serviceId:  'service_0rvox9x',
   templateId: 'template_4k60hjj',
+  templateRecapId: '',   // à remplir : 2e modèle EmailJS « récapitulatif d'enregistrement » (variables : to_email, titre, contenu)
   publicKey:  'awxu35zCxrmJzkyOZ'
 };
 async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, instruction) {
@@ -4682,6 +4735,7 @@ function rOwner() {
           (v.photo ? '<div style="flex:1"><div class="lbl">📸 Photo moto</div><img src="' + v.photo + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;border:2px solid rgba(239,68,68,.4)"/></div>' : '') +
           (v.photoP ? '<div><div class="lbl">🪪 Propriétaire</div><img src="' + v.photoP + '" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid rgba(239,68,68,.4)"/></div>' : '') +
         '</div>' : '') +
+      docsProprioHtml(v) +
 
       // Toutes les infos
       '<div class="card" style="margin-bottom:14px;border-color:rgba(239,68,68,.2)">' +
@@ -4753,6 +4807,7 @@ function rOwner() {
           (v.photo ? '<div style="flex:1"><div class="lbl">📸 Moto</div><img src="' + v.photo + '" style="width:100%;height:110px;object-fit:cover;border-radius:9px;border:1px solid rgba(249,115,22,.3)"/></div>' : '') +
           (v.photoP ? '<div><div class="lbl">🪪 Vous</div><img src="' + v.photoP + '" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid rgba(249,115,22,.4)"/></div>' : '') +
         '</div>' : '') +
+      docsProprioHtml(v) +
 
       // Infos véhicule
       '<div class="card" style="margin-bottom:10px">' +
@@ -5317,6 +5372,7 @@ function processSearch(qn) {
       if(showPhotoP && v.photoP) html += '<div><div class="lbl">🪪 Propriétaire</div><img src="' + v.photoP + '" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid ' + (v.stolen?'#EF4444':'rgba(249,115,22,.4)') + '"/></div>';
       html += '</div>';
     }
+    if(staffView) html += docsProprioHtml(v);
     html += '<div style="font-size:13px;margin-bottom:4px"><b>' + v.brand + ' ' + v.model + '</b> · ' + v.color + (v.year?' · '+v.year:'') + '</div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Matricule : <b style="color:#EAB308">' + (v.mat || '—') + '</b></div>';
     html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Enregistré le : <b style="color:var(--text2)">' + (v.reg ? new Date(v.reg).toLocaleDateString('fr-FR') : '—') + '</b></div>';
@@ -5431,9 +5487,7 @@ function startScan(mode) {
             if(codes.length > 0) {
               const raw = codes[0].rawValue;
               stopScan();
-              document.getElementById('sr').innerHTML = '';
-              processSearch(nrm(extraireDonneesQR(raw)));
-              toast('📷 QR scanné !');
+              traiterQRScanne(raw);
             }
           } catch(e) {}
         }, 300);
@@ -5451,8 +5505,7 @@ function startScan(mode) {
               const code = jsQR(imgData.data, imgData.width, imgData.height);
               if(code) {
                 stopScan();
-                processSearch(nrm(extraireDonneesQR(code.data)));
-                toast('📷 QR scanné !');
+                traiterQRScanne(code.data);
               }
             }
           }, 300);
@@ -5472,6 +5525,22 @@ function startScan(mode) {
 // Le QR encode une URL du site (?v=AMG-XXXXX%7CMATRICULE%7CVIN) : scanné depuis
 // l'extérieur, l'app décode l'URL au chargement. Le scanner INTERNE doit faire pareil,
 // sinon la recherche reçoit l'URL brute avec %7C et ne trouve rien.
+// Traitement central d'un QR scanné en interne : gère motos (?v=) ET taxis (?taxi=)
+function traiterQRScanne(brut) {
+  const s = String(brut || '').trim();
+  const mTaxi = /[?&]taxi=([^&#]+)/i.exec(s);
+  if(mTaxi) {
+    let idTaxi = mTaxi[1];
+    try { idTaxi = decodeURIComponent(idTaxi); } catch(e) {}
+    const tx = DB.taxis.find(t => t.id === idTaxi);
+    if(tx) { afficherFichePubliqueTaxi(tx); toast('📷 QR taxi scanné !'); return; }
+    toast('⚠️ Taxi introuvable pour ce QR', true); return;
+  }
+  document.getElementById('sr').innerHTML = '';
+  processSearch(nrm(extraireDonneesQR(s)));
+  toast('📷 QR scanné !');
+}
+
 function extraireDonneesQR(brut) {
   let s = String(brut || '').trim();
   const m = /[?&](?:v|qr)=([^&#]+)/i.exec(s);
@@ -6378,7 +6447,29 @@ function setVehType(type) {
   // Permis : obligatoire uniquement voiture
   document.getElementById('mm-permis-wrap').style.display = type==='voiture' ? '' : 'none';
   // Label photo
-  document.getElementById('mm-pp-lbl').textContent = type==='voiture' ? '📸 Voiture' : '📸 Moto';
+  appliquerLabelsPhotosEnreg();
+}
+
+// Applique les libellés des 4 photos avec « * » quand l'admin les a rendues obligatoires
+function appliquerLabelsPhotosEnreg() {
+  const pe = DB.photosEnreg || {};
+  const etoile = k => pe[k]==='obligatoire' ? ' *' : '';
+  const lbls = {
+    'mm-pp-lbl':  (curVehType==='voiture' ? '📸 Voiture' : '📸 Moto') + etoile('moto'),
+    'mm-ppp-lbl': '🪪 Propriétaire' + etoile('proprio'),
+    'mm-pfa-lbl': '🧾 Facture' + etoile('facture'),
+    'mm-pcg-lbl': '📄 Carte grise' + etoile('cg'),
+    'mm-ppi-lbl': '🪪 Pièce d\'identité' + etoile('piece')
+  };
+  for(const id in lbls) { const e = document.getElementById(id); if(e) e.textContent = lbls[id]; }
+}
+
+// Réglage admin : photo obligatoire ou optionnelle (page Tarifs)
+function majPhotoEnreg(key, val) {
+  if(!DB.photosEnreg) DB.photosEnreg = {moto:'optionnel',proprio:'optionnel',facture:'optionnel',cg:'optionnel',piece:'optionnel'};
+  DB.photosEnreg[key] = val;
+  sbSaveConfig();
+  toast('✅ Photo « ' + ({moto:'véhicule',proprio:'propriétaire',facture:'facture',cg:'carte grise',piece:'pièce d\'identité'}[key]||key) + ' » : ' + (val==='obligatoire'?'obligatoire':'optionnelle'));
 }
 
 function searchClientForMoto() {
@@ -6422,13 +6513,13 @@ function openAddMoto() {
   DB.mHP = [];
   curVehType = 'moto';
   clearClientMoto();
-  ['mm-mat','mm-vin','mm-brand','mm-model','mm-color','mm-year','mm-cg','mm-owner-prenom','mm-owner-nom','mm-owner-email','mm-owner-pass','mm-phone','mm-addr','mm-gilet','mm-permis','mm-hn','mm-ht','mm-secours','mm-lien','mm-frais-especes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['mm-mat','mm-vin','mm-brand','mm-model','mm-color','mm-year','mm-cg','mm-owner-prenom','mm-owner-nom','mm-owner-email','mm-owner-pass','mm-phone','mm-addr','mm-gilet','mm-permis','mm-hn','mm-ht','mm-secours','mm-lien','mm-frais-especes','mm-datenais','mm-lieunais'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['mm-dachat','mm-hd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mm-statut').value='actif';
   document.getElementById('merr').style.display='none';
   document.getElementById('mm-hist').innerHTML='';
-  ['mm-pp','mm-ppp'].forEach(id=>{const e=document.getElementById(id);if(e){e.src='';e.style.display='none';}});
-  ['mm-pp-ph','mm-ppp-ph'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});
+  ['mm-pp','mm-ppp','mm-pfa','mm-pcg','mm-ppi'].forEach(id=>{const e=document.getElementById(id);if(e){e.src='';e.style.display='none';}});
+  ['mm-pp-ph','mm-ppp-ph','mm-pfa-ph','mm-pcg-ph','mm-ppi-ph'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});
   setVehType('moto');
   const tsel = document.getElementById('mm-cat');
   tsel.innerHTML = DB.tarifs.map(t=>`<option value="${t.id}">${t.label} — ${fmt(t.prix)}</option>`).join('');
@@ -6445,6 +6536,7 @@ function openAddMoto() {
 
 // ════ QR CODE ════
 function showQR(data, titre, infosHtml, note) {
+  const _bfiche = document.getElementById('qr-btn-fiche'); if(_bfiche) _bfiche.style.display = 'none';
   // URL canonique officielle du site — toujours propre peu importe le nom du fichier local.
   // En développement (fichier local), on utilise window.location comme fallback.
   const siteUrl = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
@@ -6477,6 +6569,120 @@ function showQR(data, titre, infosHtml, note) {
     } catch(e) { console.error('QR error:', e); }
   }
   openModal('m-qr');
+}
+
+// ══ Email récapitulatif automatique au client après enregistrement ══
+async function envoyerEmailRecapEnregistrement(v) {
+  try {
+    if(!EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateRecapId || !EMAILJS_CONFIG.publicKey) return false;
+    const cl = DB.clients.find(c => c.id === v.clientId);
+    const email = cl && cl.email;
+    if(!email) return false;
+    const tf = DB.tarifs.find(t => t.id === (v.cat || v.catId));
+    const lignes = [
+      'NUMÉRO UNIQUE : ' + v.num,
+      'Code d\'accès client : ' + v.code,
+      '',
+      '── PROPRIÉTAIRE ──',
+      'Nom : ' + (v.owner||'—'),
+      v.dateNaissance ? 'Date de naissance : ' + v.dateNaissance : null,
+      v.lieuNaissance ? 'Lieu de naissance : ' + v.lieuNaissance : null,
+      'Téléphone : ' + (v.phone||'—'),
+      'Adresse : ' + (v.addr||'—'),
+      v.secours ? 'Contact de secours : ' + v.secours + (v.lienSecours?' ('+v.lienSecours+')':'') : null,
+      '',
+      '── VÉHICULE ──',
+      'Type : ' + (v.type||'moto'),
+      'Matricule : ' + ((v.mat||'—').toUpperCase()),
+      'VIN / Châssis : ' + ((v.vin||'—').toUpperCase()),
+      'Marque / Modèle : ' + (v.brand||'') + ' ' + (v.model||''),
+      'Couleur : ' + (v.color||'—'),
+      v.year ? 'Année : ' + v.year : null,
+      v.cg ? 'N° carte grise : ' + v.cg : null,
+      tf ? 'Catégorie : ' + tf.label : null,
+      v.dachat ? 'Date d\'achat : ' + v.dachat : null,
+      'Date d\'enregistrement : ' + (v.reg||''),
+      'Statut : ' + (v.valide ? '✅ Validé' : '⏳ En attente de validation par l\'administration'),
+      '',
+      'Vérification publique : https://laouni-securite-ultime.com?v=' + encodeURIComponent(v.num + '|' + (v.mat||'') + '|' + (v.vin||''))
+    ].filter(x => x !== null);
+    const rep = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_CONFIG.serviceId,
+        template_id: EMAILJS_CONFIG.templateRecapId,
+        user_id: EMAILJS_CONFIG.publicKey,
+        template_params: {
+          to_email: email,
+          titre: 'Confirmation d\'enregistrement — ' + (v.mat || v.vin || v.num),
+          contenu: lignes.join('\n')
+        }
+      })
+    });
+    return rep.ok;
+  } catch(e) { console.warn('Email récap:', e && e.message); return false; }
+}
+
+// ══ Fiche PDF récapitulative (imprimable / enregistrable en PDF) ══
+function fichePdfEnregistrement(vehId) {
+  const v = DB.vehs.find(x => x.id === (vehId || window._dernierVehFiche));
+  if(!v) { toast('Véhicule introuvable', true); return; }
+  const tf = DB.tarifs.find(t => t.id === (v.cat || v.catId));
+  const cl = DB.clients.find(c => c.id === v.clientId);
+  const siteUrl = 'https://laouni-securite-ultime.com';
+  const urlData = siteUrl + '?v=' + encodeURIComponent(v.num + '|' + (v.mat||'') + '|' + (v.vin||''));
+  const ouvrir = (qrDataUrl) => {
+    const w = window.open('', '_blank', 'width=430,height=680');
+    if(!w) { toast('⚠️ Fenêtre bloquée — autorisez les pop-ups pour la fiche PDF.', true); return; }
+    const ligne = (l, val) => val ? '<tr><td style="padding:4px 8px;color:#666;font-size:12px;white-space:nowrap">' + l + '</td><td style="padding:4px 8px;font-weight:700;font-size:12px">' + val + '</td></tr>' : '';
+    w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche ' + v.num + '</title>' +
+    '<style>body{font-family:Arial,sans-serif;color:#111;padding:18px;max-width:520px;margin:auto}' +
+    'h1{color:#f97316;font-size:16px;margin:0}' +
+    '.num{font-size:22px;font-weight:900;letter-spacing:1px}' +
+    'table{width:100%;border-collapse:collapse}' +
+    '.sect{color:#f97316;font-weight:900;font-size:13px;margin:14px 0 4px;border-bottom:2px solid #f97316;padding-bottom:3px}' +
+    '.photos img{height:80px;border-radius:6px;margin:0 6px 6px 0;border:1px solid #ddd}' +
+    '@media print{button{display:none}}</style></head><body>' +
+    '<div style="text-align:center">' +
+      '<h1>🛡️ LAOUNI AFRIMOTO — Registre sécurisé · Guinée</h1>' +
+      '<div style="font-size:12px;color:#666;margin:4px 0 10px">Fiche officielle d\'enregistrement — ' + new Date().toLocaleDateString('fr-FR') + '</div>' +
+      '<div class="num">' + v.num + '</div>' +
+      (qrDataUrl ? '<img src="' + qrDataUrl + '" style="width:150px;height:150px;margin:8px 0"/>' : '') +
+      '<div style="font-family:monospace;font-size:11px;color:#666">' + v.num + ' | ' + (v.mat||'').toUpperCase() + ' | ' + (v.vin||'').toUpperCase() + '</div>' +
+    '</div>' +
+    '<div class="sect">👤 PROPRIÉTAIRE</div>' +
+    '<table>' + ligne('Nom complet', esc(v.owner||'')) + ligne('Date de naissance', v.dateNaissance||'') + ligne('Lieu de naissance', esc(v.lieuNaissance||'')) + ligne('Téléphone', esc(v.phone||'')) + ligne('Adresse', esc(v.addr||'')) + ligne('Contact de secours', v.secours ? esc(v.secours) + (v.lienSecours?' ('+esc(v.lienSecours)+')':'') : '') + ligne('N° client', cl ? cl.num : '') + '</table>' +
+    '<div class="sect">🏍️ VÉHICULE</div>' +
+    '<table>' + ligne('Type', v.type||'moto') + ligne('Matricule', (v.mat||'').toUpperCase()) + ligne('VIN / Châssis', (v.vin||'').toUpperCase()) + ligne('Marque / Modèle', esc((v.brand||'') + ' ' + (v.model||''))) + ligne('Couleur', esc(v.color||'')) + ligne('Année', v.year||v.annee||'') + ligne('N° carte grise', esc(v.cg||'')) + ligne('Catégorie', tf ? esc(tf.label) : '') + ligne('Date d\'achat', v.dachat||'') + ligne('Date d\'enregistrement', v.reg||'') + ligne('Statut', v.valide ? '✅ Validé' : '⏳ En attente de validation') + '</table>' +
+    ((v.photo||v.photoP||v.photoFacture||v.photoCG||v.photoPiece) ? '<div class="sect">📸 PHOTOS</div><div class="photos">' + [v.photo,v.photoP,v.photoFacture,v.photoCG,v.photoPiece].filter(Boolean).map(p => '<img src="' + p + '"/>').join('') + '</div>' : '') +
+    '<div style="margin-top:14px;font-size:10px;color:#999;text-align:center">Ce QR reste valide à vie — même après changement de propriétaire.<br>Vérification : ' + siteUrl + '</div>' +
+    '<button onclick="window.print()" style="margin-top:14px;width:100%;padding:12px;background:#f97316;color:#fff;border:none;border-radius:8px;font-weight:800;font-size:14px">🖨️ Imprimer / Enregistrer en PDF</button>' +
+    '</body></html>');
+    w.document.close();
+  };
+  if(typeof QRCode !== 'undefined') {
+    const tmp = document.createElement('canvas');
+    try { QRCode.toCanvas(tmp, urlData, {width:300, margin:1}, err => ouvrir(err ? '' : tmp.toDataURL())); }
+    catch(e) { ouvrir(''); }
+  } else ouvrir('');
+}
+
+// ══ Documents confidentiels du véhicule (facture, carte grise, pièce d'identité) ══
+// Visibles UNIQUEMENT par le client propriétaire, l'agent et l'administration — jamais en public.
+function docsProprioHtml(v) {
+  const docs = [
+    ['🧾 Facture', v.photoFacture],
+    ['📄 Carte grise', v.photoCG],
+    ['🪪 Pièce d\'identité', v.photoPiece]
+  ].filter(d => d[1]);
+  if(!docs.length) return '';
+  return '<div class="card" style="margin-bottom:14px">' +
+    '<div class="sect" style="margin-top:0">📁 Documents confidentiels</div>' +
+    '<div class="qr-note-txt" style="font-size:10px;margin-bottom:8px">Visibles uniquement par le propriétaire, l\'agent et l\'administration — jamais en public.</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+    docs.map(d => '<div><div class="lbl" style="font-size:9px">' + d[0] + '</div><img src="' + d[1] + '" onclick="voirPhotoGrande(\'' + d[1] + '\',\'' + d[0] + '\')" style="width:86px;height:64px;object-fit:cover;border-radius:8px;border:2px solid rgba(249,115,22,.35);cursor:pointer"/></div>').join('') +
+    '</div></div>';
 }
 
 function printQR() {
@@ -6587,6 +6793,19 @@ async function saveMoto() {
     err.textContent='⚠️ Ce numéro de châssis est déjà enregistré.'; err.style.display='block'; return;
   }
 
+  // Photos obligatoires selon le réglage admin (page Tarifs)
+  const pe = DB.photosEnreg || {};
+  const photosManquantes = [];
+  if(pe.moto==='obligatoire'    && !getPic('mm-pp'))  photosManquantes.push(curVehType==='voiture'?'photo de la voiture':'photo de la moto');
+  if(pe.proprio==='obligatoire' && !getPic('mm-ppp')) photosManquantes.push('photo du propriétaire');
+  if(pe.facture==='obligatoire' && !getPic('mm-pfa')) photosManquantes.push('photo de la facture');
+  if(pe.cg==='obligatoire'      && !getPic('mm-pcg')) photosManquantes.push('photo de la carte grise');
+  if(pe.piece==='obligatoire'   && !getPic('mm-ppi')) photosManquantes.push('photo de la pièce d\'identité');
+  if(photosManquantes.length) {
+    err.textContent='⚠️ Photo(s) obligatoire(s) manquante(s) : ' + photosManquantes.join(', ') + '.';
+    err.style.display='block'; return;
+  }
+
   const statut = document.getElementById('mm-statut').value;
   const catId = document.getElementById('mm-cat').value;
   const tf = DB.tarifs.find(t=>t.id===catId);
@@ -6638,6 +6857,10 @@ async function saveMoto() {
     cat:catId, agId, owner, phone, addr,
     stolen:statut==='vole', reg:new Date().toISOString().split('T')[0],
     photo:getPic('mm-pp'), photoP:getPic('mm-ppp'),
+    photoFacture:getPic('mm-pfa'), photoCG:getPic('mm-pcg'),
+    photoPiece:getPic('mm-ppi'),
+    dateNaissance:(document.getElementById('mm-datenais')||{}).value||'',
+    lieuNaissance:((document.getElementById('mm-lieunais')||{}).value||'').trim(),
     // Validation admin obligatoire avant que l'enregistrement soit effectif et visible publiquement,
     // sauf si l'agent qui enregistre a lui-même été habilité à valider par l'admin.
     valide: peutValiderEnregistrements(),
@@ -6645,7 +6868,27 @@ async function saveMoto() {
     hist:[...DB.mHP,{nom:owner,tel:phone,depuis:dachat||new Date().toISOString().split('T')[0]}]
   };
   DB.vehs.push(newV);
-  sbSaveVehicule(newV);
+
+  // ── SÉCURITÉ : la sauvegarde Supabase doit RÉUSSIR avant de générer le QR ──
+  toast('⏳ Sauvegarde en cours…');
+  const sauvegardeOK = await sbSaveVehicule(newV);
+  if(sauvegardeOK !== true) {
+    // Retirer le véhicule local + rembourser le débit agent éventuel
+    DB.vehs = DB.vehs.filter(x => x.id !== newV.id);
+    if(agId && tf && !isAdmin()) {
+      const agR = DB.agents.find(a => a.id === agId);
+      if(agR) {
+        const debitR = Math.round(tf.prix * DB.commissions.enregAgent / 100);
+        agR.solde += debitR;
+        logMvt('rech','↩️ Remboursement auto — échec enregistrement ' + (mat||vin).toUpperCase(), debitR, 'Système', agR.name, {annulation:true});
+        sbSaveAgent(agR);
+      }
+    }
+    err.textContent = '⚠️ ÉCHEC DE LA SAUVEGARDE — le véhicule n\'a PAS été enregistré dans le système. Vérifiez votre connexion internet puis réessayez. Aucun QR n\'a été généré.';
+    err.style.display = 'block';
+    toast('⚠️ Enregistrement NON sauvegardé — réessayez', true);
+    return;
+  }
   // Lier le véhicule au compte client (si c'est son premier véhicule, on garde une référence directe)
   const clFinal = DB.clients.find(c=>c.id===cltIdFinal);
   if(clFinal && !clFinal.vid) { clFinal.vid = newV.id; sbSaveClient(clFinal); }
@@ -6679,6 +6922,11 @@ async function saveMoto() {
     (!newV.valide ? '<br><span style="color:#EAB308;font-size:12px">⏳ En attente de validation par l\'administration</span>' : ''),
     'Ce QR reste valide à vie — même après changement de propriétaire'
   );
+
+  // Bouton « Fiche PDF » dans le modal QR + email récapitulatif automatique au client
+  window._dernierVehFiche = newV.id;
+  const _bfq = document.getElementById('qr-btn-fiche'); if(_bfq) _bfq.style.display='';
+  envoyerEmailRecapEnregistrement(newV).then(ok => { if(ok) toast('📧 Récapitulatif envoyé par email au client'); });
 }
 
 let mHPTemp = [];
@@ -7344,7 +7592,8 @@ function rAnnonces() {
   const ms30j = 30 * 24 * 60 * 60 * 1000;
   const prefN = nrm(filtreAnnoncePref);
   const annoncesVisibles = annoncesValides().filter(a =>
-    !prefN || nrm(a.pref||'')===prefN || nrm(a.ville||'').includes(prefN)
+    (a.statut||'active') === 'active' &&   // exclut suspendues (vol déclaré) et vendues du public
+    (!prefN || nrm(a.pref||'')===prefN || nrm(a.ville||'').includes(prefN))
   );
   document.getElementById('annonces-list').innerHTML = annoncesVisibles.length ? annoncesVisibles.map(an=>{
     const joursRestants = Math.ceil((ms30j - (now - new Date(an.date||now))) / (24*60*60*1000));
@@ -7454,7 +7703,7 @@ function delAnn(id) {
 }
 function marquerVendu(id) {
   const a = DB.annonces.find(x=>x.id===id);
-  if(a) { a.statut='vendu'; rAnnonces(); rClientContent(); toast('✅ Annonce marquée vendue'); }
+  if(a) { a.statut='vendu'; sbSaveAnnonce(a); rAnnonces(); rClientContent(); toast('✅ Annonce marquée vendue'); }
 }
 
 // ════════════════════════════════════════════════
@@ -7753,7 +8002,7 @@ function rGestion() {
         <div style="display:flex;gap:10px;align-items:flex-start">
           ${ag.photo?`<img src="${ag.photo}" style="width:46px;height:46px;object-fit:cover;border-radius:50%;flex-shrink:0;border:2px solid rgba(249,115,22,.3)"/>`:'<div style="width:46px;height:46px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📍</div>'}
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:14px">${esc(ag.name)} ${!ag.actif?'<span class="tag tag-red" style="font-size:9px">SUSPENDU</span>':''} ${ag.peutValider?'<span class="tag tag-green" style="font-size:9px">✅ HABILITÉ VALIDATION</span>':''}</div>
+            <div style="font-weight:700;font-size:14px">${esc(ag.name)} ${!ag.actif?'<span class="tag tag-red" style="font-size:9px">SUSPENDU</span>':''} ${ag.peutValider?'<span class="tag tag-green" style="font-size:9px">✅ HABILITÉ VALIDATION</span>':''} ${ag.peutVoirCourses?'<span class="tag tag-gold" style="font-size:9px">🚕 HISTORIQUE COURSES</span>':''}</div>
             <div style="font-size:11px;color:var(--text2)">📍 ${ag.city} · Code: <span style="color:#EAB308;font-family:monospace">${ag.code}</span></div>
             <div style="font-size:13px;color:${ag.solde<50000?'#EF4444':'#f97316'};font-weight:700">💰 ${fmt(ag.solde)}</div>
             <div style="font-size:11px;color:var(--text2)">${DB.vehs.filter(v=>v.agId===ag.id).length} véh. · ${DB.taxis.filter(t=>t.agId===ag.id).length} taxis</div>
@@ -7762,6 +8011,7 @@ function rGestion() {
             <button class="btn-blue" style="font-size:10px;padding:5px 8px" onclick="editAg('${ag.id}')">✏️</button>
             <button class="${ag.actif?'btn-gold':'btn-ghost'}" style="font-size:10px;padding:5px 8px" onclick="toggleAg('${ag.id}')">${ag.actif?'⏸️':'✅'}</button>
             <button class="${ag.peutValider?'btn':'btn-ghost'}" style="font-size:9px;padding:5px 8px" onclick="toggleAgentPeutValider('${ag.id}')" title="Peut valider les enregistrements">${ag.peutValider?'⏳✅':'⏳➕'}</button>
+            <button class="${ag.peutVoirCourses?'btn':'btn-ghost'}" style="font-size:9px;padding:5px 8px" onclick="toggleAgentPeutVoirCourses('${ag.id}')" title="Peut consulter l'historique des courses">${ag.peutVoirCourses?'🚕✅':'🚕➕'}</button>
             <button class="btn-red" style="font-size:10px;padding:5px 8px" onclick="delAg('${ag.id}')">🗑️</button>
           </div>
         </div>
@@ -8157,6 +8407,15 @@ function rGestion() {
     html = `
       <div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
         Historique des demandes de course, conservé 48h puis supprimé automatiquement. Total commissions affichées : <b>${fmt(totalCommissions)}</b>.
+      </div>
+      <div class="card" style="margin-bottom:14px;border-color:rgba(239,68,68,.35)">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">🗑️ Suppression par période — réservé à l'administrateur</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:130px"><div class="lbl">Du</div><input type="date" id="crs-du" style="width:100%"/></div>
+          <div style="flex:1;min-width:130px"><div class="lbl">Au</div><input type="date" id="crs-au" style="width:100%"/></div>
+          <button class="btn-red" style="padding:10px 14px;font-size:12px;flex-shrink:0" onclick="supprimerCoursesPeriode()">🗑️ Supprimer la période</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">Toutes les courses comprises entre ces deux dates (incluses) seront supprimées définitivement, du site et de la base de données.</div>
       </div>` +
       (list.length ? list.map(d => `
       <div class="card" style="margin-bottom:8px">
@@ -8424,6 +8683,38 @@ function toggleAgentPeutValider(id) {
   sbSaveAgent(ag);
   toast(ag.peutValider ? '✅ ' + ag.name + ' peut désormais valider ses enregistrements' : '⏳ ' + ag.name + ' doit désormais passer par la validation admin');
   rGestion();
+}
+function toggleAgentPeutVoirCourses(id) {
+  const ag = DB.agents.find(x=>x.id===id);
+  if(!ag) return;
+  ag.peutVoirCourses = !ag.peutVoirCourses;
+  sbSaveAgent(ag);
+  toast(ag.peutVoirCourses ? '🚕 ' + ag.name + ' peut désormais consulter l\'historique des courses' : '🚫 ' + ag.name + ' ne peut plus consulter l\'historique des courses');
+  rGestion();
+  updateNav();
+}
+// Suppression de toutes les courses d'une période — RÉSERVÉ ADMIN
+function supprimerCoursesPeriode() {
+  if(!isAdmin()) { toast('⛔ Réservé à l\'administrateur', true); return; }
+  const du = document.getElementById('crs-du').value;
+  const au = document.getElementById('crs-au').value;
+  if(!du || !au) { toast('⚠️ Sélectionnez les deux dates (du → au)', true); return; }
+  const debut = new Date(du + 'T00:00:00');
+  const fin   = new Date(au + 'T23:59:59.999');
+  if(debut > fin) { toast('⚠️ La date « du » doit précéder la date « au »', true); return; }
+  const aSupprimer = DB.demandesCourse.filter(d => {
+    const dd = new Date(d.date || 0);
+    return dd >= debut && dd <= fin;
+  });
+  if(!aSupprimer.length) { toast('Aucune course sur cette période', true); return; }
+  askConfirm('Supprimer définitivement ' + aSupprimer.length + ' course(s) du ' + fd(du) + ' au ' + fd(au) + ' ? Cette action est irréversible.', () => {
+    const ids = aSupprimer.map(d => d.id);
+    DB.demandesCourse = DB.demandesCourse.filter(d => !ids.includes(d.id));
+    ids.forEach(id => { if(typeof sbDeleteItem === 'function') sbDeleteItem('demandes_course', id); });
+    logMvt('suppr', '🗑️ Suppression de ' + ids.length + ' course(s) — période du ' + fd(du) + ' au ' + fd(au), 0, 'Administrateur', 'Système');
+    toast('✅ ' + ids.length + ' course(s) supprimée(s)');
+    rGestion();
+  });
 }
 function delAg(id) {
   const ag = DB.agents.find(x=>x.id===id);
@@ -9349,25 +9640,28 @@ function annulerRecharge(id) {
     if(ag) {
       if(ag.solde < m.montant) { toast('⚠️ Impossible — solde agent insuffisant pour le remboursement', true); return; }
       ag.solde -= m.montant;
+      sbSaveAgent(ag);
     }
   } else if(m.cibleType==='sousagent') {
     const sa = DB.sousAgents.find(s=>s.id===m.cibleId);
     if(sa) {
       if(sa.solde < m.montant) { toast('⚠️ Impossible — solde sous-agent insuffisant pour le remboursement', true); return; }
       sa.solde -= m.montant;
+      sbSaveSousAgent(sa);
     }
   } else if(m.cibleType==='client') {
     const cl = DB.clients.find(c=>c.id===m.cibleId);
     if(cl) {
       if((cl.solde||0) < m.montant) { toast('⚠️ Impossible — solde client insuffisant pour le remboursement', true); return; }
       cl.solde -= m.montant;
+      sbSaveClient(cl);
       // Rembourser la source (SA ou agent)
       if(m.sourceType==='sousagent') {
         const sa = DB.sousAgents.find(s=>s.id===m.sourceId);
-        if(sa) sa.solde += m.montant;
+        if(sa) { sa.solde += m.montant; sbSaveSousAgent(sa); }
       } else {
         const ag = DB.agents.find(a=>a.id===m.agentId);
-        if(ag) ag.solde += m.montant;
+        if(ag) { ag.solde += m.montant; sbSaveAgent(ag); }
       }
     }
   }
@@ -9375,6 +9669,7 @@ function annulerRecharge(id) {
   m.annule = true;
   m.annulePar = DB.user ? DB.user.name : '—';
   m.annuleDate = new Date().toISOString();
+  sbLogMvt(m);
   logMvt('rech','↩️ Annulation : '+m.desc, m.montant, DB.user?DB.user.name:'Admin', m.de, {annulation:true});
   toast('✅ Recharge annulée — montant reversé');
   rHistorique(); updateNav();
@@ -9425,6 +9720,25 @@ function rTarifs() {
       <div style="margin-bottom:-4px">
         <div style="font-size:11px;color:var(--text2);text-align:center">Les modifications sont appliquées immédiatement à toutes les prochaines opérations.</div>
       </div>
+    </div>
+
+    <div class="sect">📸 Photos d'enregistrement (moto / voiture)</div>
+    <div class="info-gold" style="margin-bottom:10px">💡 Choisissez pour chaque photo si elle est obligatoire ou optionnelle lors de l'enregistrement d'un véhicule. Appliqué immédiatement.</div>
+    <div class="card" style="margin-bottom:10px">
+      ${[
+        ['moto','📸 Photo du véhicule (moto / voiture)'],
+        ['proprio','🪪 Photo du propriétaire'],
+        ['facture','🧾 Photo de la facture'],
+        ['cg','📄 Photo de la carte grise'],
+        ['piece','🪪 Photo de la pièce d\'identité'],
+      ].map(([key,lbl])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(249,115,22,.1)">
+          <div style="font-weight:600;font-size:13px">${lbl}</div>
+          <select style="width:150px;padding:8px 10px;font-size:13px" onchange="majPhotoEnreg('${key}', this.value)">
+            <option value="optionnel" ${(DB.photosEnreg||{})[key]!=='obligatoire'?'selected':''}>Optionnelle</option>
+            <option value="obligatoire" ${(DB.photosEnreg||{})[key]==='obligatoire'?'selected':''}>Obligatoire ✱</option>
+          </select>
+        </div>`).join('')}
     </div>
 
     <div class="sect">Ajouter un tarif</div>
