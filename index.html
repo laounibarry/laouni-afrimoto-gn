@@ -705,6 +705,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photoPiece:r.photo_piece_url||r.photoPiece||'',
       dateNaissance:r.date_naissance||r.dateNaissance||'',
       lieuNaissance:r.lieu_naissance||r.lieuNaissance||'',
+      nationalite:r.nationalite||'',
+      typePiece:r.type_piece||r.typePiece||'',
+      numPiece:r.num_piece||r.numPiece||'',
       fraisEnreg:r.frais_enregistrement||r.fraisEnreg||0,
       valide:r.valide!==false,
       vis:r.vis||{owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false},
@@ -937,6 +940,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       type:v.type||'moto',                 // n'était pas sauvegardé → voitures/taxis rechargés en 'moto'
       valide:v.valide!==false,             // n'était pas sauvegardé → état de validation perdu
       derniere_maj:v.derniereMaj||null, suspendu_auto:v.suspenduAuto||false,
+      nationalite:v.nationalite||null, type_piece:v.typePiece||null, num_piece:v.numPiece||null,
       carte_grise:v.cg||null,
       date_achat:v.dachat||null,
       vol_date:v.volDate||null,
@@ -1158,7 +1162,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;opacity:.95">Registre ultra-sécurisé des trajets, des véhicules et des motos en Afrique</div>
     <div class="hero-pub-sub">Enregistrement · Anti-vol · Vérification · Trajets</div>
     <div class="hero-pub-badges">
-      <span class="hero-pub-badge">🛡️ Officiel</span>
+      <span class="hero-pub-badge">🛡️ Enregistré</span>
       <span class="hero-pub-badge">📱 QR Code</span>
       <span class="hero-pub-badge">🚨 Anti-vol</span>
     </div>
@@ -1739,7 +1743,19 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div class="fld"><div class="lbl">Nom *</div><input type="text" id="insp-nom" autocomplete="off"/></div>
     <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="insp-tel" autocomplete="off" placeholder="+224 6XX XX XX XX"/></div>
     <div class="fld"><div class="lbl">Email *</div><input type="email" id="insp-email" autocomplete="off" placeholder="exemple@email.com"/></div>
-    <div class="fld"><div class="lbl">N° pièce d'identité (CNI, passeport...) *</div><input type="text" id="insp-piece" autocomplete="off"/></div>
+    <div class="grid2">
+      <div class="fld"><div class="lbl">Nationalité *</div><input type="text" id="insp-nationalite" placeholder="Guinéenne" autocomplete="off"/></div>
+      <div class="fld"><div class="lbl">Type de pièce *</div>
+        <select id="insp-type-piece">
+          <option value="CNI">🪪 CNI</option>
+          <option value="Passeport">📘 Passeport</option>
+          <option value="Permis">🚗 Permis</option>
+          <option value="Carte consulaire">🏛️ Carte consulaire</option>
+          <option value="Autre">📄 Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="fld"><div class="lbl">N° de pièce d'identité *</div><input type="text" id="insp-piece" autocomplete="off" placeholder="Ex: CNI-2024-XXXXX"/></div>
     <div class="fld">
       <div class="lbl">Photo de la pièce d'identité *</div>
       <div style="display:flex;align-items:center;gap:12px">
@@ -2033,7 +2049,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <div class="lbl">Frais d'enregistrement perçus en espèces (GNF) *
           <span style="color:var(--text2);font-weight:400;font-size:9px;text-transform:none;letter-spacing:0"> — montant encaissé auprès du propriétaire</span>
         </div>
-        <input type="number" id="mm-frais-especes" placeholder="Ex: 50000" min="0"/>
+        <input type="number" id="mm-frais-especes" placeholder="Prix automatique selon catégorie" min="0" readonly style="background:rgba(249,115,22,.06);cursor:not-allowed"/>
+        <div id="mm-frais-info" style="font-size:10px;color:var(--text2);margin-top:4px">💡 Prix fixé par l'administration selon la catégorie sélectionnée.</div>
       </div>
     </div>
 
@@ -2079,6 +2096,19 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <div class="fld"><div class="lbl">Email <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel — pour récapitulatif et récupération de compte</span></div><input type="email" id="mm-owner-email" placeholder="exemple@email.com" autocomplete="off"/></div>
       <div class="fld"><div class="lbl">Mot de passe *</div><div style="display:flex;gap:6px"><input type="password" id="mm-owner-pass" style="flex:1" autocomplete="off"/><button class="btn-ghost" style="flex-shrink:0;padding:0 10px;font-size:16px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button></div></div>
       <div class="fld"><div class="lbl">Adresse</div><input type="text" id="mm-addr" placeholder="Quartier, Ville"/></div>
+      <div class="grid2">
+        <div class="fld"><div class="lbl">Nationalité</div><input type="text" id="mm-nationalite" placeholder="Guinéenne"/></div>
+        <div class="fld"><div class="lbl">Type de pièce</div>
+          <select id="mm-type-piece">
+            <option value="CNI">🪪 CNI</option>
+            <option value="Passeport">📘 Passeport</option>
+            <option value="Permis">🚗 Permis de conduire</option>
+            <option value="Carte consulaire">🏛️ Carte consulaire</option>
+            <option value="Autre">📄 Autre</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld"><div class="lbl">N° de pièce d'identité</div><input type="text" id="mm-num-piece" placeholder="Ex: CNI-2024-XXXXX" autocomplete="off"/></div>
       <div class="grid2">
         <div class="fld"><div class="lbl">N° Secours <span style="color:#EF4444;font-weight:700">*</span> <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Toujours visible publiquement</span></div><input type="tel" id="mm-secours" placeholder="+224 6xx xxx xxx"/></div>
         <div class="fld"><div class="lbl">Lien <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel</span></div><input type="text" id="mm-lien" placeholder="Père, Frère..."/></div>
@@ -3248,8 +3278,10 @@ async function soumettreInscriptionPassager() {
   }
   const num = genNumPersonne('passager', DB.passagers, nom, prenom);
   const hashedPass = await hashPw(pass);
+  const nationalite = ((document.getElementById('insp-nationalite')||{}).value||'').trim();
+  const typePiece = (document.getElementById('insp-type-piece')||{}).value||'CNI';
   const newPs = {
-    id: gid(), num, prenom, nom, tel, email, piece, photoPiece, photoProfil, user: userLogin, pass: hashedPass,
+    id: gid(), num, prenom, nom, tel, email, nationalite, typePiece, piece, photoPiece, photoProfil, user: userLogin, pass: hashedPass,
     valide: false, dateInscription: new Date().toISOString(),
     consentementDonneLe: new Date().toISOString()
   };
@@ -5442,6 +5474,14 @@ function processSearch(qn) {
       html += '</div>';
     }
     if(v.statut === 'suspendu') html += '<div style="background:#EAB308;color:#111;font-weight:800;text-align:center;border-radius:10px;padding:10px;margin-bottom:10px">⏸️ ENREGISTREMENT SUSPENDU — mise à jour requise (espace client ou chez un agent)</div>';
+    // Photo moto (publique si visible activée)
+    if(v.photo && (!v.vis || v.vis.photo !== false)) {
+      html += '<div style="text-align:center;margin:10px 0"><img src="' + v.photo + '" style="max-width:100%;max-height:200px;border-radius:12px;border:2px solid rgba(249,115,22,.3)" alt="Photo du véhicule"/></div>';
+    }
+    // Photo propriétaire (publique si activée)
+    if(v.photoP && v.vis && v.vis.photoP) {
+      html += '<div style="text-align:center;margin:8px 0"><img src="' + v.photoP + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(249,115,22,.4)" alt="Propriétaire"/></div>';
+    }
     if(staffView) html += staffMajFicheHtml(v, false);
     if(staffView) html += docsProprioHtml(v);
     html += '<div style="font-size:13px;margin-bottom:4px"><b>' + v.brand + ' ' + v.model + '</b> · ' + v.color + (v.year?' · '+v.year:'') + '</div>';
@@ -6607,7 +6647,7 @@ function openAddMoto() {
   DB.mHP = [];
   curVehType = 'moto';
   clearClientMoto();
-  ['mm-mat','mm-vin','mm-brand','mm-model','mm-color','mm-year','mm-cg','mm-owner-prenom','mm-owner-nom','mm-owner-email','mm-owner-pass','mm-phone','mm-addr','mm-gilet','mm-permis','mm-hn','mm-ht','mm-secours','mm-lien','mm-frais-especes','mm-datenais','mm-lieunais'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['mm-mat','mm-vin','mm-brand','mm-model','mm-color','mm-year','mm-cg','mm-owner-prenom','mm-owner-nom','mm-owner-email','mm-owner-pass','mm-phone','mm-addr','mm-gilet','mm-permis','mm-hn','mm-ht','mm-secours','mm-lien','mm-frais-especes','mm-datenais','mm-lieunais','mm-nationalite','mm-num-piece'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['mm-dachat','mm-hd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mm-statut').value='actif';
   document.getElementById('merr').style.display='none';
@@ -6617,6 +6657,22 @@ function openAddMoto() {
   setVehType('moto');
   const tsel = document.getElementById('mm-cat');
   tsel.innerHTML = DB.tarifs.map(t=>`<option value="${t.id}">${t.label} — ${fmt(t.prix)}</option>`).join('');
+  // Prix automatique selon catégorie (non modifiable par l'agent)
+  function majPrixCat() {
+    const tf = DB.tarifs.find(t => t.id === tsel.value);
+    const fraisEl = document.getElementById('mm-frais-especes');
+    const infoEl = document.getElementById('mm-frais-info');
+    if(tf && fraisEl) {
+      fraisEl.value = tf.prix;
+      fraisEl.readOnly = !isAdmin(); // Admin peut ajuster si besoin
+      fraisEl.style.cursor = isAdmin() ? '' : 'not-allowed';
+      if(infoEl) infoEl.textContent = isAdmin()
+        ? '⚙️ Admin : vous pouvez modifier ce montant si nécessaire.'
+        : '💡 Prix fixé par l\'administration : ' + fmt(tf.prix) + ' GNF — non modifiable.';
+    }
+  }
+  tsel.onchange = majPrixCat;
+  majPrixCat(); // Appliquer au chargement
   const asel = document.getElementById('mm-agent');
   if(isAdmin()) {
     document.getElementById('mm-agent-wrap').style.display='';
@@ -6725,7 +6781,7 @@ async function envoyerEmailRecapEnregistrement(v) {
     try {
       const tf2 = DB.tarifs.find(t => t.id === (v.cat||v.catId));
       const htmlPdf = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;padding:20px;max-width:500px;color:#111}h2{color:#f97316;font-size:16px}table{width:100%;border-collapse:collapse}td{padding:5px 8px;font-size:12px}tr:nth-child(even){background:#f9f9f9}.s{color:#f97316;font-weight:700;margin:12px 0 4px;padding-bottom:3px;border-bottom:2px solid #f97316;font-size:13px}</style></head><body>' +
-        '<h2>🛡️ Laouni AfriMoto — Fiche d\'enregistrement</h2>' +
+        '<div style="text-align:center;margin-bottom:8px"><div style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f97316,#ea6c00);padding:8px 16px;border-radius:12px"><span style="font-size:22px">🛡️</span><div style="text-align:left"><div style="font-size:13px;font-weight:900;color:#fff">LAOUNI AFRIMOTO</div><div style="font-size:8px;color:rgba(255,255,255,.75);letter-spacing:1px">REGISTRE SÉCURISÉ · GUINÉE</div></div></div></div>' +
         '<div class="s">NUMÉRO UNIQUE</div><p style="font-size:20px;font-weight:900;letter-spacing:1px">' + esc(v.num) + '</p>' +
         '<div class="s">PROPRIÉTAIRE</div><table>' +
           '<tr><td>Nom complet</td><td><b>' + esc(v.owner||'') + '</b></td></tr>' +
@@ -6781,26 +6837,51 @@ function fichePdfEnregistrement(vehId) {
     if(!w) { toast('⚠️ Fenêtre bloquée — autorisez les pop-ups pour la fiche PDF.', true); return; }
     const ligne = (l, val) => val ? '<tr><td style="padding:4px 8px;color:#666;font-size:12px;white-space:nowrap">' + l + '</td><td style="padding:4px 8px;font-weight:700;font-size:12px">' + val + '</td></tr>' : '';
     w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche ' + v.num + '</title>' +
-    '<style>body{font-family:Arial,sans-serif;color:#111;padding:18px;max-width:520px;margin:auto}' +
+    '<style>body{font-family:Arial,sans-serif;color:#111;padding:18px;max-width:520px;margin:auto;position:relative}' +
     'h1{color:#f97316;font-size:16px;margin:0}' +
     '.num{font-size:22px;font-weight:900;letter-spacing:1px}' +
     'table{width:100%;border-collapse:collapse}' +
     '.sect{color:#f97316;font-weight:900;font-size:13px;margin:14px 0 4px;border-bottom:2px solid #f97316;padding-bottom:3px}' +
     '.photos img{height:80px;border-radius:6px;margin:0 6px 6px 0;border:1px solid #ddd}' +
-    '@media print{button{display:none}}</style></head><body>' +
+    '.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:72px;font-weight:900;color:rgba(249,115,22,0.07);letter-spacing:4px;pointer-events:none;white-space:nowrap;z-index:0;user-select:none;font-family:Arial,sans-serif}' +
+    '.watermark2{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg) translateY(90px);font-size:18px;font-weight:700;color:rgba(249,115,22,0.07);letter-spacing:8px;pointer-events:none;white-space:nowrap;z-index:0;user-select:none}' +
+    '.content{position:relative;z-index:1}' +
+    '.sign-zone{display:flex;gap:20px;margin-top:28px;margin-bottom:10px}' +
+    '.sign-box{flex:1;border-top:2px solid #ccc;padding-top:8px;text-align:center;font-size:11px;color:#555}' +
+    '.sign-box .sign-label{font-weight:700;font-size:12px;color:#111;margin-bottom:4px}' +
+    '.sign-area{height:50px;border:1px dashed #ccc;border-radius:6px;margin:6px 0}' +
+    '@media print{button{display:none}.watermark,.watermark2{position:fixed}}</style></head><body>' +
+    '<div class="watermark">LAOUNI AFRIMOTO</div>' +
+    '<div class="watermark2">REGISTRE SÉCURISÉ · GUINÉE</div>' +
+    '<div class="content">' +
     '<div style="text-align:center">' +
       '<h1>🛡️ LAOUNI AFRIMOTO — Registre sécurisé · Guinée</h1>' +
-      '<div style="font-size:12px;color:#666;margin:4px 0 10px">Fiche officielle d\'enregistrement — ' + new Date().toLocaleDateString('fr-FR') + '</div>' +
+      '<div style="font-size:12px;color:#666;margin:4px 0 10px">Fiche d\'enregistrement Laouni AfriMoto — ' + new Date().toLocaleDateString('fr-FR') + '</div>' +
       '<div class="num">' + v.num + '</div>' +
       (qrDataUrl ? '<img src="' + qrDataUrl + '" style="width:150px;height:150px;margin:8px 0"/>' : '') +
       '<div style="font-family:monospace;font-size:11px;color:#666">' + v.num + ' | ' + (v.mat||'').toUpperCase() + ' | ' + (v.vin||'').toUpperCase() + '</div>' +
     '</div>' +
     '<div class="sect">👤 PROPRIÉTAIRE</div>' +
-    '<table>' + ligne('Nom complet', esc(v.owner||'')) + ligne('Date de naissance', v.dateNaissance||'') + ligne('Lieu de naissance', esc(v.lieuNaissance||'')) + ligne('Téléphone', esc(v.phone||'')) + ligne('Adresse', esc(v.addr||'')) + ligne('Contact de secours', v.secours ? esc(v.secours) + (v.lienSecours?' ('+esc(v.lienSecours)+')':'') : '') + ligne('N° client', cl ? cl.num : '') + '</table>' +
+    '<table>' + ligne('Nom complet', esc(v.owner||'')) + ligne('Date de naissance', v.dateNaissance||'') + ligne('Lieu de naissance', esc(v.lieuNaissance||'')) + ligne('Nationalité', esc(v.nationalite||'')) + ligne('Type de pièce', esc(v.typePiece||'')) + ligne('N° de pièce', esc(v.numPiece||'')) + ligne('Téléphone', esc(v.phone||'')) + ligne('Adresse', esc(v.addr||'')) + ligne('Contact de secours', v.secours ? esc(v.secours) + (v.lienSecours?' ('+esc(v.lienSecours)+')':'') : '') + ligne('N° client', cl ? cl.num : '') + '</table>' +
     '<div class="sect">🏍️ VÉHICULE</div>' +
     '<table>' + ligne('Type', v.type||'moto') + ligne('Matricule', (v.mat||'').toUpperCase()) + ligne('VIN / Châssis', (v.vin||'').toUpperCase()) + ligne('Marque / Modèle', esc((v.brand||'') + ' ' + (v.model||''))) + ligne('Couleur', esc(v.color||'')) + ligne('Année', v.year||v.annee||'') + ligne('N° carte grise', esc(v.cg||'')) + ligne('Catégorie', tf ? esc(tf.label) : '') + ligne('Date d\'achat', v.dachat||'') + ligne('Date d\'enregistrement', v.reg||'') + ligne('Statut', v.valide ? '✅ Validé' : '⏳ En attente de validation') + '</table>' +
     ((v.photo||v.photoP||v.photoFacture||v.photoCG||v.photoPiece) ? '<div class="sect">📸 PHOTOS</div><div class="photos">' + [v.photo,v.photoP,v.photoFacture,v.photoCG,v.photoPiece].filter(Boolean).map(p => '<img src="' + p + '"/>').join('') + '</div>' : '') +
     '<div style="margin-top:14px;font-size:10px;color:#999;text-align:center">Ce QR reste valide à vie — même après changement de propriétaire.<br>Vérification : ' + siteUrl + '</div>' +
+    '<div class="sign-zone">' +
+      '<div class="sign-box">' +
+        '<div class="sign-label">Signature de l\'agent</div>' +
+        '<div style="font-size:10px;color:#888;margin-bottom:4px">Nom & cachet de l\'agence</div>' +
+        '<div class="sign-area"></div>' +
+        '<div style="font-size:10px;color:#aaa">Date : ___/___/______</div>' +
+      '</div>' +
+      '<div class="sign-box">' +
+        '<div class="sign-label">Signature du client</div>' +
+        '<div style="font-size:10px;color:#888;margin-bottom:4px">Lu et approuvé</div>' +
+        '<div class="sign-area"></div>' +
+        '<div style="font-size:10px;color:#aaa">Date : ___/___/______</div>' +
+      '</div>' +
+    '</div>' +
+    '</div>' +
     '<button onclick="window.print()" style="margin-top:14px;width:100%;padding:12px;background:#f97316;color:#fff;border:none;border-radius:8px;font-weight:800;font-size:14px">🖨️ Imprimer / Enregistrer en PDF</button>' +
     '</body></html>');
     w.document.close();
@@ -7003,6 +7084,9 @@ async function saveMoto() {
     photo:getPic('mm-pp'), photoP:getPic('mm-ppp'),
     photoFacture:getPic('mm-pfa'), photoCG:getPic('mm-pcg'),
     photoPiece:getPic('mm-ppi'),
+    nationalite:((document.getElementById('mm-nationalite')||{}).value||'').trim(),
+    typePiece:(document.getElementById('mm-type-piece')||{}).value||'CNI',
+    numPiece:((document.getElementById('mm-num-piece')||{}).value||'').trim(),
     derniereMaj:new Date().toISOString(), suspenduAuto:false,
     dateNaissance:(document.getElementById('mm-datenais')||{}).value||'',
     lieuNaissance:((document.getElementById('mm-lieunais')||{}).value||'').trim(),
@@ -10035,6 +10119,34 @@ function logMvt(type, desc, montant=0, de='', vers='', meta={}) {
   DB.mouvements.unshift(m);
   sbLogMvt(m);
 }
+function syncTelVal(id) {
+  const pays = document.getElementById(id + '-pays');
+  const inp = document.getElementById(id);
+  if(!pays || !inp) return;
+  const num = (inp.value||'').replace(/^0+/,'').replace(/\s/g,'');
+  inp.dataset.full = num ? '+' + pays.value + num : '';
+}
+function getTelFull(id) {
+  const pays = document.getElementById(id + '-pays');
+  const inp = document.getElementById(id);
+  if(!inp) return '';
+  if(pays) {
+    const num = (inp.value||'').replace(/^0+/,'').replace(/\s/g,'');
+    return num ? '+' + pays.value + num : '';
+  }
+  return inp.value || '';
+}
+function setTelVal(id, fullNum) {
+  if(!fullNum) return;
+  const pays = document.getElementById(id + '-pays');
+  const inp = document.getElementById(id);
+  if(!inp) return;
+  const m = String(fullNum).match(/^\+?(\d{1,3})(\d+)$/);
+  if(m && pays) {
+    pays.value = m[1];
+    inp.value = m[2];
+  } else { inp.value = fullNum; }
+}
 function rHistoriqueVehicule() {
   const q = nrm((document.getElementById('hist-veh-search')||{}).value||'');
   const zone = document.getElementById('hist-veh-result');
@@ -10532,6 +10644,32 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   for(const p of DB.passagers)  if(p.pass && p.pass.length < 60) p.pass = await hashPw(p.pass);
 
   // ── Paramètres URL (QR code, taxi, Orange Money) ──
+  // Initialiser les champs téléphone avec indicatif défilant
+  document.querySelectorAll('input[type="tel"]').forEach(inp => {
+    const id = inp.id;
+    if(!id || inp.dataset.telWrapped) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'tel-wrap';
+    wrap.id = id + '-wrap';
+    const sel = document.createElement('select');
+    sel.id = id + '-pays';
+    sel.title = 'Indicatif pays';
+    PAYS_TEL.forEach(([nom,code],i) => {
+      const opt = document.createElement('option');
+      opt.value = code; opt.textContent = nom + ' (+' + code + ')';
+      if(i===0) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => syncTelVal(id);
+    inp.oninput = () => syncTelVal(id);
+    inp.placeholder = '6XX XX XX XX';
+    inp.style.cssText += ';border:none;background:transparent;flex:1;padding:10px 12px;outline:none';
+    inp.dataset.telWrapped = '1';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(sel);
+    wrap.appendChild(inp);
+  });
+
   const _resetParam = new URLSearchParams(window.location.search).get('reset');
   if(_resetParam) {
     try {
