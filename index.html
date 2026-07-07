@@ -3018,7 +3018,10 @@ function openModal(id) {
     toast('⚠️ Les alertes sont réservées au public', true); return;
   }
   const el = document.getElementById(id);
-  if(el) { el.classList.add('open'); document.body.style.overflow='hidden'; }
+  if(el) { el.classList.add('open'); document.body.style.overflow='hidden';
+    // Initialiser les champs téléphone dans ce modal (créés dynamiquement)
+    setTimeout(() => initTelFields(el), 50);
+  }
   // Réinitialiser le modal de connexion public sur "Propriétaire" (admin/agent ont leurs propres accès dédiés)
   if(id === 'm-login') {
     document.getElementById('login-roles-public').style.display = 'flex';
@@ -6721,6 +6724,7 @@ function clearClientMoto() {
 }
 
 function openAddMoto() {
+  // Les champs tel du formulaire moto seront initialisés par openModal via initTelFields
   if(isAgent() && !isAdmin()) {
     const ag = DB.agents.find(a=>a.id===DB.user.agId);
     const minTarif = Math.min(...DB.tarifs.map(t=>Math.round(t.prix*DB.commissions.enregAgent/100)));
@@ -10215,6 +10219,32 @@ function logMvt(type, desc, montant=0, de='', vers='', meta={}) {
   DB.mouvements.unshift(m);
   sbLogMvt(m);
 }
+function initTelFields(root) {
+  (root||document).querySelectorAll('input[type="tel"]').forEach(inp => {
+    const id = inp.id;
+    if(!id || inp.dataset.telWrapped) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'tel-wrap';
+    wrap.id = id + '-wrap';
+    const sel = document.createElement('select');
+    sel.id = id + '-pays';
+    sel.title = 'Indicatif pays';
+    PAYS_TEL.forEach(([nom,code],i) => {
+      const opt = document.createElement('option');
+      opt.value = code; opt.textContent = nom + ' (+' + code + ')';
+      if(i===0) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => syncTelVal(id);
+    inp.oninput = () => syncTelVal(id);
+    inp.placeholder = '6XX XX XX XX';
+    inp.style.cssText += ';border:none;background:transparent;flex:1;padding:10px 12px;outline:none';
+    inp.dataset.telWrapped = '1';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(sel);
+    wrap.appendChild(inp);
+  });
+}
 function syncTelVal(id) {
   const pays = document.getElementById(id + '-pays');
   const inp = document.getElementById(id);
@@ -10740,31 +10770,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   for(const p of DB.passagers)  if(p.pass && p.pass.length < 60) p.pass = await hashPw(p.pass);
 
   // ── Paramètres URL (QR code, taxi, Orange Money) ──
-  // Initialiser les champs téléphone avec indicatif défilant
-  document.querySelectorAll('input[type="tel"]').forEach(inp => {
-    const id = inp.id;
-    if(!id || inp.dataset.telWrapped) return;
-    const wrap = document.createElement('div');
-    wrap.className = 'tel-wrap';
-    wrap.id = id + '-wrap';
-    const sel = document.createElement('select');
-    sel.id = id + '-pays';
-    sel.title = 'Indicatif pays';
-    PAYS_TEL.forEach(([nom,code],i) => {
-      const opt = document.createElement('option');
-      opt.value = code; opt.textContent = nom + ' (+' + code + ')';
-      if(i===0) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    sel.onchange = () => syncTelVal(id);
-    inp.oninput = () => syncTelVal(id);
-    inp.placeholder = '6XX XX XX XX';
-    inp.style.cssText += ';border:none;background:transparent;flex:1;padding:10px 12px;outline:none';
-    inp.dataset.telWrapped = '1';
-    inp.parentNode.insertBefore(wrap, inp);
-    wrap.appendChild(sel);
-    wrap.appendChild(inp);
-  });
+  initTelFields(document); // Initialiser les champs téléphone au chargement
 
   const _resetParam = new URLSearchParams(window.location.search).get('reset');
   if(_resetParam) {
