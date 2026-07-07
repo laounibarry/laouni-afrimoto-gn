@@ -9757,7 +9757,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="ag-tel" placeholder="+224 6xx xxx xxx"/></div>
       </div>
       <div class="fld"><div class="lbl">Email</div><input type="email" id="ag-email" placeholder="agent@email.com"/></div>
-      <div class="fld"><div class="lbl">Lieu de naissance <span style="font-weight:400;text-transform:none;font-size:9px">(optionnel)</span></div><input type="text" id="ag-lieu-naissance" placeholder="Ex: Conakry, Kindia..."/></div>
+      <div class="grid2">
+        <div class="fld"><div class="lbl">Date de naissance</div><input type="date" id="ag-date-naissance"/></div>
+        <div class="fld"><div class="lbl">Lieu de naissance</div><input type="text" id="ag-lieu-naissance" placeholder="Ex: Conakry, Kindia..."/></div>
+      </div>
+      <div class="fld"><div class="lbl">Profession</div><input type="text" id="ag-profession" placeholder="Ex: Commerçant, Fonctionnaire..."/></div>
+      <div class="grid2">
+        <div class="fld"><div class="lbl">Nom du père</div><input type="text" id="ag-nom-pere" placeholder="Prénom Nom"/></div>
+        <div class="fld"><div class="lbl">Nom de la mère</div><input type="text" id="ag-nom-mere" placeholder="Prénom Nom"/></div>
+      </div>
       <div class="sect">🪪 Pièce d'identité (optionnel)</div>
       <div class="grid2">
         <div class="fld"><div class="lbl">Type de pièce</div><select id="ag-piece-type"><option value="">-- Sélectionner --</option><option>CNI</option><option>Passeport</option><option>Permis de conduire</option><option>Carte électeur</option></select></div>
@@ -9789,7 +9797,9 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', e => { if(e.target===m) closeModal('m-ag'); });
+    setTimeout(() => initTelFields(m), 100);
   }
+  setTimeout(() => initTelFields(document.getElementById('m-ag')), 100);
 });
 
 function previewAgPiece(inp) {
@@ -9827,7 +9837,11 @@ async function saveAg() {
     code: num,
     pass: await hashPw(pass),
     tel, email,
+    dateNaissance: (document.getElementById('ag-date-naissance')||{}).value||'',
     lieuNaissance: document.getElementById('ag-lieu-naissance').value.trim()||'',
+    profession: ((document.getElementById('ag-profession')||{}).value||'').trim(),
+    nomPere: ((document.getElementById('ag-nom-pere')||{}).value||'').trim(),
+    nomMere: ((document.getElementById('ag-nom-mere')||{}).value||'').trim(),
     pieceType: document.getElementById('ag-piece-type').value||'',
     pieceNum:  document.getElementById('ag-piece-num').value.trim()||'',
     pieceDelivrance: document.getElementById('ag-piece-delivrance').value||'',
@@ -10342,6 +10356,20 @@ function initTelFields(root) {
     wrap.appendChild(inp);
   });
 }
+// Liste des pays avec indicatifs téléphoniques
+const PAYS_TEL = [
+  ['🇬🇳 Guinée','224'],['🇸🇳 Sénégal','221'],['🇨🇮 Cote Ivoire','225'],
+  ['🇲🇱 Mali','223'],['🇬🇭 Ghana','233'],['🇧🇫 Burkina Faso','226'],
+  ['🇳🇪 Niger','227'],['🇳🇬 Nigeria','234'],['🇨🇲 Cameroun','237'],
+  ['🇹🇬 Togo','228'],['🇧🇯 Bénin','229'],['🇬🇦 Gabon','241'],
+  ['🇨🇬 Congo','242'],['🇨🇩 RD Congo','243'],['🇸🇱 Sierra Leone','232'],
+  ['🇱🇷 Liberia','231'],['🇬🇼 Guinée-Bissau','245'],['🇲🇷 Mauritanie','222'],
+  ['🇫🇷 France','33'],['🇧🇪 Belgique','32'],['🇨🇭 Suisse','41'],
+  ['🇺🇸 USA','1'],['🇬🇧 UK','44'],['🇩🇿 Algérie','213'],
+  ['🇲🇦 Maroc','212'],['🇹🇳 Tunisie','216'],['🇪🇬 Égypte','20'],
+  ['🇿🇦 Afrique du Sud','27'],['🇰🇪 Kenya','254'],['🇪🇹 Éthiopie','251'],
+];
+
 function syncTelVal(id) {
   const pays = document.getElementById(id + '-pays');
   const inp = document.getElementById(id);
