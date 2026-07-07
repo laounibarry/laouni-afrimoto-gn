@@ -2987,8 +2987,9 @@ async function rechercherCompteParEmail() {
     '<div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:12px;font-size:12px">⏳ Vérification en cours...</div>';
   resultat.style.display = 'block';
 
-  const token = btoa(identifiant + '|' + typeCompte + '|' + Date.now());
-  try { localStorage.setItem('reset_token_' + token, JSON.stringify({identifiant, typeCompte, exp: Date.now() + 3600000})); } catch(e) {}
+  // Encoder identifiant + typeCompte + expiration directement dans l'URL (fonctionne sur n'importe quel appareil)
+  const payload = JSON.stringify({identifiant, typeCompte, exp: Date.now() + 3600000});
+  const token = btoa(unescape(encodeURIComponent(payload)));
   const lienReset = 'https://laouni-securite-ultime.com?reset=' + encodeURIComponent(token);
   const instructionFull = instruction + '\n\nOu cliquez sur ce lien pour réinitialiser directement votre mot de passe (valable 1 heure) :\n' + lienReset;
   const envoye = await envoyerEmailRecuperation(email, identifiant, typeCompte, instructionFull);
@@ -10786,13 +10787,22 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   const _resetParam = new URLSearchParams(window.location.search).get('reset');
   if(_resetParam) {
     try {
-      const _rtData = JSON.parse(localStorage.getItem('reset_token_' + _resetParam) || 'null');
-      if(_rtData && Date.now() < _rtData.exp) {
+      // Décoder le token (infos encodées directement dans l'URL — fonctionne sur tout appareil)
+      const _rtData = JSON.parse(decodeURIComponent(escape(atob(_resetParam))));
+      if(_rtData && _rtData.exp && Date.now() < _rtData.exp) {
         setTimeout(() => ouvrirModalResetDepuisLien(_rtData.identifiant, _rtData.typeCompte, _resetParam), 1200);
       } else {
-        setTimeout(() => toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true), 1200);
+        setTimeout(() => toast('⚠️ Ce lien a expiré (valable 1 heure). Faites une nouvelle demande.', true), 1200);
       }
-    } catch(e) {}
+    } catch(e) {
+      // Compatibilité : anciens liens avec localStorage
+      try {
+        const _rtOld = JSON.parse(localStorage.getItem('reset_token_' + _resetParam) || 'null');
+        if(_rtOld && Date.now() < _rtOld.exp) {
+          setTimeout(() => ouvrirModalResetDepuisLien(_rtOld.identifiant, _rtOld.typeCompte, _resetParam), 1200);
+        }
+      } catch(e2) {}
+    }
     window.history.replaceState({}, '', window.location.pathname);
   }
   const urlParams = new URLSearchParams(window.location.search);
