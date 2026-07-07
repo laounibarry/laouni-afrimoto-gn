@@ -2933,6 +2933,35 @@ const EMAILJS_CONFIG = {
   templateRecapId: 'template_6uq04fr',   // modèle confirmations/récapitulatifs (variables : to_email, titre, contenu)
   publicKey:  'awxu35zCxrmJzkyOZ'
 };
+async function _validerReset() {
+  const _d = window._resetData;
+  const token = window._resetToken;
+  const p1 = (document.getElementById('_rst-p1')||{}).value||'';
+  const p2 = (document.getElementById('_rst-p2')||{}).value||'';
+  const err = document.getElementById('_rst-err');
+  if(p1.length < 6) { err.textContent='⚠️ Minimum 6 caractères.'; err.style.display='block'; return; }
+  if(p1 !== p2) { err.textContent='⚠️ Les mots de passe ne correspondent pas.'; err.style.display='block'; return; }
+  try {
+    const hash = await hashPw(p1);
+    let ok = false;
+    const sauver = (arr, save) => { const x = arr.find(a => a.num===_d.identifiant||a.user===_d.identifiant); if(x){x.pass=hash;x.pass_hash=hash;save(x);ok=true;} };
+    if(_d.typeCompte==='admin') { DB.adminPass=hash; sbSaveConfig(); ok=true; }
+    else if(_d.typeCompte==='agent') sauver(DB.agents, sbSaveAgent);
+    else if(_d.typeCompte==='sousagent') sauver(DB.sousAgents, sbSaveSousAgent);
+    else if(_d.typeCompte==='client') sauver(DB.clients, sbSaveClient);
+    else if(_d.typeCompte==='passager') sauver(DB.passagers, sbSavePassager);
+    if(ok) {
+      try { if(_d.nonce){const u=JSON.parse(localStorage.getItem('reset_used_done')||'[]');u.push(_d.nonce);localStorage.setItem('reset_used_done',JSON.stringify(u.slice(-50)));} } catch(e){}
+      document.getElementById('_reset-overlay').remove();
+      toast('✅ Mot de passe réinitialisé ! Reconnexion...');
+      setTimeout(()=>{ try{clearSession();}catch(e){} location.reload(); }, 2000);
+    } else {
+      err.textContent='⚠️ Compte introuvable dans la base de données. Contactez un agent.';
+      err.style.display='block';
+    }
+  } catch(e) { err.textContent='⚠️ Erreur: '+e.message; err.style.display='block'; }
+}
+
 function decodeResetToken(token) {
   try {
     // Décoder l'URL encoding d'abord, puis base64
@@ -10906,21 +10935,37 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   if(_resetParam) {
     window._pendingReset = _resetParam;
     window.history.replaceState({}, '', window.location.pathname);
-    // Bouton flottant visible immédiatement
-    setTimeout(function() {
-      const _btnR = document.createElement('div');
-      _btnR.id = '_btn-reset-flottant';
-      _btnR.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:#f97316;color:#fff;padding:14px 28px;border-radius:40px;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 4px 20px rgba(249,115,22,.5);white-space:nowrap';
-      _btnR.textContent = '🔑 Réinitialiser mon mot de passe';
-      _btnR.onclick = function() {
-        try {
-          const _d = decodeResetToken(_resetParam);
-          if(_d && _d.exp && Date.now() < _d.exp) { _btnR.remove(); ouvrirModalResetDepuisLien(_d.identifiant, _d.typeCompte, _resetParam); }
-          else toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true);
-        } catch(e) { toast('⚠️ Lien invalide.', true); }
-      };
-      document.body.appendChild(_btnR);
-    }, 300);
+    function _afficherResetPage() {
+      try {
+        const _d = decodeResetToken(_resetParam);
+        if(!_d || !_d.exp || !_d.identifiant) { setTimeout(()=>toast('⚠️ Lien invalide.',true),500); return; }
+        if(Date.now() > _d.exp) { setTimeout(()=>toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.',true),500); return; }
+        const _used = JSON.parse(localStorage.getItem('reset_used_done')||'[]');
+        if(_d.nonce && _used.includes(_d.nonce)) { setTimeout(()=>toast('⚠️ Ce lien a déjà été utilisé.',true),500); return; }
+        const old = document.getElementById('_reset-overlay'); if(old) old.remove();
+        const overlay = document.createElement('div');
+        overlay.id = '_reset-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+        overlay.innerHTML = '<div style="background:#1C1C1E;border-radius:18px;padding:28px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.8)">'
+          + '<div style="text-align:center;margin-bottom:20px"><div style="font-size:40px">🔑</div>'
+          + '<div style="font-size:18px;font-weight:900;color:#f97316;margin-top:8px">Nouveau mot de passe</div>'
+          + '<div style="font-size:12px;color:#9CA3AF;margin-top:4px">Compte : <b style="color:#fff">' + _d.identifiant + '</b> (' + _d.typeCompte + ')</div></div>'
+          + '<div style="margin-bottom:14px"><div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">NOUVEAU MOT DE PASSE *</div>'
+          + '<input type="password" id="_rst-p1" placeholder="Minimum 6 caractères" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(249,115,22,.4);background:#2C2C2E;color:#fff;font-size:14px;box-sizing:border-box"/></div>'
+          + '<div style="margin-bottom:20px"><div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">CONFIRMER *</div>'
+          + '<input type="password" id="_rst-p2" placeholder="Répétez le mot de passe" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(249,115,22,.4);background:#2C2C2E;color:#fff;font-size:14px;box-sizing:border-box"/></div>'
+          + '<div id="_rst-err" style="display:none;background:#FEE2E2;color:#DC2626;padding:10px;border-radius:8px;font-size:12px;margin-bottom:14px"></div>'
+          + '<button onclick="_validerReset()" style="width:100%;padding:14px;background:#f97316;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer;margin-bottom:8px">✅ Valider le nouveau mot de passe</button>'
+          + '<button onclick="document.getElementById(&quot;_reset-overlay&quot;).remove()" style="width:100%;padding:12px;background:transparent;color:#9CA3AF;border:1px solid rgba(255,255,255,.1);border-radius:12px;font-size:13px;cursor:pointer">Annuler</button>'
+          + '</div>';
+        window._resetData = _d;
+        window._resetToken = _resetParam;
+        document.body.appendChild(overlay);
+        setTimeout(()=>{const el=document.getElementById('_rst-p1');if(el)el.focus();},200);
+      } catch(err) { console.error('Reset page error:', err); }
+    }
+    if(document.readyState === 'complete') setTimeout(_afficherResetPage, 800);
+    else window.addEventListener('load', ()=>setTimeout(_afficherResetPage, 800));
   }
   const urlParams = new URLSearchParams(window.location.search);
 
