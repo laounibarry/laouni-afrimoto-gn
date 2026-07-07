@@ -618,13 +618,15 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       if(window._pendingReset) {
         const _pr = window._pendingReset; window._pendingReset = null;
         try {
-          const _rtData = JSON.parse(decodeURIComponent(escape(atob(_pr))));
+          const _decoded = decodeURIComponent(escape(atob(_pr)));
+          const _rtData = JSON.parse(_decoded);
+          console.log('Reset token decoded:', _rtData);
           if(_rtData && _rtData.exp && Date.now() < _rtData.exp) {
-            setTimeout(() => ouvrirModalResetDepuisLien(_rtData.identifiant, _rtData.typeCompte, _pr), 800);
+            setTimeout(() => { ouvrirModalResetDepuisLien(_rtData.identifiant, _rtData.typeCompte, _pr); }, 500);
           } else {
-            setTimeout(() => toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true), 800);
+            setTimeout(() => toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true), 500);
           }
-        } catch(e) { console.warn('Reset link:', e); }
+        } catch(e) { console.warn('Reset link error:', e); toast('⚠️ Lien invalide. Faites une nouvelle demande.', true); }
       }
 
       // Suspension automatique des enregistrements non renouvelés
@@ -10799,10 +10801,8 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 
   const _resetParam = new URLSearchParams(window.location.search).get('reset');
   if(_resetParam) {
-    // Nettoyer l'URL immédiatement
+    window._pendingReset = _resetParam; // Stocker AVANT le chargement Supabase
     window.history.replaceState({}, '', window.location.pathname);
-    // Stocker le token pour l'ouvrir après le chargement complet du site
-    window._pendingReset = _resetParam;
   }
   const urlParams = new URLSearchParams(window.location.search);
 
