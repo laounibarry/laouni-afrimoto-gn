@@ -2915,15 +2915,26 @@ async function validerResetMdp(identifiant, typeCompte, token) {
 }
 
 async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, instruction) {
+  const texte = 'Bonjour,\n\nUne demande de récupération a été faite pour votre compte Laouni AfriMoto.\n\nType de compte : ' + typeCompte + '\nIdentifiant : ' + identifiant + '\n\n' + instruction + '\n\n— Laouni AfriMoto · Registre sécurisé · Guinée';
+  // Essai 1 : Resend via Vercel Function
   try {
-    const texte = 'Bonjour,\n\nUne demande de récupération a été faite pour votre compte Laouni AfriMoto.\n\nType de compte : ' + typeCompte + '\nIdentifiant : ' + identifiant + '\n\n' + instruction + '\n\n— Laouni AfriMoto · Registre sécurisé · Guinée';
     const r = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: destinataire, subject: 'Récupération de compte — Laouni AfriMoto', text: texte })
     });
-    return r.ok;
-  } catch(e) { console.error('Email récupération:', e); return false; }
+    if(r.ok) return true;
+  } catch(e) { console.warn('Resend:', e && e.message); }
+  // Essai 2 : EmailJS en fallback
+  try {
+    if(!EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateId || !EMAILJS_CONFIG.publicKey) return false;
+    const r2 = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_id:EMAILJS_CONFIG.serviceId, template_id:EMAILJS_CONFIG.templateId,
+        user_id:EMAILJS_CONFIG.publicKey, template_params:{ to_email:destinataire, identifiant, type_compte:typeCompte, instruction } })
+    });
+    if(r2.ok) return true;
+  } catch(e2) { console.warn('EmailJS fallback:', e2 && e2.message); }
+  return false;
 }
 async function rechercherCompteParEmail() {
   const email = document.getElementById('recup-email').value.trim();
