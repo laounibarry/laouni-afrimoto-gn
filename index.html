@@ -2918,7 +2918,8 @@ async function validerResetMdp(identifiant, typeCompte, token) {
   const hash = await hashPw(p1);
   let ok = false;
   const sauver = (arr, save) => { const x = arr.find(a => a.num===identifiant||a.user===identifiant); if(x) { x.pass=hash; x.pass_hash=hash; save(x); ok=true; } };
-  if(typeCompte==='agent') sauver(DB.agents, sbSaveAgent);
+  if(typeCompte==='admin') { DB.adminPass=hash; sbSaveConfig(); ok=true; }
+  else if(typeCompte==='agent') sauver(DB.agents, sbSaveAgent);
   else if(typeCompte==='sousagent') sauver(DB.sousAgents, sbSaveSousAgent);
   else if(typeCompte==='client') sauver(DB.clients, sbSaveClient);
   else if(typeCompte==='passager') sauver(DB.passagers, sbSavePassager);
@@ -10801,8 +10802,23 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 
   const _resetParam = new URLSearchParams(window.location.search).get('reset');
   if(_resetParam) {
-    window._pendingReset = _resetParam; // Stocker AVANT le chargement Supabase
+    window._pendingReset = _resetParam;
     window.history.replaceState({}, '', window.location.pathname);
+    // Bouton flottant visible immédiatement
+    setTimeout(function() {
+      const _btnR = document.createElement('div');
+      _btnR.id = '_btn-reset-flottant';
+      _btnR.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:#f97316;color:#fff;padding:14px 28px;border-radius:40px;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 4px 20px rgba(249,115,22,.5);white-space:nowrap';
+      _btnR.textContent = '🔑 Réinitialiser mon mot de passe';
+      _btnR.onclick = function() {
+        try {
+          const _d = JSON.parse(decodeURIComponent(escape(atob(_resetParam))));
+          if(_d && _d.exp && Date.now() < _d.exp) { _btnR.remove(); ouvrirModalResetDepuisLien(_d.identifiant, _d.typeCompte, _resetParam); }
+          else toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true);
+        } catch(e) { toast('⚠️ Lien invalide.', true); }
+      };
+      document.body.appendChild(_btnR);
+    }, 300);
   }
   const urlParams = new URLSearchParams(window.location.search);
 
