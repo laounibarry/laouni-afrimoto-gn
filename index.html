@@ -3148,6 +3148,83 @@ function corbeilleValide() {
   return DB.corbeille.filter(c => (now - new Date(c.dateSuppr)) < ms48h);
 }
 // Restauration depuis la corbeille (admin uniquement) : remet l'élément dans sa liste d'origine
+// ══ SÉLECTION MULTIPLE dans les onglets de Gestion ══
+if(!window._gestSel) window._gestSel = {};
+function gestSelKey() { return 'sel_' + (typeof gestTab !== 'undefined' ? gestTab : ''); }
+function gestSel() { return window._gestSel[gestSelKey()] || (window._gestSel[gestSelKey()] = new Set()); }
+function gestToggle(id, on) { if(on) gestSel().add(id); else gestSel().delete(id); rGestion(); }
+function gestToutSel(on, ids) { if(on) ids.forEach(id=>gestSel().add(id)); else gestSel().clear(); rGestion(); }
+function gestSupprSel() {
+  const sel = gestSel();
+  if(!sel.size) { toast('⚠️ Aucun élément sélectionné', true); return; }
+  const nb = sel.size;
+  const tabMap = { vehs:'vehs', taxis:'taxis', clients:'clients', passagers:'passagers', agents:'clients', sas:'clients', trajets:'trajets', annonces:'annonces', alertes:'alertes' };
+  const cfg = REGISTRES_SUPPR[tabMap[gestTab]] || REGISTRES_SUPPR[gestTab];
+  if(!cfg) { toast('⚠️ Registre non disponible', true); return; }
+  askConfirm('🗑️ Supprimer ' + nb + ' élément(s) ?' + (cfg.corbeille ? ' Récupérables 48h dans la corbeille.' : ' Suppression DÉFINITIVE.'), () => {
+    const listeRef = gestTab === 'vehs' ? DB.vehs : gestTab === 'taxis' ? DB.taxis : gestTab === 'clients' ? DB.clients : gestTab === 'passagers' ? DB.passagers : gestTab === 'agents' ? DB.agents : gestTab === 'sas' ? DB.sousAgents : gestTab === 'trajets' ? DB.trajets : gestTab === 'annonces' ? DB.annonces : gestTab === 'alertes' ? DB.alertes : [];
+    [...sel].forEach(id => {
+      const item = listeRef.find(x => x.id === id);
+      if(!item) return;
+      if(cfg.corbeille) {
+        const ci = { id:gid(), type:cfg.liste, data:item, listeOrigine:cfg.liste, label:cfg.label(item), dateSuppr:new Date().toISOString(), supprimePar:DB.user?(DB.user.name||DB.user.role):'Admin' };
+        DB.corbeille.unshift(ci); sbSaveCorbeille(ci);
+      }
+      if(gestTab==='clients') {
+        DB.vehs.filter(v=>v.clientId===item.id).forEach(v=>{ const ci2={id:gid(),type:'vehs',data:v,listeOrigine:'vehs',label:'Véhicule: '+(v.mat||v.vin||'?'),dateSuppr:new Date().toISOString(),supprimePar:'Admin (cascade)'}; DB.corbeille.unshift(ci2); sbSaveCorbeille(ci2); sbDeleteItem('vehicules',v.id); }); DB.vehs=DB.vehs.filter(v=>v.clientId!==item.id);
+      }
+      if(cfg.liste==='clients') DB.clients=DB.clients.filter(x=>x.id!==id);
+      else if(cfg.liste==='passagers') DB.passagers=DB.passagers.filter(x=>x.id!==id);
+      else if(cfg.liste==='vehs') DB.vehs=DB.vehs.filter(x=>x.id!==id);
+      else if(cfg.liste==='taxis') DB.taxis=DB.taxis.filter(x=>x.id!==id);
+      else if(cfg.liste==='agents') DB.agents=DB.agents.filter(x=>x.id!==id);
+      else if(cfg.liste==='trajets') DB.trajets=DB.trajets.filter(x=>x.id!==id);
+      else if(cfg.liste==='annonces') DB.annonces=DB.annonces.filter(x=>x.id!==id);
+      else if(cfg.liste==='alertes') DB.alertes=DB.alertes.filter(x=>x.id!==id);
+      sbDeleteItem(cfg.table, id);
+    });
+    logMvt('enreg', '🗑️ Suppression multiple — '+nb+' · '+cfg.nom, 0, DB.user?DB.user.name:'Admin', '');
+    sel.clear(); toast('🗑️ '+nb+' élément(s) supprimé(s)'); rGestion(); rHome();
+  });
+}
+function mkSelBar(list) {
+  if(!list.length) return '';
+  const sel = gestSel(); const ids = list.map(x=>x.id); const nb = ids.filter(id=>sel.has(id)).length; const toutSel = nb===ids.length && ids.length>0;
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" '+(toutSel?'checked':'')+' onchange="gestToutSel(this.checked,['+ids.map(id=>"'"+id+"'").join(',')+'])"/> Tout sélectionner ('+list.length+')</label>' +
+    (nb>0?'<button class="btn-red" style="font-size:11px;padding:7px 12px" onclick="gestSupprSel()">🗑️ Supprimer sélection ('+nb+')</button>':'') +
+  '</div>';
+}
+function mkSelCheck(id) {
+  const sel=gestSel(); const chk=sel.has(id)?'checked':''; return '<input type="checkbox" '+chk+' data-selid="'+id+'" onchange="gestToggle(this.dataset.selid,this.checked)" style="flex-shrink:0;margin-top:2px;cursor:pointer" onclick="event.stopPropagation()"/>';
+}
+
+function corbToggle(id, on) {
+  if(!window._corbSel) window._corbSel = new Set();
+  if(on) window._corbSel.add(id); else window._corbSel.delete(id);
+  rGestion();
+}
+function corbToutSel(on) {
+  const list = DB.corbeille;
+  window._corbSel = on ? new Set(list.map(x=>x.id)) : new Set();
+  rGestion();
+}
+function corbActionSel(action) {
+  if(!window._corbSel || !window._corbSel.size) { toast('⚠️ Aucun élément sélectionné', true); return; }
+  const ids = [...window._corbSel];
+  const nb = ids.length;
+  askConfirm(
+    (action==='restaurer' ? '♻️ Restaurer ' : '🗑️ Effacer définitivement ') + nb + ' élément(s) ?',
+    () => {
+      ids.forEach(id => {
+        if(action==='restaurer') restaurerCorbeille(id);
+        else supprimerDefinitivement(id);
+      });
+      window._corbSel = new Set();
+      toast((action==='restaurer' ? '♻️ ' : '🗑️ ') + nb + ' élément(s) ' + (action==='restaurer' ? 'restauré(s)' : 'effacé(s) définitivement'));
+    }
+  );
+}
 function restaurerCorbeille(corbeilleId) {
   const entree = DB.corbeille.find(c => c.id === corbeilleId);
   if(!entree) { toast('Élément introuvable', true); return; }
@@ -4341,10 +4418,16 @@ function demanderSuppressionCompteClient() {
   const cl = DB.clients.find(x=>x.id===DB.user.id);
   if(!cl) return;
   const vehLies = DB.vehs.filter(v => v.clientId === cl.id);
-  const avertVeh = vehLies.length ? ' Vos ' + vehLies.length + ' véhicule(s) enregistré(s) resteront dans le registre mais ne seront plus liés à un compte connectable.' : '';
+  const avertVeh = vehLies.length ? ' Vos ' + vehLies.length + ' véhicule(s) enregistré(s) seront également supprimés automatiquement.' : '';
   const avertSolde = cl.solde > 0 ? ' Votre solde restant (' + fmt(cl.solde) + ') sera perdu.' : '';
   askConfirm('Voulez-vous vraiment supprimer définitivement votre compte ? Cette action est irréversible après 48h.' + avertVeh + avertSolde, () => {
-    vehLies.forEach(v => { v.clientId = null; });
+    // Supprimer les véhicules liés (cascade)
+    vehLies.forEach(v => {
+      DB.corbeille.unshift({ id:gid(), type:'vehs', data:v, listeOrigine:'vehs',
+        label:'Véhicule : '+(v.mat||v.vin||'?'), dateSuppr:new Date().toISOString(), supprimePar:cl.prenom+' '+cl.nom+' (cascade)' });
+      DB.vehs = DB.vehs.filter(x => x.id !== v.id);
+      sbDeleteItem('vehicules', v.id);
+    });
     DB.corbeille.unshift({
       id: gid(), type: 'clients', data: cl, listeOrigine: 'clients', label: 'Client : ' + cl.prenom + ' ' + cl.nom,
       dateSuppr: new Date().toISOString(), supprimePar: cl.prenom + ' ' + cl.nom + ' (auto-suppression)'
@@ -8241,9 +8324,10 @@ function rGestion() {
   // ─── AGENTS ───
   if(gestTab==='agents') {
     const list = q ? DB.agents.filter(a=>[a.name,a.city,a.code].some(x=>nrm(x||'').includes(q))) : DB.agents;
-    html = list.map(ag=>`
+    html = mkSelBar(list) + list.map(ag=>`
       <div class="card" style="margin-bottom:8px;${!ag.actif?'opacity:.65;border-style:dashed':''}">
         <div style="display:flex;gap:10px;align-items:flex-start">
+          ${mkSelCheck(ag.id)}
           ${ag.photo?`<img src="${ag.photo}" style="width:46px;height:46px;object-fit:cover;border-radius:50%;flex-shrink:0;border:2px solid rgba(249,115,22,.3)"/>`:'<div style="width:46px;height:46px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📍</div>'}
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:14px">${esc(ag.name)} ${!ag.actif?'<span class="tag tag-red" style="font-size:9px">SUSPENDU</span>':''} ${ag.peutValider?'<span class="tag tag-green" style="font-size:9px">✅ HABILITÉ VALIDATION</span>':''} ${ag.peutVoirCourses?'<span class="tag tag-gold" style="font-size:9px">🚕 HISTORIQUE COURSES</span>':''}</div>
@@ -8265,9 +8349,10 @@ function rGestion() {
   // ─── VÉHICULES ───
   } else if(gestTab==='vehs') {
     const list = q ? DB.vehs.filter(v=>[v.mat,v.owner,v.brand,v.num].some(x=>nrm(x||'').includes(q))) : DB.vehs;
-    html = list.map(v=>`
+    html = mkSelBar(list) + list.map(v=>`
       <div class="card" style="margin-bottom:7px;${v.statut==='suspendu'?'opacity:.65;border-style:dashed':''}">
         <div style="display:flex;gap:8px;align-items:flex-start">
+          ${mkSelCheck(v.id)}
           <div style="flex:1;min-width:0">
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:3px">
               <span class="mat">${v.mat}</span>
@@ -8293,9 +8378,10 @@ function rGestion() {
   // ─── TAXIS ───
   } else if(gestTab==='taxis') {
     const list = q ? DB.taxis.filter(t=>[t.nom,t.plaque,t.gilet].some(x=>nrm(x||'').includes(q))) : DB.taxis;
-    html = list.map(t=>`
+    html = mkSelBar(list) + list.map(t=>`
       <div class="card" style="margin-bottom:7px;${t.statut==='suspendu'?'opacity:.65;border-style:dashed':''}">
         <div style="display:flex;gap:8px;align-items:center">
+          ${mkSelCheck(t.id)}
           ${t.photo?`<img src="${t.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;flex-shrink:0"/>`:'<div style="width:44px;height:44px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🚕</div>'}
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:13px">${t.nom} <span class="tag ${t.statut==='actif'?'tag-green':t.statut==='vole'?'tag-red':'tag-gold'}" style="font-size:9px">${t.statut.toUpperCase()}</span></div>
@@ -9180,6 +9266,16 @@ function executerSuppressionMasse() {
             supprimePar: DB.user ? (DB.user.name || DB.user.role) : 'Admin' };
           DB.corbeille.unshift(corbItem);
           sbSaveCorbeille(corbItem);
+        }
+        // Cascade : si client supprimé → supprimer ses véhicules
+        if(cfg.liste === 'clients') {
+          DB.vehs.filter(v => v.clientId === item.id).forEach(v => {
+            const ci = { id:gid(), type:'vehs', data:v, listeOrigine:'vehs',
+              label:'Véhicule : '+(v.mat||v.vin||'?'), dateSuppr:new Date().toISOString(), supprimePar:'Admin (cascade client)' };
+            DB.corbeille.unshift(ci); sbSaveCorbeille(ci);
+            sbDeleteItem('vehicules', v.id);
+          });
+          DB.vehs = DB.vehs.filter(v => v.clientId !== item.id);
         }
         DB[cfg.liste] = DB[cfg.liste].filter(x => x.id !== id);
         sbDeleteItem(cfg.table, id);
