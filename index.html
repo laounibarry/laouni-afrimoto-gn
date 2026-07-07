@@ -618,8 +618,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       if(window._pendingReset) {
         const _pr = window._pendingReset; window._pendingReset = null;
         try {
-          const _decoded = decodeURIComponent(escape(atob(_pr)));
-          const _rtData = JSON.parse(_decoded);
+          const _rtData = decodeResetToken(_pr);
           console.log('Reset token decoded:', _rtData);
           if(_rtData && _rtData.exp && Date.now() < _rtData.exp) {
             setTimeout(() => { ouvrirModalResetDepuisLien(_rtData.identifiant, _rtData.typeCompte, _pr); }, 500);
@@ -2894,6 +2893,20 @@ const EMAILJS_CONFIG = {
   templateRecapId: 'template_6uq04fr',   // modèle confirmations/récapitulatifs (variables : to_email, titre, contenu)
   publicKey:  'awxu35zCxrmJzkyOZ'
 };
+function decodeResetToken(token) {
+  try {
+    // Décoder l'URL encoding d'abord, puis base64
+    const b64 = decodeURIComponent(token).replace(/ /g, '+');
+    const json = decodeURIComponent(escape(atob(b64)));
+    return JSON.parse(json);
+  } catch(e) {
+    try {
+      // Essai direct sans décoder l'URL
+      const json = decodeURIComponent(escape(atob(token)));
+      return JSON.parse(json);
+    } catch(e2) { return null; }
+  }
+}
 function ouvrirModalResetDepuisLien(identifiant, typeCompte, token) {
   const div = document.createElement('div');
   div.id = 'm-chg-mdp-reset';
@@ -10812,7 +10825,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
       _btnR.textContent = '🔑 Réinitialiser mon mot de passe';
       _btnR.onclick = function() {
         try {
-          const _d = JSON.parse(decodeURIComponent(escape(atob(_resetParam))));
+          const _d = decodeResetToken(_resetParam);
           if(_d && _d.exp && Date.now() < _d.exp) { _btnR.remove(); ouvrirModalResetDepuisLien(_d.identifiant, _d.typeCompte, _resetParam); }
           else toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true);
         } catch(e) { toast('⚠️ Lien invalide.', true); }
