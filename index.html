@@ -4638,7 +4638,19 @@ function rClientContent() {
   } else if(clientTab === 'vente') {
     // Annonces publiées par ce client
     const mesAnnonces = annoncesValides().filter(a => a.clientId === cl.id);
+    // Véhicules du client : autorisation de transfert (sécurité anti-vol)
+    const mesVehsVente = DB.vehs.filter(v => (v.clientId===cl.id || v.id===cl.vid || v.phone===cl.tel) && !v.stolen);
+    const carteTransfert = mesVehsVente.map(v =>
+      '<div style="border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:14px;margin-bottom:10px">' +
+        '<div style="font-weight:700;font-size:14px;color:#16A34A;margin-bottom:4px">💰 Vendre ma moto — <span class="mat" style="font-size:12px">' + esc(v.mat||v.vin||'') + '</span></div>' +
+        (v.enVente
+          ? '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">✅ Votre moto est marquée <b style="color:#16A34A">VENDUE</b>. Le nouveau propriétaire peut faire le transfert chez un agent.</div>' +
+            '<button class="btn-ghost" style="width:100%;padding:11px;border:1px solid rgba(239,68,68,.3);color:#EF4444" onclick="ownerAnnulerVente(\'' + v.id + '\')">❌ Annuler la vente</button>'
+          : '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔒 <b>Sécurité anti-vol :</b> personne ne peut changer le propriétaire de votre moto tant que vous ne l\'avez pas marquée comme vendue ici. Cliquez uniquement si la vente est réelle.</div>' +
+            '<button class="btn" style="width:100%;padding:12px;background:#16A34A" onclick="ownerMarquerVendu(\'' + v.id + '\')">💰 J\'ai vendu ma moto — autoriser le transfert</button>') +
+      '</div>').join('');
     el.innerHTML =
+      carteTransfert +
       '<div class="card" style="margin-bottom:10px">' +
         '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🏷️ Mettre en vente</div>' +
         '<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Frais de publication : <b style="color:#EAB308">10 000 GNF</b> débités.</div>' +
@@ -5175,16 +5187,6 @@ function rOwner() {
         '<div id="owner-verifs"><div style="font-size:12px;color:var(--text2)">⏳ Chargement...</div></div>' +
       '</div>' +
 
-      // Vente / transfert de propriété — sécurité anti-vol
-      '<div style="border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:14px;margin-bottom:14px">' +
-        '<div style="font-weight:700;font-size:14px;color:#16A34A;margin-bottom:4px">💰 Vendre ma moto</div>' +
-        (v.enVente
-          ? '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">✅ Votre moto est marquée <b style="color:#16A34A">VENDUE</b>. Le nouveau propriétaire peut maintenant faire le transfert chez un agent.</div>' +
-            '<button id="btn-annuler-vente" class="btn-ghost" style="width:100%;padding:11px;border:1px solid rgba(239,68,68,.3);color:#EF4444">❌ Annuler la vente</button>'
-          : '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">🔒 <b>Sécurité anti-vol :</b> personne ne peut changer le propriétaire de votre moto tant que vous ne l\'avez pas marquée comme vendue ici. Cliquez uniquement si vous avez réellement vendu votre moto.</div>' +
-            '<button id="btn-marquer-vendu" class="btn" style="width:100%;padding:12px;background:#16A34A">💰 J\'ai vendu ma moto — autoriser le transfert</button>') +
-      '</div>' +
-
       // Bouton déclarer volée
       '<div style="border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:14px;margin-bottom:14px">' +
         '<div style="font-weight:700;font-size:14px;color:#EF4444;margin-bottom:4px">🚨 Déclarer ma moto volée</div>' +
@@ -5259,10 +5261,6 @@ function rOwner() {
       const btn = document.getElementById('vis-' + key);
       if(btn) btn.addEventListener('click', function() { toggle(key); });
     });
-    const _bVendu = document.getElementById('btn-marquer-vendu');
-    if(_bVendu) _bVendu.addEventListener('click', function() { ownerMarquerVendu(vid); });
-    const _bAnnul = document.getElementById('btn-annuler-vente');
-    if(_bAnnul) _bAnnul.addEventListener('click', function() { ownerAnnulerVente(vid); });
     chargerHistoriqueVerifs(v.id);
   }
 }
@@ -5283,7 +5281,7 @@ async function chargerHistoriqueVerifs(vehId) {
     const libelles = {qr_externe:'📷 Scan QR (téléphone)', qr_camera:'📷 Scan QR (caméra du site)', matricule:'⌨️ Saisie du matricule', chassis:'⌨️ Saisie du N° châssis'};
     el.innerHTML = data.map(x => {
       const d = x.date ? new Date(x.date) : null;
-      const quand = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
+      const quand = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '—';
       const lieu = (x.lat != null && x.lng != null)
         ? '<a href="https://maps.google.com/?q=' + x.lat + ',' + x.lng + '" target="_blank" rel="noopener" style="color:#f97316;font-weight:700;text-decoration:none">📍 Voir la position</a>'
         : '<span style="color:var(--text2)">📍 Position non partagée</span>';
@@ -5309,7 +5307,7 @@ function ownerMarquerVendu(vid) {
   sbSaveVehicule(v);
   logMvt('enreg', '💰 Moto marquée VENDUE par le propriétaire — ' + (v.mat||v.vin||'') + ' (' + v.owner + ')', 0, v.owner, 'Registre');
   toast('✅ Moto marquée vendue — le transfert est maintenant autorisé');
-  rOwner();
+  if(DB.user && DB.user.role === 'client') rClientContent(); else rOwner();
 }
 function ownerAnnulerVente(vid) {
   const v = DB.vehs.find(x => x.id === vid);
@@ -5318,7 +5316,7 @@ function ownerAnnulerVente(vid) {
   sbSaveVehicule(v);
   logMvt('enreg', '❌ Vente annulée par le propriétaire — ' + (v.mat||v.vin||''), 0, v.owner, 'Registre');
   toast('❌ Vente annulée — le transfert est de nouveau bloqué');
-  rOwner();
+  if(DB.user && DB.user.role === 'client') rClientContent(); else rOwner();
 }
 
 function ownerVol(vid, avecCrime, typeCrime, ville) {
@@ -8280,7 +8278,17 @@ function ouvrirTransfert(annId) {
 }
 function marquerVendu(id) {
   const a = DB.annonces.find(x=>x.id===id);
-  if(a) { a.statut='vendu'; sbSaveAnnonce(a); rAnnonces(); rClientContent(); toast('✅ Annonce marquée vendue'); }
+  if(!a) return;
+  a.statut='vendu'; sbSaveAnnonce(a);
+  // Vente confirmée → autoriser automatiquement le transfert de propriété de la moto liée
+  const vLie = a.vehId ? DB.vehs.find(v=>v.id===a.vehId) : null;
+  if(vLie) {
+    vLie.enVente = true;
+    sbSaveVehicule(vLie);
+    logMvt('enreg', '💰 Moto marquée VENDUE (via annonce) — ' + (vLie.mat||vLie.vin||''), 0, vLie.owner, 'Registre');
+  }
+  rAnnonces(); rClientContent();
+  toast('✅ Annonce marquée vendue' + (vLie ? ' — le transfert de propriété est autorisé' : ''));
 }
 
 // ════════════════════════════════════════════════
