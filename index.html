@@ -4879,6 +4879,36 @@ function purgerCoursesEtTrajets() {
   const ms45j  = 45 * 24 * 60 * 60 * 1000;
   const ms48h  = 48 * 60 * 60 * 1000;
 
+  // ── Trajets expirés JAMAIS réservés → suppression automatique ──
+  DB.trajets = (DB.trajets||[]).filter(t => {
+    const dh = t.dateHeure ? new Date(t.dateHeure) : null;
+    const expire = dh && !isNaN(dh) && now > dh;
+    const sansResa = !t.reservations || t.reservations.length === 0;
+    if(t.statut === 'actif' && expire && sansResa) {
+      sbDeleteItem('trajets', t.id);
+      return false;
+    }
+    return true;
+  });
+
+  // ── Trajets terminés ou annulés → suppression après 45 jours ──
+  DB.trajets = (DB.trajets||[]).filter(t => {
+    if(t.statut !== 'effectué' && t.statut !== 'annulé') return true;
+    const ref = t.arriveLe || t.dateHeure || null;
+    if(!ref) return true;
+    if(now - new Date(ref) > ms45j) { sbDeleteItem('trajets', t.id); return false; }
+    return true;
+  });
+
+  // ── Alertes trajets expirées (la date de voyage souhaitée est passée) → suppression auto ──
+  DB.alertes = (DB.alertes||[]).filter(a => {
+    const dh = a.dateHeure ? new Date(a.dateHeure) : null;
+    if(dh && !isNaN(dh) && now > dh) { sbDeleteItem('alertes', a.id); return false; }
+    // Alertes sans date : supprimées 30 jours après leur création
+    if(!dh && a.date && (now - new Date(a.date) > 30*24*3600*1000)) { sbDeleteItem('alertes', a.id); return false; }
+    return true;
+  });
+
   // Courses incomplètes (annulées, refusées, expirées, sans QR confirmé) → supprimées après 72h
   DB.demandesCourse = DB.demandesCourse.filter(d => {
     const age = now - new Date(d.date || now);
@@ -5307,7 +5337,7 @@ async function chargerSignalements(vehId) {
   try {
     const {data, error} = await supabaseClient.from('verifications')
       .select('*').eq('veh_id', vehId).eq('mode', 'signalement')
-      .order('date', {ascending:false}).limit(50);
+      .order('date', {ascending:false}).limit(10);
     if(error) throw error;
     if(!data || !data.length) {
       el.innerHTML = '<div style="font-size:12px;color:var(--text2);font-style:italic">Aucune position reçue pour le moment.</div>';
@@ -5854,9 +5884,12 @@ function envoyerSignalementPosition(vehId) {
         if(error) {
           if(btn) { btn.disabled = false; btn.textContent = '📍 Envoyer ma localisation au propriétaire'; }
           alert('⚠️ Envoi impossible pour le moment. Réessayez.');
-        } else if(btn) {
-          btn.style.background = '#16A34A'; btn.style.color = '#fff';
-          btn.textContent = '✅ Position envoyée au propriétaire — merci !';
+        } else {
+          purgerVieillesVerifs(vehId);
+          if(btn) {
+            btn.style.background = '#16A34A'; btn.style.color = '#fff';
+            btn.textContent = '✅ Position envoyée au propriétaire — merci !';
+          }
         }
       });
     },
@@ -5868,16 +5901,34 @@ function envoyerSignalementPosition(vehId) {
   );
 }
 
-// Ne conserver que les 10 vérifications les plus récentes par moto : au-delà, suppression automatique
+// Ne conserver que les 10 plus récentes par moto (vérifications ET signalements, comptés séparément)
 async function purgerVieillesVerifs(vehId) {
   try {
-    const {data} = await supabaseClient.from('verifications')
-      .select('id').eq('veh_id', vehId).neq('mode', 'signalement')
-      .order('date', {ascending:false}).range(10, 200);
-    if(data && data.length) {
-      await supabaseClient.from('verifications').delete().in('id', data.map(x=>x.id));
-    }
+    const [{data: v1}, {data: v2}] = await Promise.all([
+      supabaseClient.from('verifications').select('id').eq('veh_id', vehId).neq('mode', 'signalement')
+        .order('date', {ascending:false}).range(10, 200),
+      supabaseClient.from('verifications').select('id').eq('veh_id', vehId).eq('mode', 'signalement')
+        .order('date', {ascending:false}).range(10, 200),
+    ]);
+    const ids = [...(v1||[]), ...(v2||[])].map(x=>x.id);
+    if(ids.length) await supabaseClient.from('verifications').delete().in('id', ids);
   } catch(e) { console.warn('purgerVieillesVerifs:', e && e.message); }
+}
+
+// Moto retrouvée : 30 jours après, les positions reçues (signalements) sont supprimées.
+// (Un signalement n'arrive que sur moto volée ; si la moto n'est plus volée et que le
+// signalement date de plus de 30 jours, il n'a plus d'utilité.)
+async function nettoyerSignalementsRetrouves() {
+  try {
+    const idsNonVolees = (DB.vehs||[]).filter(v => !v.stolen && v.statut !== 'vole').map(v => v.id);
+    if(!idsNonVolees.length) return;
+    const cutoff = new Date(Date.now() - 30*24*3600*1000).toISOString();
+    for(let i = 0; i < idsNonVolees.length; i += 100) {
+      await supabaseClient.from('verifications').delete()
+        .eq('mode', 'signalement').lt('date', cutoff)
+        .in('veh_id', idsNonVolees.slice(i, i + 100));
+    }
+  } catch(e) { console.warn('nettoyerSignalementsRetrouves:', e && e.message); }
 }
 const MODES_VERIF = {
   qr_externe: '📷 Scan QR (téléphone)',
@@ -11273,6 +11324,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 
   try {
     await chargerDonnéesSupabase();
+    setTimeout(() => { try { nettoyerSignalementsRetrouves(); } catch(e) {} }, 5000); // nettoyage en arrière-plan
   } catch(e) {
     console.warn('Supabase non disponible, mode local:', e);
   }
