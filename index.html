@@ -4621,7 +4621,7 @@ function rPassager() {
       if(!mesCourses.length) return '';
       const libellesStatut = {
         en_attente:['⏳ En attente','#EAB308'], prix_propose:['💰 Prix proposé','#60A5FA'],
-        acceptee:['✅ Acceptée — en route','#22C55E'], effectuee:['🏍️ Présence confirmée','#22C55E'],
+        acceptee:['✅ Taxi en route pour vous','#22C55E'], effectuee:['🚗 Taxi arrivé — montez !','#22C55E'],
         terminee:['✅ Course terminée','#22C55E'], refusee:['❌ Refusée','#EF4444'],
         refusee_passager:['❌ Prix refusé','#EF4444'], expiree:['⏱️ Expirée','var(--text2)'],
         annulee:['❌ Annulée','#EF4444'], annulee_chauffeur:['🚨 Annulée par le chauffeur','#EF4444'],
@@ -4641,7 +4641,7 @@ function rPassager() {
           const t = DB.taxis.find(x => x.id === d.taxiId);
           const [libBase, coulBase] = libellesStatut[d.statutAttribution] || ['—','var(--text2)'];
           // Une course dont le code a été validé (enCours) affiche "Course en cours", peu importe le statut brut
-          const [lib, coul] = d.enCours ? ['🚗 Course en cours', '#f97316'] : [libBase, coulBase];
+          const [lib, coul] = d.enCours ? ['🚙 Course en cours', '#f97316'] : [libBase, coulBase];
           return '<div style="display:flex;gap:10px;background:rgba(0,0,0,.15);border-radius:10px;padding:10px;margin-bottom:6px;align-items:flex-start">' +
             (t && t.photo ? '<img src="'+t.photo+'" onclick="agrandirImg(this)" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;cursor:pointer" title="Agrandir"/>' : '<div style="width:44px;height:44px;border-radius:50%;background:rgba(249,115,22,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏍️</div>') +
             '<div style="flex:1;min-width:0;font-size:12px">' +
