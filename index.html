@@ -576,6 +576,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         { data: corbeille },
         { data: demandesCourse },
         { data: avisChauffeurs },
+        { data: avisCourses },
         { data: chauffeursBloquesParNom },
         { data: journalAccesSensibles },
         { data: configRows },
@@ -593,6 +594,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         supabaseClient.from('corbeille').select('*'),
         supabaseClient.from('demandes_course').select('*'),
         supabaseClient.from('avis_chauffeurs').select('*'),
+        supabaseClient.from('avis_courses').select('*'),
         supabaseClient.from('chauffeurs_bloques_par_nom').select('*'),
         supabaseClient.from('journal_acces_sensibles').select('*'),
         supabaseClient.from('config_admin').select('*').limit(1),
@@ -612,6 +614,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       DB.corbeille = (corbeille||[]).map(mapCorbeille);
       DB.demandesCourse = (demandesCourse||[]).map(mapDemandeCourse);
       DB.avisChauffeurs = (avisChauffeurs||[]).map(x=>({...x}));
+      DB.avisCourses = (avisCourses||[]).map(x=>({...x}));
       DB.chauffeursBloquesParNom = (chauffeursBloquesParNom||[]).map(x=>x.nom||x.name||x);
       DB.journalAccesSensibles = (journalAccesSensibles||[]).map(x=>({...x}));
 
@@ -2686,6 +2689,34 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   </div>
 </div>
 
+<!-- MODAL AVIS COURSES TAXI -->
+<div id="m-avis-course" class="modal-bot">
+  <div class="mbox-bot fu">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:900">⭐ Laisser un avis (course)</div>
+      <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="closeModal('m-avis-course')">✕</button>
+    </div>
+    <div id="ac-etape1">
+      <div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">Renseignez le numéro de téléphone utilisé lors de votre course pour la retrouver.</div>
+      <div class="fld"><div class="lbl">Votre téléphone *</div><input type="tel" id="ac-tel" placeholder="+224 6xx xxx xxx"/></div>
+      <div id="acerr1" class="warn" style="display:none"></div>
+      <button class="btn-blue" style="width:100%;padding:13px" onclick="chercherCoursePourAvis()">🔍 Trouver ma course</button>
+    </div>
+    <div id="ac-etape2" style="display:none">
+      <input type="hidden" id="ac-course-id" value=""/>
+      <div id="ac-course-info" class="qr-note-txt" style="font-size:12px;margin-bottom:14px"></div>
+      <div class="fld">
+        <div class="lbl">Votre note *</div>
+        <div id="ac-etoiles" style="display:flex;gap:8px;font-size:30px;margin-bottom:4px"></div>
+        <input type="hidden" id="ac-note" value="0"/>
+      </div>
+      <div class="fld"><div class="lbl">Votre commentaire</div><textarea id="ac-comment" rows="3" placeholder="Comment s'est passée la course ?"></textarea></div>
+      <div id="acerr2" class="warn" style="display:none"></div>
+      <button class="btn-blue" style="width:100%;padding:13px" onclick="publierAvisCourse()">✅ Publier mon avis</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHANGER LA ZONE D'UN TAXI (ESPACE CLIENT) -->
 <div id="m-changer-zone" class="modal-bot">
   <div class="mbox-bot fu">
@@ -2950,6 +2981,7 @@ const DB = {
   bandeauVitesse: 18, // secondes pour un cycle complet (plus petit = plus rapide)
   commissionCourseTaxi: 2000,
   avisChauffeurs: [],
+  avisCourses: [],
   chauffeursBloquesParNom: [],
   trajets: [],
   annonces: [],
@@ -4650,6 +4682,23 @@ function rPassager() {
               (d.depart||d.arrivee ? '<div style="color:#EAB308;font-size:11px;margin-top:2px">🛣️ '+esc(d.depart||'?')+' → '+esc(d.arrivee||'?')+'</div>' : '') +
               '<div style="color:var(--text2);font-size:10px;margin-top:2px">' + fdt(d.date) + '</div>' +
               '<div style="color:'+coul+';font-weight:700;font-size:11px;margin-top:3px">' + lib + (d.prixPropose ? ' · '+fmt(d.prixPropose) : '') + '</div>' +
+              (() => {
+                const av = avisCourse(d.id);
+                if(!av) return (d.statutAttribution === 'terminee' ? '<button onclick="openModal(\'m-avis-course\')" style="background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer;margin-top:6px">⭐ Laisser un avis</button>' : '');
+                return '<div style="font-size:11px;color:#EAB308;margin-top:6px;cursor:pointer" onclick="toggleAvisCourse(this)" title="Cliquer pour lire tous les avis">' +
+                  '★'.repeat(Math.round(av.moyenne))+'☆'.repeat(5-Math.round(av.moyenne))+' '+av.moyenne.toFixed(1)+' ('+av.total+' avis) <span style="color:var(--text2);font-size:10px">▼ Lire tous</span>' +
+                  '</div>' +
+                  '<div class="avis-dernier" style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-top:6px;font-size:11px">' +
+                    '<div style="color:#EAB308;font-weight:700">★'.repeat(av.avis[av.avis.length-1].note)+'☆'.repeat(5-av.avis[av.avis.length-1].note)+' <span style="color:var(--text2);font-weight:400;font-size:10px">dernier avis</span></div>' +
+                    (av.avis[av.avis.length-1].comment?'<div style="color:var(--text2);margin-top:3px;line-height:1.4">"'+esc(av.avis[av.avis.length-1].comment)+'"</div>':'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>') +
+                  '</div>' +
+                  '<div class="avis-liste" style="display:none;margin-top:6px">' +
+                    av.avis.map(a=>'<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">' +
+                      '<div style="color:#EAB308;font-weight:700">★'.repeat(a.note)+'☆'.repeat(5-a.note)+' <span style="color:var(--text2);font-weight:400">'+(a.date?new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'')+' </span></div>' +
+                      (a.comment?'<div style="color:var(--text2);margin-top:3px;line-height:1.4">"'+esc(a.comment)+'"</div>':'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>') +
+                    '</div>').join('') +
+                  '</div>';
+              })() +
             '</div>' +
             '<button onclick="supprimerHistoriqueCourse(\'' + d.id + '\')" style="background:none;border:none;color:var(--text2);font-size:14px;cursor:pointer;flex-shrink:0" title="Supprimer">🗑️</button>' +
           '</div>';
@@ -9423,8 +9472,12 @@ function rTrajets() {
         </div>
       </div>
       ${av ? `
-        <div style="font-size:12px;color:#EAB308;margin-top:2px;cursor:pointer" onclick="toggleAvis(this)" title="Cliquer pour lire les avis">
-          ${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))} ${av.moyenne.toFixed(1)} (${av.total} avis) <span style="color:var(--text2);font-size:10px">▼ Lire</span>
+        <div style="font-size:12px;color:#EAB308;margin-top:2px;cursor:pointer" onclick="toggleAvis(this)" title="Cliquer pour lire tous les avis">
+          ${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))} ${av.moyenne.toFixed(1)} (${av.total} avis) <span style="color:var(--text2);font-size:10px">▼ Lire tous</span>
+        </div>
+        <div class="avis-dernier" style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-top:6px;font-size:11px">
+          <div style="color:#EAB308;font-weight:700">${'★'.repeat(av.avis[av.avis.length-1].note)}${'☆'.repeat(5-av.avis[av.avis.length-1].note)} <span style="color:var(--text2);font-weight:400;font-size:10px">dernier avis</span></div>
+          ${av.avis[av.avis.length-1].comment?`<div style="color:var(--text2);margin-top:3px;line-height:1.4">"${esc(av.avis[av.avis.length-1].comment)}"</div>`:'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>'}
         </div>
         <div class="avis-liste" style="display:none;margin-top:6px">
           ${av.avis.map(a=>`<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">
@@ -9708,25 +9761,107 @@ function publierAvisChauffeur() {
     id: _nvAvis.id, client_id: _nvAvis.clientId||null, conducteur: _nvAvis.conducteur,
     trajet_id: _nvAvis.trajetId, tel: _nvAvis.tel, note: _nvAvis.note,
     comment: _nvAvis.comment, date: _nvAvis.date
-  }).then(({error}) => {
-    if(error) { console.error('Avis:', error.message); toast('⚠️ Erreur lors de l\'enregistrement de l\'avis', true); return; }
-    DB.avisChauffeurs.push(_nvAvis); // ajout local après confirmation serveur
+  }).then(({data, error}) => {
+    if(error) { console.error('Avis trajet:', error.message); toast('⚠️ Erreur avis trajet', true); return; }
+    DB.avisChauffeurs.push(_nvAvis);
     closeModal('m-avis-chauffeur');
     rTrajets();
+    toast('✅ Merci pour votre avis !');
+  });
+}
+// Chercher une course pour laisser un avis
+function chercherCoursePourAvis() {
+  const tel = document.getElementById('ac-tel').value.trim();
+  const err = document.getElementById('acerr1');
+  err.style.display = 'none';
+  if(!tel) { err.textContent='⚠️ Renseignez votre numéro de téléphone.'; err.style.display='block'; return; }
+  const telN = tel.replace(/\D/g,'');
+  const trouve = DB.demandesCourse.find(d => d.statutAttribution === 'terminee' && (d.passagerTel||'').replace(/\D/g,'') === telN);
+  if(!trouve) { err.textContent='❌ Aucune course terminée trouvée avec ce numéro. L\'avis n\'est possible qu\'après la fin de la course.'; err.style.display='block'; return; }
+  const dejaAvis = DB.avisCourses.find(a => a.courseId === trouve.id && (a.tel||'').replace(/\D/g,'') === telN);
+  if(dejaAvis) { err.textContent='❌ Vous avez déjà laissé un avis pour cette course.'; err.style.display='block'; return; }
+  
+  document.getElementById('ac-course-id').value = trouve.id;
+  document.getElementById('ac-course-info').innerHTML = `<b>${esc(trouve.depart)} → ${esc(trouve.arrivee)}</b><br>🏍️ Taxi : ${esc(trouve.taxiNom||'—')}`;
+  document.getElementById('ac-note').value = '0';
+  document.getElementById('ac-comment').value = '';
+  renderEtoilesAvisCourse(0);
+  document.getElementById('ac-etape1').style.display = 'none';
+  document.getElementById('ac-etape2').style.display = '';
+  document.getElementById('acerr1').style.display = 'none';
+}
+function renderEtoilesAvisCourse(note) {
+  const el = document.getElementById('ac-etoiles');
+  el.innerHTML = [1,2,3,4,5].map(n => `<span style="cursor:pointer;color:${n<=note?'#EAB308':'#4b5563'}" onclick="setNoteAvisCourse(${n})">★</span>`).join('');
+}
+function setNoteAvisCourse(n) {
+  document.getElementById('ac-note').value = n;
+  renderEtoilesAvisCourse(n);
+}
+function publierAvisCourse() {
+  const courseId = document.getElementById('ac-course-id').value;
+  const note = parseInt(document.getElementById('ac-note').value) || 0;
+  const comment = document.getElementById('ac-comment').value.trim();
+  const tel = document.getElementById('ac-tel').value.trim();
+  const err = document.getElementById('acerr2');
+  const d = DB.demandesCourse.find(x=>x.id===courseId);
+  if(!d) { err.textContent='⚠️ Course introuvable.'; err.style.display='block'; return; }
+  if(note < 1) { err.textContent='⚠️ Sélectionnez une note (1 à 5 étoiles).'; err.style.display='block'; return; }
+  const _nvAvis = {
+    id: gid(),
+    courseId: d.id,
+    taxiId: d.taxiId || null,
+    taxiNom: d.taxiNom,
+    tel,
+    note,
+    comment,
+    date: new Date().toISOString()
+  };
+  supabaseClient.from('avis_courses').insert({
+    id: _nvAvis.id, course_id: _nvAvis.courseId, taxi_id: _nvAvis.taxiId||null,
+    taxi_nom: _nvAvis.taxiNom, tel: _nvAvis.tel, note: _nvAvis.note,
+    comment: _nvAvis.comment, date: _nvAvis.date
+  }).then(({data, error}) => {
+    if(error) { console.error('Avis course:', error.message); toast('⚠️ Erreur avis course', true); return; }
+    DB.avisCourses.push(_nvAvis);
+    closeModal('m-avis-course');
+    rPassager();
     toast('✅ Merci pour votre avis !');
   });
 }
 // Retourne {moyenne, total} des avis pour un chauffeur (par clientId, ou par nom si pas de compte client)
 function toggleAvis(el) {
   const liste = el.nextElementSibling;
+  const dernier = liste?.previousElementSibling;
   if(!liste) return;
   const ouvert = liste.style.display !== 'none';
   liste.style.display = ouvert ? 'none' : '';
+  if(dernier && dernier.classList.contains('avis-dernier')) {
+    dernier.style.display = ouvert ? '' : 'none';
+  }
   const lien = el.querySelector('span:last-child');
-  if(lien) lien.textContent = ouvert ? '▼ Lire' : '▲ Masquer';
+  if(lien) lien.textContent = ouvert ? '▼ Lire tous' : '▲ Masquer';
+}
+function toggleAvisCourse(el) {
+  const liste = el.nextElementSibling?.nextElementSibling;
+  const dernier = el.nextElementSibling;
+  if(!liste) return;
+  const ouvert = liste.style.display !== 'none';
+  liste.style.display = ouvert ? 'none' : '';
+  if(dernier && dernier.classList.contains('avis-dernier')) {
+    dernier.style.display = ouvert ? '' : 'none';
+  }
+  const lien = el.querySelector('span:last-child');
+  if(lien) lien.textContent = ouvert ? '▼ Lire tous' : '▲ Masquer';
 }
 function avisChauffeur(clientId, conducteurNom) {
   const avis = DB.avisChauffeurs.filter(a => clientId ? a.clientId === clientId : nrm(a.conducteur) === nrm(conducteurNom));
+  if(avis.length === 0) return null;
+  const moyenne = avis.reduce((s,a)=>s+a.note,0) / avis.length;
+  return { moyenne, total: avis.length, avis };
+}
+function avisCourse(courseId) {
+  const avis = DB.avisCourses.filter(a => a.courseId === courseId);
   if(avis.length === 0) return null;
   const moyenne = avis.reduce((s,a)=>s+a.note,0) / avis.length;
   return { moyenne, total: avis.length, avis };
