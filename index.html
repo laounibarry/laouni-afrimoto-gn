@@ -10867,7 +10867,7 @@ function rGestion() {
         <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:var(--text2)">${fdt(d.date)}</span><span style="font-size:11px;font-weight:700;color:${labCoul}">${lib}</span></div>
         ${d.depart||d.arrivee ? `<div style="font-weight:700;font-size:12px;color:#EAB308;margin-top:2px">🛣️ ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:6px">
-          <div style="flex:1;background:rgba(0,0,0,.12);border-radius:6px;padding:6px;font-size:11px"><b>🧍 ${esc(d.passagerNom)}</b><br>${esc(d.passagerTel)}${ps?'<br><span style="color:var(--text2)">'+esc(ps.num)+'</span>':''}</div>
+          <div style="flex:1;background:rgba(0,0,0,.12);border-radius:6px;padding:6px;font-size:11px"><b>🧍 ${esc(d.passagerNom)}</b><br>${(['refusee','refusee_passager','expiree','annulee','annulee_chauffeur','annulee_suspect','annulee_passager','terminee'].includes(d.statutAttribution) && !isAdmin()) ? '<span style="color:var(--text2);font-style:italic">🔒 Contact masqué</span>' : esc(d.passagerTel)}${ps?'<br><span style="color:var(--text2)">'+esc(ps.num)+'</span>':''}</div>
           <div style="flex:1;background:rgba(0,0,0,.12);border-radius:6px;padding:6px;font-size:11px"><b>🏍️ ${esc(d.taxiNom)}</b><br>${esc(d.taxiPlaque||'—')}${t?'<br>'+esc(t.tel):''}</div>
         </div>
         ${d.prixPropose ? `<div style="font-size:11px;color:#f97316;margin-top:4px">Prix course : ${fmt(d.prixPropose)}</div>` : ''}
@@ -10939,7 +10939,7 @@ function rGestion() {
           <div style="flex:1;background:rgba(0,0,0,.15);border-radius:8px;padding:8px">
             <div style="font-size:10px;color:var(--text2);margin-bottom:3px">🧍 PASSAGER</div>
             <div style="font-weight:700;font-size:12px">${esc(d.passagerNom)}</div>
-            <a href="tel:${esc(d.passagerTel)}" style="display:block;font-size:11px;color:#f97316;font-weight:700;text-decoration:none">${esc(d.passagerTel)}</a>
+            ${(['refusee','refusee_passager','expiree','annulee','annulee_chauffeur','annulee_suspect','annulee_passager','terminee'].includes(d.statutAttribution) && !isAdmin()) ? '<div style="font-size:11px;color:var(--text2);font-style:italic">🔒 Contact masqué</div>' : `<a href="tel:${esc(d.passagerTel)}" style="display:block;font-size:11px;color:#f97316;font-weight:700;text-decoration:none">${esc(d.passagerTel)}</a>`}
             ${ps ? `<div style="font-size:10px;color:var(--text2);margin-top:2px">N° unique : ${esc(ps.num)}</div>` : ''}
           </div>
           <div style="flex:1;background:rgba(0,0,0,.15);border-radius:8px;padding:8px">
