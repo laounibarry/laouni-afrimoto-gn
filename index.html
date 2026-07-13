@@ -9703,7 +9703,7 @@ function publierAvisChauffeur() {
     date: new Date().toISOString()
   };
   // Ne pas push localement — on rechargera depuis Supabase pour avoir tous les avis
-  sbUpsertSouple('avis_chaucheurs_save', null, {}).catch(()=>{}); // flush
+  sbUpsertSouple('avis_chauffeurs', null, {}).catch(()=>{}); // flush
   supabaseClient.from('avis_chauffeurs').insert({
     id: _nvAvis.id, client_id: _nvAvis.clientId||null, conducteur: _nvAvis.conducteur,
     trajet_id: _nvAvis.trajetId, tel: _nvAvis.tel, note: _nvAvis.note,
