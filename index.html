@@ -1273,6 +1273,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="tab" id="tab-alertes" onclick="goPage('alertes')">🔔 Alertes</button>
     <button class="tab" id="tab-registre" style="display:none" onclick="goPage('registre')">📋 Registre</button>
     <button class="tab" id="tab-gestion" style="display:none" onclick="goPage('gestion')">⚙️ Gestion</button>
+    <button class="tab" id="tab-recherche-agent" style="display:none" onclick="goPage('recherche-agent')">🔎 Recherche</button>
     <button class="tab" id="tab-recharge" style="display:none" onclick="goPage('recharge')">💳 Recharge</button>
     <button class="tab" id="tab-sousagents" style="display:none" onclick="goPage('sousagents')">👥 Sous-agents</button>
     <button class="tab" id="tab-historique" style="display:none" onclick="goPage('historique')">📜 Historique</button>
@@ -1731,6 +1732,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <!-- MODAL ÉDITION UNIVERSEL -->
 <div id="m-edit" class="modal">
   <div class="mbox fu" id="m-edit-inner"></div>
+</div>
+
+<!-- RECHERCHE AGENT -->
+<div id="page-recherche-agent" class="page">
+  <div class="h2">🔎 Recherche compte</div>
+  <input type="text" id="rech-agent-q" placeholder="Numéro unique, téléphone, matricule, nom..." style="margin-bottom:11px" oninput="renderRechercheAgent()"/>
+  <div id="rech-agent-content"></div>
 </div>
 
 <!-- RECHARGE -->
@@ -3153,7 +3161,7 @@ function goPage(id, skipHistory) {
     id = DB.user ? (isAgent() ? 'vehs' : (pagesPersonnelles[DB.user.role] || 'home')) : 'home';
   }
   // Pages réservées agent (recharge, sous-agents, gps) : admin a aussi accès (supervision)
-  const pagesAgentOnly = ['recharge','sousagents','gps'];
+  const pagesAgentOnly = ['recherche-agent','recharge','sousagents','gps'];
   if(pagesAgentOnly.includes(id) && !isAgent() && !isAdmin()) {
     id = DB.user ? (pagesPersonnelles[DB.user.role] || 'home') : 'home';
   }
@@ -3179,7 +3187,7 @@ function goPage(id, skipHistory) {
   });
   const renders = {owner:rOwner,client:rClient,sousagent:rSousAgent,passager:rPassager,home:rHome,vehs:rVehs,taxis:rTaxis,gps:rGPS,trajets:rTrajets,
     annonces:rAnnonces,alertes:rAlertes,agences:rAgences,registre:()=>rRegistre(),
-    gestion:()=>rGestion(),recharge:()=>rRecharge(),
+    gestion:()=>rGestion(),'recherche-agent':renderRechercheAgent,recharge:()=>rRecharge(),
     sousagents:rSA,historique:()=>rHistorique(),tarifs:rTarifs};
   if(renders[id]) renders[id]();
   // Nav bottom public
@@ -4371,7 +4379,7 @@ function updateNav() {
   document.getElementById('tabs-bar').style.display = hideAll ? 'none' : '';
 
   const adminTabs = ['tab-registre','tab-gestion','tab-historique','tab-tarifs'];
-  const agentTabs = ['tab-recharge','tab-sousagents'];
+  const agentTabs = ['tab-recherche-agent','tab-recharge','tab-sousagents'];
   const gpsTabs = ['tab-gps'];
   // Onglet Accueil : masqué pour admin/agent (contenu réservé au public)
   const tabHome = document.getElementById('tab-home');
@@ -12042,6 +12050,49 @@ function renderRechTabs() {
   const el = document.getElementById('recharge-tabs');
   if(!el) return;
   el.innerHTML = tabs.map(t => `<button class="${rechTab===t.id?'btn':'btn-ghost'}" onclick="setRechTab('${t.id}')" style="font-size:12px;padding:7px 13px">${t.label}</button>`).join('');
+}
+
+function renderRechercheAgent() {
+  const inputEl = document.getElementById('rech-agent-q');
+  const contentEl = document.getElementById('rech-agent-content');
+  if(!inputEl || !contentEl) return;
+  
+  const q = (inputEl.value || '').trim();
+  if(!q) { contentEl.innerHTML = '<div class="empty">Entrez un identifiant pour rechercher.</div>'; return; }
+  
+  const qNorm = nrm(q);
+  let html = '';
+  
+  // Clients
+  const clients = DB.clients.filter(c => nrm(c.num||c.id).includes(qNorm) || nrm(c.tel||'').includes(qNorm) || nrm((c.prenom||'')+' '+(c.nom||'')).includes(qNorm));
+  if(clients.length) {
+    html += '<div class="sect">👤 Clients (' + clients.length + ')</div>' + 
+    clients.map(c => '<div class="card" style="margin-bottom:8px"><div style="font-weight:800">' + esc(c.prenom+' '+c.nom) + ' <span style="font-size:11px;color:var(--text2)">' + esc(c.num||c.id) + '</span></div><div style="font-size:12px;color:var(--text2)">📞 ' + esc(c.tel) + ' · Solde : ' + fmt(c.solde||0) + '</div>' + (c.suspendu ? '<div style="font-size:11px;color:#EF4444;font-weight:700">⛔ Suspendu</div>' : '') + '</div>').join('');
+  }
+  
+  // Passagers
+  const passagers = DB.passagers.filter(p => nrm(p.num||p.id).includes(qNorm) || nrm(p.tel||'').includes(qNorm) || nrm((p.prenom||'')+' '+(p.nom||'')).includes(qNorm));
+  if(passagers.length) {
+    html += '<div class="sect">🧍 Passagers (' + passagers.length + ')</div>' + 
+    passagers.map(p => '<div class="card" style="margin-bottom:8px"><div style="font-weight:800">' + esc(p.prenom+' '+p.nom) + ' <span style="font-size:11px;color:var(--text2)">' + esc(p.num||p.id) + '</span></div><div style="font-size:12px;color:var(--text2)">📞 ' + esc(p.tel) + ' · Solde : ' + fmt(p.solde||0) + '</div></div>').join('');
+  }
+  
+  // Taxis
+  const taxis = DB.taxis.filter(t => nrm(t.plaque||'').includes(qNorm) || nrm(t.tel||'').includes(qNorm) || nrm(t.nom||'').includes(qNorm) || nrm(t.gilet||'').includes(qNorm));
+  if(taxis.length) {
+    html += '<div class="sect">🏍️ Taxis moto (' + taxis.length + ')</div>' + 
+    taxis.map(t => '<div class="card" style="margin-bottom:8px"><div style="font-weight:800">' + esc(t.nom) + ' · <span style="color:#EAB308">' + esc(t.plaque) + '</span></div><div style="font-size:12px;color:var(--text2)">📞 ' + esc(t.tel) + ' · Gilet n° ' + esc(t.gilet||'—') + ' · ' + (t.enService ? '🟢 En service' : '⚪ Hors service') + '</div></div>').join('');
+  }
+  
+  // Véhicules
+  const vehs = DB.vehs.filter(v => nrm(v.mat||'').includes(qNorm) || nrm(v.vin||'').includes(qNorm) || nrm(v.phone||'').includes(qNorm) || nrm(v.owner||'').includes(qNorm));
+  if(vehs.length) {
+    html += '<div class="sect">🏍️ Véhicules (' + vehs.length + ')</div>' + 
+    vehs.map(v => '<div class="card" style="margin-bottom:8px"><div style="font-weight:800">' + esc(v.mat) + ' · ' + esc(v.brand) + ' ' + esc(v.model) + '</div><div style="font-size:12px;color:var(--text2)">👤 ' + esc(v.owner) + ' · 📞 ' + esc(v.phone) + '</div>' + (v.stolen ? '<div style="font-size:11px;color:#EF4444;font-weight:700">🚨 Volé</div>' : '') + '</div>').join('');
+  }
+  
+  if(!html) html = '<div class="empty">Aucun résultat pour « ' + esc(q) + ' ».</div>';
+  contentEl.innerHTML = html;
 }
 
 function rRecharge() {
