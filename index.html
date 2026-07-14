@@ -9807,31 +9807,22 @@ function _publierTrajetDefinitif() {
   DB.trajets.unshift(newTrajet);
   
   // CRITIQUE: Attendre la sauvegarde en base AVANT de fermer le modal
-  sbSaveTrajet(newTrajet).then(ok => {
-    if(!ok) {
-      toast('⚠️ Erreur lors de la publication du trajet.', true);
-      // Rollback local si echec
-      DB.trajets = DB.trajets.filter(t => t.id !== newTrajet.id);
-      document.getElementById('tr-confirm-zone').style.display = 'block';
-      return;
-    }
-    
-    // Succès : continuer
-    logMvt('trajet',`Trajet ${dep} → ${arr} par ${cond}`,0);
+  sbSaveTrajet(newTrajet);
+  
+  // Logging
+  logMvt('trajet',`Trajet ${dep} → ${arr} par ${cond}`,0);
+  
+  // Afficher le toast IMMÉDIATEMENT
+  toast(trajetParent
+    ? '✅ Trajet complémentaire publié (' + pl + ' place(s) prise(s) sur votre trajet en cours)' + (fraisInfo.montant > 0 ? ' · Frais : '+fmt(fraisInfo.montant) : '')
+    : (fraisInfo.montant > 0 ? '✅ Trajet publié ! Frais débités : '+fmt(fraisInfo.montant) : '✅ Trajet publié !'));
+  
+  // Attendre 300ms pour laisser le toast s'afficher, PUIS fermer + rafraîchir
+  setTimeout(() => {
     closeModal('m-trajet');
     rTrajets();
     if(DB.user && DB.user.role==='client') { rClientContent(); updateNav(); }
-    
-    toast(trajetParent
-      ? '✅ Trajet complémentaire publié (' + pl + ' place(s) prise(s) sur votre trajet en cours)' + (fraisInfo.montant > 0 ? ' · Frais : '+fmt(fraisInfo.montant) : '')
-      : (fraisInfo.montant > 0 ? '✅ Trajet publié ! Frais débités : '+fmt(fraisInfo.montant) : '✅ Trajet publié !'));
-  }).catch(err => {
-    console.error('Erreur publication trajet:', err);
-    toast('⚠️ Erreur réseau : trajet non publié.', true);
-    // Rollback local
-    DB.trajets = DB.trajets.filter(t => t.id !== newTrajet.id);
-    document.getElementById('tr-confirm-zone').style.display = 'block';
-  });
+  }, 300);
 }
 
 // ── Réservation de trajet par un passager (espace public, sans compte) ──
