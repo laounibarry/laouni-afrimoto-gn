@@ -3932,6 +3932,7 @@ function addPrefArrows(el) {
 // ── Filtres préfecture + ville pour recherche (trajets/alertes) ──
 let filtreTrajetPref = '';
 let filtreTrajetVille = '';
+let trajetParent = null;  // Trajet parent pour trajets complémentaires
 let filtreAlertePref = '';
 let filtreAlerteVille = '';
 let filtreAnnoncePref = '';
@@ -9761,8 +9762,15 @@ function saveTrajet() {
 }
 
 // Étape 2 : le chauffeur a lu les frais et clique "Confirmer et publier"
-function confirmerEtPublierTrajet() {
+function confirmerEtPublierTrajet()
+{
+  alert("DEBUG 1: confirmerEtPublierTrajet appelée");
+  console.log("✅ confirmerEtPublierTrajet() appelée");
+  document.getElementById("tr-confirm-zone").style.display = "none";
+  _publierTrajetDefinitif();
+} {
   document.getElementById('tr-confirm-zone').style.display = 'none';
+  alert("DEBUG 2: _publierTrajetDefinitif appelée");
   _publierTrajetDefinitif();
 }
 // Publie réellement le trajet après confirmation du chauffeur (ou direct pour le staff)
