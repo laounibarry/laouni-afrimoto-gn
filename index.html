@@ -12285,13 +12285,17 @@ function renderRechercheCompteDetail() {
   
   const { type, id, data } = _rechercheCompteSelectionne;
   
+  // Logique sécurité: masquer numéro unique si Agent regarde un autre compte
+  const isAgentViewingOtherAccount = (DB.user && (DB.user.role === 'agent' || DB.user.role === 'sous_agent') && DB.user.id !== data.id) || false;
+  const showNumUnique = isAdmin() || !isAgentViewingOtherAccount;
+  
   // Bouton Retour
   let html = `<div style="margin-bottom:12px"><button class="btn-ghost" style="padding:8px 12px;font-size:12px" onclick="_rechercheCompteSelectionne=null;_rechercheCompteCategorie='info';renderRechercheAgent()">← Retour</button></div>`;
   
   // Titre + Infos du compte
   html += `<div class="card" style="margin-bottom:12px;border-left:4px solid #f97316">
     <div style="font-weight:800;font-size:14px">${type === 'client' ? '👤' : type === 'passager' ? '🧍' : type === 'taxi' ? '🏍️' : '🚗'} ${esc(data.prenom ? (data.prenom+' '+data.nom) : (data.nom || data.taxiNom))}</div>
-    <div style="font-size:12px;color:var(--text2);margin-top:4px">${type === 'client' || type === 'passager' ? '🆔 '+esc(data.num||data.id)+' · ' : ''}📞 ${esc(data.tel)} ${type === 'taxi' ? ' · 🏷️ '+esc(data.plaque) : ''}</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px">${type === 'client' || type === 'passager' ? (showNumUnique ? '🆔 '+esc(data.num||data.id)+' · ' : '') : ''}📞 ${esc(data.tel)} ${type === 'taxi' ? ' · 🏷️ '+esc(data.plaque) : ''}</div>
   </div>`;
   
   // Menu catégories
@@ -12351,7 +12355,7 @@ function renderRechercheCompteDetail() {
 
 function renderRechercheInfo(type, data) {
   // Logique sécurité: masquer numéro unique si Agent regarde un autre compte
-  const isAgentViewingOtherAccount = (_currentUser && (_currentUser.role === 'agent' || _currentUser.role === 'sous_agent') && _currentUser.id !== data.id) || false;
+  const isAgentViewingOtherAccount = (DB.user && (DB.user.role === 'agent' || DB.user.role === 'sous_agent') && DB.user.id !== data.id) || false;
   const showNumUnique = isAdmin() || !isAgentViewingOtherAccount;
   
   if(type === 'client') {
@@ -12393,7 +12397,7 @@ function renderRechercheCourses(userId, userType) {
   if(!courses.length) return '<div class="empty">Aucune course</div>';
   
   // Logique sécurité: masquer numéro unique si c'est un Agent qui regarde un autre compte
-  const isAgentViewingOtherAccount = (_currentUser && (_currentUser.role === 'agent' || _currentUser.role === 'sous_agent') && _currentUser.id !== userId) || false;
+  const isAgentViewingOtherAccount = (DB.user && (DB.user.role === 'agent' || DB.user.role === 'sous_agent') && DB.user.id !== userId) || false;
   const showNumUnique = isAdmin() || !isAgentViewingOtherAccount;
   
   const libellesStatut = {
