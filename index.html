@@ -890,8 +890,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       prix_propose:(d.prixPropose!=null)?d.prixPropose:null,
       en_cours:d.enCours||false, qr_confirme:d.qrConfirme||false,
       date_effectuee:d.dateEffectuee||null,
-      heure_debut: d.heureDebut ? (typeof d.heureDebut === 'number' ? d.heureDebut : new Date(d.heureDebut).getHours()) : null, minute_debut: d.minuteDebut || null,
-      heure_fin: d.heureFin ? (typeof d.heureFin === 'number' ? d.heureFin : new Date(d.heureFin).getHours()) : null, minute_fin: d.minuteFin || null, minute_debut:d.minuteDebut||0, minute_fin:d.minuteFin||0,
+      heure_debut:d.heureDebut||null,
+      heure_fin:d.heureFin||null, minute_debut:d.minuteDebut||0, minute_fin:d.minuteFin||0,
       historique_supprime:d.historiqueSupprime||false,
       supprime_par:d.supprimePar||null };
     await sbUpsertSouple('demandes_course', row, {});
@@ -5927,7 +5927,7 @@ function demarrerCourseAvecCode(demandeId) {
   demande.enCours = true;
   demande.heureDebut = new Date().toISOString();
   demande.dateDepart = new Date().toISOString();
-  sbMajStatutDemande(demandeId, {statut_attribution: 'effectuee', en_cours: true, date_depart: demande.dateDepart, heure_debut: demande.heureDebut});
+  sbMajStatutDemande(demandeId, {statut_attribution: 'effectuee', en_cours: true, date_depart: demande.dateDepart, heure_debut: Math.floor(demande.heureDebut instanceof Date ? demande.heureDebut.getHours() : typeof demande.heureDebut === 'number' ? demande.heureDebut : new Date(demande.heureDebut).getHours()), minute_debut: Math.floor(demande.minuteDebut instanceof Date ? demande.minuteDebut.getMinutes() : typeof demande.minuteDebut === 'number' ? demande.minuteDebut : new Date(demande.heureDebut).getMinutes())});
   toast('✅ Code correct — course démarrée !');
   rClientContent();
 }
@@ -5964,7 +5964,7 @@ function terminerCourse(demandeId) {
   demande.enCours = false;
   demande.statutAttribution = 'terminee';
   demande.heureFin = new Date().toISOString();
-  sbMajStatutDemande(demandeId, {statut_attribution: 'terminee', en_cours: false, heure_fin: demande.heureFin});
+  sbMajStatutDemande(demandeId, {statut_attribution: 'terminee', en_cours: false, heure_fin: Math.floor(demande.heureFin instanceof Date ? demande.heureFin.getHours() : typeof demande.heureFin === 'number' ? demande.heureFin : new Date(demande.heureFin).getHours()), minute_fin: Math.floor(demande.minuteFin instanceof Date ? demande.minuteFin.getMinutes() : typeof demande.minuteFin === 'number' ? demande.minuteFin : new Date(demande.heureFin).getMinutes())});
   logMvt('trajet', '✅ Course terminée — ' + esc(demande.passagerNom), 0);
   toast('✅ Course terminée !');
   rClient();
