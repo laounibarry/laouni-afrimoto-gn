@@ -14625,5 +14625,45 @@ function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','')
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
 </script>
-</body>
-</html>
+  <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
+    <button onclick="debugAvisAdmin()" style="background:#FF6B6B;color:#fff;border:none;border-radius:50%;width:50px;height:50px;cursor:pointer;font-size:18px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,.3)" title="Debug avis">🐛</button>
+  </div>
+
+  <script>
+  function debugAvisAdmin() {
+    const info = [];
+    info.push('=== DEBUG AVIS ADMIN ===\n');
+    
+    if(!_rechercheCompteSelectionne) {
+      info.push('❌ Pas de taxi sélectionné');
+      alert(info.join('\n'));
+      return;
+    }
+    
+    const data = _rechercheCompteSelectionne.data;
+    info.push('TAXI INFO:');
+    info.push('- ID: ' + data.id);
+    info.push('- Nom: ' + data.nom);
+    info.push('- ClientID: ' + data.clientId);
+    info.push('');
+    
+    info.push('AVIS CHAUFFEURS:');
+    info.push('- Total: ' + (DB.avisChauffeurs ? DB.avisChauffeurs.length : 0));
+    
+    if(DB.avisChauffeurs && DB.avisChauffeurs.length > 0) {
+      info.push('- Premier avis ID: ' + DB.avisChauffeurs[0].id);
+      info.push('- Premier avis clientId: ' + DB.avisChauffeurs[0].clientId);
+      info.push('- Premier avis conducteur_nom: ' + DB.avisChauffeurs[0].conducteur_nom);
+      info.push('');
+      
+      info.push('RECHERCHE PAR DIFFÉRENTES MÉTHODES:');
+      info.push('- Par data.id: ' + DB.avisChauffeurs.filter(a => a.clientId === data.id).length + ' avis');
+      info.push('- Par data.clientId: ' + (data.clientId ? DB.avisChauffeurs.filter(a => a.clientId === data.clientId).length : 'N/A') + ' avis');
+      info.push('- Par data.nom: ' + DB.avisChauffeurs.filter(a => a.conducteur_nom === data.nom).length + ' avis');
+    } else {
+      info.push('❌ AUCUN AVIS EN BASE!');
+    }
+    
+    alert(info.join('\n'));
+  }
+  </script>
