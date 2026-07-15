@@ -11668,6 +11668,7 @@ function rGestion() {
           <div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px">
             <div style="font-weight:700;color:#60A5FA;margin-bottom:6px;font-size:12px">👤 CLIENT / PASSAGER</div>
             <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.passagerNom||'?')}</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:3px">🔢 Numéro: <span style="color:#60A5FA;font-weight:700;font-family:monospace">${esc((DB.passagers.find(p=>p.id===d.passagerId)||{}).num||'—')}</span></div>
             <div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(d.passagerTel||'')}" style="color:#60A5FA;text-decoration:none">${esc(d.passagerTel||'—')}</a></div>
             ${d.passagerEmail ? `<div style="font-size:11px;color:var(--text2)">✉️ ${esc(d.passagerEmail)}</div>` : ''}
           </div>
@@ -11709,12 +11710,16 @@ function rGestion() {
           </div>
         </div>` : ''}
         
-        <!-- LOCALISATION -->
-        ${d.lat && d.lng ? `<div style="font-size:10px;color:var(--text2);padding:8px;background:rgba(96,165,250,.05);border-radius:6px">
-          📍 Position: <b>${d.lat.toFixed(4)}, ${d.lng.toFixed(4)}</b>
-          <a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#60A5FA;text-decoration:none;margin-left:6px">Voir sur carte</a>
-        </div>` : ''}
-      </div>
+        <!-- POSITION AU MOMENT DE LA COMMANDE -->
+        ${d.lat && d.lng ? `<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px">
+          <div style="font-weight:700;color:#60A5FA;margin-bottom:6px;font-size:12px">📍 POSITION REÇUE (Moment de la commande)</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px">
+            <b>Coordonnées GPS:</b><br>
+            Latitude: <span style="font-family:monospace;color:#60A5FA">${d.lat.toFixed(6)}</span><br>
+            Longitude: <span style="font-family:monospace;color:#60A5FA">${d.lng.toFixed(6)}</span>
+          </div>
+          <a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="display:inline-block;background:rgba(96,165,250,.2);color:#60A5FA;text-decoration:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700">🗺️ Voir sur Google Maps</a>
+        </div>` : '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px"><div style="font-size:11px;color:#EF4444">⚠️ Aucune position GPS reçue</div></div>'}
     `).join('') : '<div class="empty">Aucune course enregistrée</div>');
   } else if(gestTab==='recherche-unifiee') {
     html = renderGestionRechercheUnifiee(q);
