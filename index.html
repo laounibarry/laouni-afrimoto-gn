@@ -5844,7 +5844,7 @@ function rClientContent() {
              (a.client_id === cl.id);
     });
     
-    // Filtrer les avis cassés (note null ou invalide)
+    // Filtrer les avis cassés
     mesAvis = mesAvis.filter(a => {
       const noteValide = (typeof a.note === 'number' && a.note >= 1 && a.note <= 5);
       const nomValide = (a.conducteur_nom && a.conducteur_nom.trim()) || 
@@ -5854,11 +5854,45 @@ function rClientContent() {
       return noteValide && nomValide;
     });
     
+    // Trier par date (plus récent en premier)
+    mesAvis = mesAvis.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    
     if(!mesAvis.length) {
       el.innerHTML = '<div class="empty">⭐<br>Aucun avis pour le moment</div>';
     } else {
       const moyenne = (mesAvis.reduce((s,a) => s + (a.note||0), 0) / mesAvis.length).toFixed(1);
-      el.innerHTML = '<div class="card" style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#EAB308">⭐ Vos avis clients</div><div style="font-size:13px;color:var(--text2);margin-top:6px">Moyenne: <b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div></div>' + mesAvis.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(a => '<div class="card" style="margin-bottom:8px"><div style="color:#EAB308;font-weight:700">★'.repeat(a.note) + '☆'.repeat(5-a.note) + ' <span style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</span></div>' + (a.comment ? '<div style="color:var(--text2);margin-top:6px;font-size:12px;line-height:1.4">« ' + esc(a.comment) + ' »</div>' : '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>') + '</div>').join('');
+      let html = '<div style="padding-top:10px">';
+      
+      // Bloc titre + statistiques
+      html += '<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:14px;margin-bottom:14px">';
+      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      html += '<span style="font-size:24px">⭐</span>';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:14px;color:var(--text1)">Vos avis clients</div>';
+      html += '<div style="font-size:13px;color:#EAB308"><b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div>';
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+      
+      // Liste des avis
+      html += '<div style="display:flex;flex-direction:column;gap:10px">';
+      mesAvis.forEach(a => {
+        html += '<div style="background:rgba(0,0,0,.03);border-left:3px solid #EAB308;border-radius:6px;padding:12px;font-size:12px">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html += '<div style="color:#EAB308;font-weight:700;font-size:13px">★'.repeat(a.note) + '☆'.repeat(5-a.note) + '</div>';
+        html += '<div style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</div>';
+        html += '</div>';
+        if(a.comment && a.comment.trim()) {
+          html += '<div style="color:var(--text2);line-height:1.5">« ' + esc(a.comment) + ' »</div>';
+        } else {
+          html += '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      
+      html += '</div>';
+      el.innerHTML = html;
     }
   }
 }
@@ -10241,10 +10275,29 @@ function toggleAvisCourse(el) {
   if(lien) lien.textContent = ouvert ? '▼ Lire tous' : '▲ Masquer';
 }
 function avisChauffeur(clientId, conducteurNom) {
-  const avis = DB.avisChauffeurs.filter(a => clientId ? a.clientId === clientId : nrm(a.conducteur) === nrm(conducteurNom));
+  // Chercher dans TOUS les champs possibles
+  const avis = DB.avisChauffeurs.filter(a => {
+    // Si clientId fourni, chercher par clientId
+    if(clientId) {
+      return a.clientId === clientId || a.client_id === clientId;
+    }
+    // Sinon chercher par nom du conducteur
+    return (a.conducteur_nom && nrm(a.conducteur_nom) === nrm(conducteurNom)) ||
+           (a.conducteur && nrm(a.conducteur) === nrm(conducteurNom));
+  });
+  
   if(avis.length === 0) return null;
-  const moyenne = avis.reduce((s,a)=>s+a.note,0) / avis.length;
-  return { moyenne, total: avis.length, avis };
+  
+  // Filtrer les avis cassés
+  const avisValides = avis.filter(a => {
+    const noteValide = (typeof a.note === 'number' && a.note >= 1 && a.note <= 5);
+    return noteValide;
+  });
+  
+  if(avisValides.length === 0) return null;
+  
+  const moyenne = avisValides.reduce((s,a)=>s+a.note,0) / avisValides.length;
+  return { moyenne, total: avisValides.length, avis: avisValides };
 }
 function avisCourse(courseId) {
   const avis = DB.avisCourses.filter(a => a.courseId === courseId);
