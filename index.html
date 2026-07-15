@@ -1276,7 +1276,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   <div class="tabs-inner" id="tabs-bar">
     <button class="tab act" id="tab-home" onclick="goPage('home')">🏠 Accueil</button>
     <button class="tab" onclick="goPage('vehs')">🏍️ Motos</button>
-    <button class="tab" onclick="goPage('taxis')">🏍️ Taxi moto</button>
+    <button class="tab" id="tab-taxis" style="display:none" onclick="goPage('taxis')">🏍️ Taxi moto</button>
     <button class="tab" id="tab-gps" style="display:none" onclick="goPage('gps')">🗺️ Suivi GPS</button>
     <button class="tab" id="tab-trajets" onclick="goPage('trajets')">🚙 Covoiturage</button>
     <button class="tab" id="tab-mes-trajets" onclick="goPage('mes-trajets')">🎫 Mes trajets</button>
@@ -9315,7 +9315,7 @@ function getPic(id) {
 // TAXIS
 // ════════════════════════════════════════════════
 let filtreTaxiZone = '';
-function setFiltreTaxiZone(z) { filtreTaxiZone = z || ''; renderPrefFilterAvecVoisins('tq-pref-list', filtreTaxiZone, 'setFiltreTaxiZone'); rTaxis(); }
+function setFiltreTaxiZone(z) { filtreTaxiZone = z || ''; renderPrefFilterAvecVoisins('tq-pref-list', filtreTaxiZone, 'setFiltreTaxiZone'); const tabTaxis = document.getElementById('tab-taxis'); if(tabTaxis) tabTaxis.style.display = filtreTaxiZone ? '' : 'none'; rTaxis(); }
 let _dernierRefreshTaxis = 0;
 let taxiAutoRefreshInterval = null;
 let mesTrajetsVisible = true; // État du toggle trajets
