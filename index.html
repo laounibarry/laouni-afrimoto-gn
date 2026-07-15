@@ -9740,6 +9740,7 @@ function rTrajets() {
       ${av ? `
         <div style="font-size:12px;color:#EAB308;margin-top:2px;cursor:pointer" onclick="toggleAvis(this)" title="Cliquer pour lire tous les avis">
           ⭐ ${av.moyenne.toFixed(1)}/5 · ${av.total} avis <span style="color:var(--text2);font-size:10px">▼</span>
+        </div>
         <div class="avis-liste" style="display:none;margin-top:6px">
           ${av.avis.slice(0, 12).map(a=>`<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">
             <div style="color:#EAB308;font-weight:700">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} <span style="color:var(--text2);font-weight:400">${a.date?new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):''}</span></div>
@@ -10250,15 +10251,11 @@ function publierAvisCourse() {
 // Retourne {moyenne, total} des avis pour un chauffeur (par clientId, ou par nom si pas de compte client)
 function toggleAvis(el) {
   const liste = el.nextElementSibling;
-  const dernier = liste?.previousElementSibling;
-  if(!liste) return;
-  const ouvert = liste.style.display !== 'none';
-  liste.style.display = ouvert ? 'none' : '';
-  if(dernier && dernier.classList.contains('avis-dernier')) {
-    dernier.style.display = ouvert ? '' : 'none';
-  }
-  const lien = el.querySelector('span:last-child');
-  if(lien) lien.textContent = ouvert ? '▼ Lire tous' : '▲ Masquer';
+  if(!liste || !liste.classList.contains('avis-liste')) return;
+  const ferme = liste.style.display === 'none';
+  liste.style.display = ferme ? 'block' : 'none';
+  const span = el.querySelector('span:last-child');
+  if(span) span.textContent = ferme ? '▲' : '▼';
 }
 function toggleAvisCourse(el) {
   const liste = el.nextElementSibling?.nextElementSibling;
