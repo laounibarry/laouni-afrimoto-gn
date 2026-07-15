@@ -14668,6 +14668,128 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','');if(!r)return;logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('✅ Avertissement enregistré');}
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
+// ========== RECHERCHE CLIENTS & AVIS ADMIN ==========
+async function rechercherClientAvis() {
+  const searchInput = (document.getElementById('admin-search-client')||{}).value.trim();
+  const resultsDiv = document.getElementById('admin-search-results');
+  
+  if(!searchInput || searchInput.length < 2) {
+    resultsDiv.innerHTML = '<div class="empty">Entrez au moins 2 caractères</div>';
+    return;
+  }
+  
+  resultsDiv.innerHTML = '<div style="text-align:center;padding:10px">🔍 Recherche en cours...</div>';
+  
+  try {
+    const {data, error} = await supabaseClient
+      .from('clients')
+      .select('*')
+      .or(`num.ilike.%${searchInput}%,tel.ilike.%${searchInput}%,prenom.ilike.%${searchInput}%,nom.ilike.%${searchInput}%`)
+      .limit(10);
+    
+    if(error) throw error;
+    
+    if(!data || data.length === 0) {
+      resultsDiv.innerHTML = '<div class="empty">❌ Aucun client trouvé</div>';
+      return;
+    }
+    
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    for(const client of data) {
+      html += '<div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:12px;cursor:pointer" onclick="afficherAvisClient(' + "'" + client.id + "'" + ',' + "'" + esc(client.prenom) + ' ' + esc(client.nom) + "'" + ')">';
+      html += '<div style="font-weight:700;color:#f97316">' + esc(client.prenom) + ' ' + esc(client.nom) + '</div>';
+      html += '<div style="font-size:12px;color:var(--text2)">📞 ' + esc(client.tel) + ' · 🏷️ ' + esc(client.num) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    resultsDiv.innerHTML = html;
+  } catch(e) {
+    console.error('Erreur recherche client:', e);
+    resultsDiv.innerHTML = '<div class="empty">❌ Erreur lors de la recherche</div>';
+  }
+}
+
+async function afficherAvisClient(clientId, clientNom) {
+  const body = document.getElementById('avis-client-body');
+  document.getElementById('avis-client-titre').textContent = 'Avis de ' + clientNom;
+  body.innerHTML = '<div style="text-align:center;padding:20px">🔍 Chargement des avis...</div>';
+  
+  try {
+    const {data: clientData} = await supabaseClient.from('clients').select('tel').eq('id', clientId).single();
+    if(!clientData) throw new Error('Client non trouvé');
+    
+    const {data: avis} = await supabaseClient
+      .from('avis_courses')
+      .select('*')
+      .eq('tel', clientData.tel)
+      .order('created_at', {ascending:false});
+    
+    if(!avis || avis.length === 0) {
+      body.innerHTML = '<div class="empty">Aucun avis trouvé pour ce client</div>';
+      openModal('modal-avis-client');
+      return;
+    }
+    
+    let html = '';
+    for(const a of avis) {
+      const borderColor = a.suspendu ? '#ef4444' : '#22c55e';
+      html += '<div style="background:rgba(0,0,0,.2);border-left:4px solid ' + borderColor + ';border-radius:8px;padding:12px;margin-bottom:10px">';
+      html += '<div style="font-weight:700">⭐ ' + a.note + '/5 · ' + fdt(a.created_at) + '</div>';
+      html += '<div style="font-size:13px;margin:8px 0;color:var(--text1)">"' + esc(a.comment || '—') + '"</div>';
+      html += '<div style="display:flex;gap:6px">';
+      
+      if(!a.suspendu) {
+        html += '<button style="background:#ef4444;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="suspendreAvis(' + "'" + a.id + "'" + ')">🚫 Suspendre</button>';
+      } else {
+        html += '<span style="color:#ef4444;font-weight:700">🚫 SUSPENDU</span>';
+      }
+      
+      if(!a.avertissement) {
+        html += '<button style="background:#f97316;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="avertirAvis(' + "'" + a.id + "'" + ')">⚠️ Avertir</button>';
+      } else {
+        html += '<span style="color:#f97316;font-weight:700">⚠️ AVERTI</span>';
+      }
+      
+      html += '</div></div>';
+    }
+    
+    body.innerHTML = html;
+    openModal('modal-avis-client');
+  } catch(e) {
+    console.error('Erreur affichage avis:', e);
+    body.innerHTML = '<div class="empty">❌ Erreur lors du chargement des avis</div>';
+    openModal('modal-avis-client');
+  }
+}
+
+async function suspendreAvis(avisId) {
+  if(!confirm('Suspendre cet avis?')) return;
+  
+  try {
+    const {error} = await supabaseClient.from('avis_courses').update({suspendu: true}).eq('id', avisId);
+    if(error) throw error;
+    toast('✅ Avis suspendu');
+    location.reload();
+  } catch(e) {
+    console.error('Erreur suspension:', e);
+    toast('❌ Erreur', true);
+  }
+}
+
+async function avertirAvis(avisId) {
+  if(!confirm('Enregistrer un avertissement?')) return;
+  
+  try {
+    const {error} = await supabaseClient.from('avis_courses').update({avertissement: true}).eq('id', avisId);
+    if(error) throw error;
+    toast('✅ Avertissement enregistré');
+    location.reload();
+  } catch(e) {
+    console.error('Erreur avertissement:', e);
+    toast('❌ Erreur', true);
+  }
+}
+
 </script>
 </body>
 </html>
