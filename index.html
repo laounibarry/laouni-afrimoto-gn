@@ -4745,7 +4745,7 @@ function rPassager() {
                     (av.avis[av.avis.length-1].comment?'<div style="color:var(--text2);margin-top:3px;line-height:1.4">"'+esc(av.avis[av.avis.length-1].comment)+'"</div>':'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>') +
                   '</div>' +
                   '<div class="avis-liste" style="display:none;margin-top:6px">' +
-                    av.avis.map(a=>'<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">' +
+                    av.avis.slice(0, 12).map(a=>'<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">' +
                       '<div style="color:#EAB308;font-weight:700">★'.repeat(a.note)+'☆'.repeat(5-a.note)+' <span style="color:var(--text2);font-weight:400">'+(a.date?new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'')+' </span></div>' +
                       (a.comment?'<div style="color:var(--text2);margin-top:3px;line-height:1.4">"'+esc(a.comment)+'"</div>':'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>') +
                     '</div>').join('') +
@@ -5863,29 +5863,32 @@ function rClientContent() {
       const moyenne = (mesAvis.reduce((s,a) => s + (a.note||0), 0) / mesAvis.length).toFixed(1);
       let html = '<div style="padding-top:10px">';
       
-      // Bloc titre + statistiques
-      html += '<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:14px;margin-bottom:14px">';
-      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
-      html += '<span style="font-size:24px">⭐</span>';
+      // Bloc titre COMPACT avec flèche
+      html += '<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:12px 14px;cursor:pointer;user-select:none" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === \'none\' ? \'block\' : \'none\'; this.querySelector(\'.arrow\').style.transform = this.nextElementSibling.style.display === \'none\' ? \'rotate(0deg)\' : \'rotate(180deg)\';">';
+      html += '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">';
+      html += '<div style="display:flex;align-items:center;gap:8px">';
+      html += '<span style="font-size:20px">⭐</span>';
       html += '<div>';
-      html += '<div style="font-weight:700;font-size:14px;color:var(--text1)">Vos avis clients</div>';
-      html += '<div style="font-size:13px;color:#EAB308"><b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div>';
+      html += '<div style="font-weight:700;font-size:13px;color:var(--text1)">Vos avis clients</div>';
+      html += '<div style="font-size:12px;color:#EAB308"><b>' + moyenne + '/5</b> · <b>' + mesAvis.length + ' avis</b></div>';
       html += '</div>';
+      html += '</div>';
+      html += '<span class="arrow" style="font-size:18px;transition:transform 0.3s">▼</span>';
       html += '</div>';
       html += '</div>';
       
-      // Liste des avis
-      html += '<div style="display:flex;flex-direction:column;gap:10px">';
+      // Liste des avis (repliée par défaut)
+      html += '<div style="display:none;margin-top:10px;display:flex;flex-direction:column;gap:8px">';
       mesAvis.forEach(a => {
-        html += '<div style="background:rgba(0,0,0,.03);border-left:3px solid #EAB308;border-radius:6px;padding:12px;font-size:12px">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-        html += '<div style="color:#EAB308;font-weight:700;font-size:13px">★'.repeat(a.note) + '☆'.repeat(5-a.note) + '</div>';
-        html += '<div style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</div>';
+        html += '<div style="background:rgba(0,0,0,.03);border-left:3px solid #EAB308;border-radius:6px;padding:10px;font-size:11px">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">';
+        html += '<div style="color:#EAB308;font-weight:700">★ ' + a.note + '/5</div>';
+        html += '<div style="color:var(--text2);font-size:10px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</div>';
         html += '</div>';
         if(a.comment && a.comment.trim()) {
-          html += '<div style="color:var(--text2);line-height:1.5">« ' + esc(a.comment) + ' »</div>';
+          html += '<div style="color:var(--text2);line-height:1.4">« ' + esc(a.comment) + ' »</div>';
         } else {
-          html += '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>';
+          html += '<div style="color:var(--text2);font-style:italic">Pas de commentaire</div>';
         }
         html += '</div>';
       });
@@ -9736,14 +9739,9 @@ function rTrajets() {
       </div>
       ${av ? `
         <div style="font-size:12px;color:#EAB308;margin-top:2px;cursor:pointer" onclick="toggleAvis(this)" title="Cliquer pour lire tous les avis">
-          ${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))} ${av.moyenne.toFixed(1)} (${av.total} avis) <span style="color:var(--text2);font-size:10px">▼ Lire tous</span>
-        </div>
-        <div class="avis-dernier" style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-top:6px;font-size:11px">
-          <div style="color:#EAB308;font-weight:700">${'★'.repeat(av.avis[av.avis.length-1].note)}${'☆'.repeat(5-av.avis[av.avis.length-1].note)} <span style="color:var(--text2);font-weight:400;font-size:10px">dernier avis</span></div>
-          ${av.avis[av.avis.length-1].comment?`<div style="color:var(--text2);margin-top:3px;line-height:1.4">"${esc(av.avis[av.avis.length-1].comment)}"</div>`:'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>'}
-        </div>
+          ⭐ ${av.moyenne.toFixed(1)}/5 · ${av.total} avis <span style="color:var(--text2);font-size:10px">▼</span>
         <div class="avis-liste" style="display:none;margin-top:6px">
-          ${av.avis.map(a=>`<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">
+          ${av.avis.slice(0, 12).map(a=>`<div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px">
             <div style="color:#EAB308;font-weight:700">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} <span style="color:var(--text2);font-weight:400">${a.date?new Date(a.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):''}</span></div>
             ${a.comment?`<div style="color:var(--text2);margin-top:3px;line-height:1.4">"${esc(a.comment)}"</div>`:'<div style="color:var(--text2);font-style:italic;margin-top:2px">Pas de commentaire.</div>'}
           </div>`).join('')}
