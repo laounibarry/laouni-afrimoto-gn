@@ -11149,10 +11149,10 @@ function renderGestionRechercheUnifiee(q) {
   // TODO: Ajouter catégories et sélection de compte comme dans Agent
   const term = (q||'').trim();
   const termN = nrm(term);
-  const matchClient = term ? DB.clients.filter(c => nrm(c.num||c.id).includes(termN) || nrm(c.tel||'').includes(termN) || nrm(c.prenom+' '+c.nom).includes(termN)) : [];
-  const matchPassager = term ? DB.passagers.filter(p => nrm(p.num||p.id).includes(termN) || nrm(p.tel||'').includes(termN) || nrm(p.prenom+' '+p.nom).includes(termN)) : [];
-  const matchTaxi = term ? DB.taxis.filter(t => nrm(t.plaque||'').includes(termN) || nrm(t.tel||'').includes(termN) || nrm(t.nom||'').includes(termN) || nrm(t.gilet||'').includes(termN) || nrm(t.code||'').includes(termN)) : [];
-  const matchVeh = term ? DB.vehs.filter(v => nrm(v.mat||'').includes(termN) || nrm(v.vin||'').includes(termN) || nrm(v.phone||'').includes(termN) || nrm(v.owner||'').includes(termN) || nrm(v.num||v.id).includes(termN)) : [];
+  const matchClient = (term||'') ? DB.clients.filter(c => nrm(c.num||c.id).includes(termN) || nrm(c.tel||'').includes(termN) || nrm(c.prenom+' '+c.nom).includes(termN)) : [];
+  const matchPassager = (term||'') ? DB.passagers.filter(p => nrm(p.num||p.id).includes(termN) || nrm(p.tel||'').includes(termN) || nrm(p.prenom+' '+p.nom).includes(termN)) : [];
+  const matchTaxi = (term||'') ? DB.taxis.filter(t => nrm(t.plaque||'').includes(termN) || nrm(t.tel||'').includes(termN) || nrm(t.nom||'').includes(termN) || nrm(t.gilet||'').includes(termN) || nrm(t.code||'').includes(termN)) : [];
+  const matchVeh = (term||'') ? DB.vehs.filter(v => nrm(v.mat||'').includes(termN) || nrm(v.vin||'').includes(termN) || nrm(v.phone||'').includes(termN) || nrm(v.owner||'').includes(termN) || nrm(v.num||v.id).includes(termN)) : [];
   
   const coursesTaxi = term ? DB.demandesCourse.filter(d =>
     nrm(d.passagerNom||'').includes(termN) || nrm(d.passagerTel||'').includes(termN) ||
