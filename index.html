@@ -2635,7 +2635,16 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="rt-tel" placeholder="+224 6xx xxx xxx"/></div>
     <div class="fld"><div class="lbl">Email (optionnel — pour recevoir la confirmation)</div><input type="email" id="rt-email" placeholder="vous@email.com"/></div>
-    <div class="fld"><div class="lbl">Nombre de places souhaité *</div><input type="number" id="rt-places" min="1" value="1"/></div>
+    
+    <!-- SÉLECTION DES PLACES -->
+    <div style="margin-bottom:14px">
+      <div class="lbl" style="margin-bottom:10px">Sélectionnez votre place *</div>
+      <div id="rt-places-container" style="display:grid;gap:10px">
+        <!-- Les carrés seront générés dynamiquement par renderPlacesSelection() -->
+      </div>
+      <input type="hidden" id="rt-place-position" value=""/>
+    </div>
+    
     <div class="fld" style="display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.15);border-radius:8px;padding:10px 12px">
       <span style="font-size:12px;color:var(--text2)">Le chauffeur peut voir mon numéro</span>
       <input type="hidden" id="rt-partager-tel" value="1"/>
@@ -9941,24 +9950,175 @@ function _publierTrajetDefinitif() {
 function openReserverTrajet(trajetId) {
   const _emCh = document.getElementById('rt-email'); if(_emCh) _emCh.value = '';
   const _tRes = DB.trajets.find(x => x.id === trajetId);
-  if(_tRes && _tRes.placesDispos <= 0) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
+  if(_tRes && (!_tRes.plAvant && !_tRes.plMilieu && !_tRes.plArriere)) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
-  if(t.placesDispos <= 0) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
+  
+  // Calculer les places disponibles
+  const totalPlaces = (t.plAvant || 0) + (t.plMilieu || 0) + (t.plArriere || 0);
+  const reservees = (t.reservations || []).length;
+  if(reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
+  
   document.getElementById('rt-trajet-id').value = trajetId;
   document.getElementById('rt-trajet-info').innerHTML =
-    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${t.placesDispos} place(s) restante(s) · ${fmt(t.prix)}/place`;
+    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${totalPlaces - reservees} place(s) restante(s) · ${fmt(t.prix)}/place`;
+  
   document.getElementById('rt-prenom').value = '';
   document.getElementById('rt-nom').value = '';
   document.getElementById('rt-tel').value = '';
-  document.getElementById('rt-places').value = '1';
-  document.getElementById('rt-places').max = t.placesDispos;
+  document.getElementById('rt-place-position').value = '';
   document.getElementById('rt-partager-tel').value = '1';
   document.getElementById('rt-partager-btn').style.background = 'rgba(249,115,22,.3)';
   document.getElementById('rt-partager-dot').style.left = '21px';
   document.getElementById('rt-partager-note').style.display = 'none';
   document.getElementById('rterr').style.display = 'none';
+  
+  // Afficher les places disponibles
+  renderPlacesSelection(trajetId);
+  
   openModal('m-reserver-trajet');
+}
+
+function renderPlacesSelection(trajetId) {
+  const t = DB.trajets.find(x => x.id === trajetId);
+  if(!t) return;
+  
+  const container = document.getElementById('rt-places-container');
+  const reservees = t.reservations || [];
+  const placesReservees = reservees.map(r => r.place_position);
+  
+  let html = '';
+  
+  // Fonction pour créer les carrés dans l'ordre: DROIT → MILIEU-DROIT → MILIEU-GAUCHE → GAUCHE
+  const creerPlaces = (zone, nombre) => {
+    let zones = [];
+    if(nombre >= 1) zones.push('DROIT');
+    if(nombre >= 2) zones.push('MILIEU-DROIT');
+    if(nombre >= 3) zones.push('MILIEU-GAUCHE');
+    if(nombre >= 4) zones.push('GAUCHE');
+    // Pour plus de 4, continuer en paires
+    if(nombre > 4) {
+      for(let i = 5; i <= nombre; i++) {
+        zones.push((i % 2 === 1) ? 'DROIT' : 'GAUCHE');
+      }
+    }
+    
+    let html_zone = '<div style="margin-bottom:14px"><div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#EAB308;text-transform:uppercase">' + zone + ' (' + nombre + ' place' + (nombre > 1 ? 's' : '') + ')</div>';
+    html_zone += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(75px,1fr));gap:6px">';
+    
+    zones.forEach((pos, idx) => {
+      const placeId = zone.toLowerCase() + '_' + (idx + 1);
+      const isReserved = placesReservees.includes(placeId);
+      const isSelected = document.getElementById('rt-place-position').value === placeId;
+      
+      const btnText = zone.charAt(0).toUpperCase() + zone.slice(1) + ' ' + (idx + 1);
+      
+      html_zone += '<button type="button" onclick="selectPlace(\'' + placeId + '\')" style="' +
+        'padding:10px 6px;border-radius:8px;border:2px solid;font-size:11px;font-weight:700;cursor:pointer;transition:.2s;' +
+        (isReserved ? 'background:#999;color:#fff;border-color:#666;cursor:not-allowed;opacity:0.5' : 
+         isSelected ? 'background:#EAB308;color:#000;border-color:#EAB308;box-shadow:0 0 0 3px rgba(234,179,8,.2)' : 
+         'background:rgba(96,165,250,.1);color:#60A5FA;border-color:rgba(96,165,250,.3)') + 
+        '"' + (isReserved ? ' disabled' : '') + '>' +
+        btnText + (isReserved ? ' ✕' : '') +
+        '</button>';
+    });
+    
+    html_zone += '</div></div>';
+    return html_zone;
+  };
+  
+  if((t.plAvant || 0) > 0) html += creerPlaces('devant', t.plAvant);
+  if((t.plMilieu || 0) > 0) html += creerPlaces('milieu', t.plMilieu);
+  if((t.plArriere || 0) > 0) html += creerPlaces('arrière', t.plArriere);
+  
+  if(!html) html = '<div style="color:var(--text2);font-style:italic">Aucune place disponible</div>';
+  
+  container.innerHTML = html;
+}
+
+function selectPlace(placeId) {
+  const input = document.getElementById('rt-place-position');
+  const container = document.getElementById('rt-places-container');
+  
+  if(input.value === placeId) {
+    input.value = '';
+  } else {
+    input.value = placeId;
+  }
+  
+  // Refresh visuel
+  const trajetId = document.getElementById('rt-trajet-id').value;
+  renderPlacesSelection(trajetId);
+}
+
+function formatNomPlace(placeId) {
+  if(!placeId) return '';
+  const parts = placeId.split('_');
+  const zone = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+  const numero = parts[1];
+  return zone + ' ' + numero;
+}
+
+function envoyerEmailConfirmationDetaille(email, prenom, nom, tel, trajet, nomPlace, pinDepart) {
+  if(!email) return;
+  
+  const lignes = [];
+  lignes.push('═════════════════════════════════════════');
+  lignes.push('✅ CONFIRMATION DE RÉSERVATION');
+  lignes.push('═════════════════════════════════════════');
+  lignes.push('');
+  
+  lignes.push('📋 RÉCAPITULATIF DE VOTRE RÉSERVATION');
+  lignes.push('─────────────────────────────────────────');
+  lignes.push('');
+  lignes.push('👤 PASSAGER');
+  lignes.push('  • Nom: ' + nom + ' ' + prenom);
+  lignes.push('  • Téléphone: ' + tel);
+  lignes.push('');
+  
+  lignes.push('🚗 TRAJET');
+  lignes.push('  • Départ: ' + trajet.depart);
+  lignes.push('  • Arrivée: ' + trajet.arrivee);
+  lignes.push('  • Date & Heure: ' + fdt(trajet.dateHeure));
+  if(trajet.vehMat) lignes.push('  • Véhicule: ' + trajet.vehMat);
+  lignes.push('');
+  
+  lignes.push('👨‍✈️ CHAUFFEUR');
+  lignes.push('  • Nom: ' + trajet.conducteur);
+  lignes.push('  • Téléphone: ' + trajet.tel);
+  lignes.push('  • Prix: ' + fmt(trajet.prix) + ' (à régler en espèces)');
+  lignes.push('');
+  
+  lignes.push('💺 VOTRE PLACE');
+  lignes.push('  • Position: ' + nomPlace.toUpperCase());
+  lignes.push('  (Cette place est réservée uniquement pour vous)');
+  lignes.push('');
+  
+  lignes.push('🔐 CODE DE CONFIRMATION');
+  lignes.push('  ⭐⭐⭐ ' + pinDepart + ' ⭐⭐⭐');
+  lignes.push('  (Communiquez ce code au chauffeur le jour du voyage)');
+  lignes.push('');
+  
+  lignes.push('═════════════════════════════════════════');
+  lignes.push('📌 INSTRUCTIONS IMPORTANTES');
+  lignes.push('═════════════════════════════════════════');
+  lignes.push('');
+  lignes.push('1. Présentez-vous 10 minutes avant l\'heure de départ');
+  lignes.push('2. Appelez le chauffeur: ' + trajet.tel);
+  lignes.push('3. Donnez le code de confirmation: ' + pinDepart);
+  lignes.push('4. Paiement en espèces directement au chauffeur');
+  lignes.push('');
+  
+  lignes.push('⚠️ ANNULATION');
+  lignes.push('  • Vous pouvez annuler jusqu\'à 1 heure avant le départ');
+  lignes.push('  • Pour annuler: rendez-vous dans l\'application');
+  lignes.push('');
+  
+  lignes.push('═════════════════════════════════════════');
+  lignes.push('Merci d\'avoir choisi Laouni AfriMoto GN !');
+  lignes.push('═════════════════════════════════════════');
+  
+  envoyerEmailConfirmation(email, 'Confirmation de réservation - ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
 }
 function toggleRtPartagerTel() {
   const inp = document.getElementById('rt-partager-tel');
@@ -9976,42 +10136,53 @@ function saveReservationTrajet() {
   const t = DB.trajets.find(x=>x.id===trajetId);
   const err = document.getElementById('rterr');
   if(!t) { err.textContent='⚠️ Trajet introuvable.'; err.style.display='block'; return; }
-  if(t.placesDispos <= 0) { err.textContent='⛔ Plus de place disponible sur ce trajet.'; err.style.display='block'; return; }
+  
+  const totalPlaces = (t.plAvant || 0) + (t.plMilieu || 0) + (t.plArriere || 0);
+  const reservees = (t.reservations || []).length;
+  if(reservees >= totalPlaces) { err.textContent='⛔ Plus de place disponible sur ce trajet.'; err.style.display='block'; return; }
+  
   const prenom = document.getElementById('rt-prenom').value.trim();
   const nom = document.getElementById('rt-nom').value.trim();
   const tel = document.getElementById('rt-tel').value.trim();
-  const nbPlaces = parseInt(document.getElementById('rt-places').value) || 1;
+  const placePosition = document.getElementById('rt-place-position').value.trim();
+  
   if(!prenom || !nom || !tel) { err.textContent='⚠️ Prénom, nom et téléphone obligatoires.'; err.style.display='block'; return; }
-  if(nbPlaces < 1) { err.textContent='⚠️ Le nombre de places doit être au moins 1.'; err.style.display='block'; return; }
-  if(nbPlaces > t.placesDispos) { err.textContent='⛔ Seulement ' + t.placesDispos + ' place(s) disponible(s) sur ce trajet.'; err.style.display='block'; return; }
+  if(!placePosition) { err.textContent='⚠️ Sélectionnez une place.'; err.style.display='block'; return; }
+  
+  // Vérifier que la place n'est pas déjà réservée
+  if((t.reservations || []).some(r => r.place_position === placePosition)) {
+    err.textContent='⛔ Cette place est déjà réservée. Choisissez une autre place.'; err.style.display='block'; return;
+  }
+  
   const email = (document.getElementById('rt-email')||{}).value.trim();
   const partagerTel = document.getElementById('rt-partager-tel').value === '1';
   if(!t.reservations) t.reservations = [];
-  // S'assurer que t.places est défini (nombre TOTAL de places)
-  if(!t.places) t.places = (t.placesDispos || 0) + (t.reservations.reduce((s,r) => s + (r.nbPlaces||1), 0));
+  
   const pinDepart = String(Math.floor(1000 + Math.random() * 9000));
-  t.reservations.push({id:gid(), prenom, nom, tel, email, partagerTel, nbPlaces, confirme:false, pinDepart, date:new Date().toISOString()});
-  // Recalculer les places disponibles : totalPlaces - totalReservé
-  const totalReserve = t.reservations.reduce((s,r) => s + (r.nbPlaces||1), 0);
-  const totalPlaces = t.places || (t.placesDispos + totalReserve); // nombre total de places au départ
-  t.placesDispos = Math.max(0, totalPlaces - totalReserve); // places restantes = total - réservées
-  sbSaveTrajet(t); // persiste réservations + placesDispos recalculé
+  const nomPlace = formatNomPlace(placePosition);
+  
+  t.reservations.push({
+    id:gid(), 
+    prenom, 
+    nom, 
+    tel, 
+    email, 
+    partagerTel, 
+    place_position: placePosition,
+    nomPlace: nomPlace,
+    confirme:false, 
+    pinDepart, 
+    date:new Date().toISOString()
+  });
+  
+  sbSaveTrajet(t);
   closeModal('m-reserver-trajet');
   rTrajets();
-  toast('✅ Réservation confirmée pour ' + nbPlaces + ' place(s) ! Paiement en espèces directement au chauffeur le jour du trajet.');
+  
+  toast('✅ Réservation confirmée pour la place ' + nomPlace + ' ! Paiement en espèces directement au chauffeur le jour du trajet.');
+  
   if(email) {
-    envoyerEmailConfirmation(email, 'Confirmation de réservation — ' + t.depart + ' → ' + t.arrivee, [
-      'Votre réservation est confirmée !',
-      '',
-      'Trajet : ' + t.depart + ' → ' + t.arrivee,
-      'Date : ' + fdt(t.dateHeure),
-      'Chauffeur : ' + t.conducteur + ' (' + t.tel + ')',
-      'Places réservées : ' + nbPlaces,
-      'Prix : ' + fmt(t.prix) + ' / place (à régler en espèces au chauffeur)',
-      '',
-      '🔢 Votre code de départ : ' + pinDepart + ' — communiquez ce code au chauffeur au départ pour confirmer votre présence.',
-      'Bon voyage avec Laouni AfriMoto GN !'
-    ]);
+    envoyerEmailConfirmationDetaille(email, prenom, nom, tel, t, nomPlace, pinDepart);
   }
 }
 // ── Annulation de réservation par le passager (recherche par téléphone, espace public) ──
