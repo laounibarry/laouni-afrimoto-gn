@@ -10093,7 +10093,7 @@ function chercherTrajetPourAvis() {
   }
   if(!trouve) { err.textContent='❌ Aucun trajet terminé trouvé avec ce numéro. L\'avis n\'est possible qu\'après la fin du trajet.'; err.style.display='block'; return; }
   // Empêcher un double avis pour le même trajet par le même passager
-  const dejaAvis = DB.avisChauffeurs.find(a => a.trajetId === trouve.id && (a.tel||'').replace(/\D/g,'') === telN);
+  const dejaAvis = DB.avisChauffeurs.find(a => (a.trajet_id === trouve.id || a.trajetId === trouve.id) && (a.tel||'').replace(/\D/g,'') === telN);
   if(dejaAvis) { err.textContent='❌ Vous avez déjà laissé un avis pour ce trajet.'; err.style.display='block'; return; }
 
   document.getElementById('av-trajet-id').value = trouve.id;
@@ -10177,7 +10177,7 @@ function chercherCoursePourAvis() {
   const telN = tel.replace(/\D/g,'');
   const trouve = DB.demandesCourse.find(d => d.statutAttribution === 'terminee' && (d.passagerTel||'').replace(/\D/g,'') === telN);
   if(!trouve) { err.textContent='❌ Aucune course terminée trouvée avec ce numéro. L\'avis n\'est possible qu\'après la fin de la course.'; err.style.display='block'; return; }
-  const dejaAvis = DB.avisCourses.find(a => a.courseId === trouve.id && (a.tel||'').replace(/\D/g,'') === telN);
+  const dejaAvis = DB.avisCourses.find(a => (a.course_id === trouve.id || a.courseId === trouve.id) && (a.tel||'').replace(/\D/g,'') === telN);
   if(dejaAvis) { err.textContent='❌ Vous avez déjà laissé un avis pour cette course.'; err.style.display='block'; return; }
   
   document.getElementById('ac-course-id').value = trouve.id;
