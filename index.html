@@ -5837,12 +5837,15 @@ function rClientContent() {
   } else if(clientTab === 'avis') {
     // Chercher les avis pour ce chauffeur - essayer plusieurs champs possibles
     const nomChauffeur = cl.nom;
-    const mesAvis = DB.avisChauffeurs.filter(a => {
+    let mesAvis = DB.avisChauffeurs.filter(a => {
       return (a.conducteur_nom === nomChauffeur) || 
              (a.conducteur === nomChauffeur) || 
              (a.clientId === cl.id) ||
              (a.client_id === cl.id);
     });
+    
+    // Filtrer les avis vides/cassés (note null, conducteur_nom vide, etc.)
+    mesAvis = mesAvis.filter(a => a.note && (a.conducteur_nom || a.conducteur || a.client_id || a.clientId));
     
     // DEBUG: Afficher les infos détaillées
     let debugHTML = '<div class="card" style="background:#ffe5cc;border:2px solid #f97316;margin-bottom:15px;font-size:11px">';
@@ -5851,7 +5854,8 @@ function rClientContent() {
     debugHTML += 'Ton nom: <b>' + (cl.nom || 'undefined') + '</b><br>';
     debugHTML += 'Ton ID: <b>' + (cl.id || 'undefined') + '</b><br>';
     debugHTML += 'Total avis en DB: <b>' + (DB.avisChauffeurs ? DB.avisChauffeurs.length : '0') + '</b><br>';
-    debugHTML += 'Avis trouvés pour toi: <b>' + mesAvis.length + '</b><br>';
+    debugHTML += 'Avis trouvés (avant filtrage): <b>' + DB.avisChauffeurs.filter(a => (a.conducteur_nom === nomChauffeur) || (a.conducteur === nomChauffeur) || (a.clientId === cl.id) || (a.client_id === cl.id)).length + '</b><br>';
+    debugHTML += 'Avis valides (après filtrage): <b>' + mesAvis.length + '</b><br>';
     if(DB.avisChauffeurs && DB.avisChauffeurs.length > 0) {
       debugHTML += '<br>Premiers 2 avis (tous champs): ';
       DB.avisChauffeurs.slice(0, 2).forEach((a, i) => {
@@ -5861,7 +5865,7 @@ function rClientContent() {
     debugHTML += '</div></div>';
     
     if(!mesAvis.length) {
-      el.innerHTML = debugHTML + '<div class="empty">⭐<br>Aucun avis pour le moment</div>';
+      el.innerHTML = debugHTML + '<div class="empty">⭐<br>Aucun avis valide pour le moment</div>';
     } else {
       const moyenne = (mesAvis.reduce((s,a) => s + (a.note||0), 0) / mesAvis.length).toFixed(1);
       el.innerHTML = debugHTML + '<div class="card" style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#EAB308">⭐ Vos avis clients</div><div style="font-size:13px;color:var(--text2);margin-top:6px">Moyenne: <b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div></div>' + mesAvis.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(a => '<div class="card" style="margin-bottom:8px"><div style="color:#EAB308;font-weight:700">★'.repeat(a.note) + '☆'.repeat(5-a.note) + ' <span style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</span></div>' + (a.comment ? '<div style="color:var(--text2);margin-top:6px;font-size:12px;line-height:1.4">« ' + esc(a.comment) + ' »</div>' : '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>') + '</div>').join('');
