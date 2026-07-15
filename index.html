@@ -11646,19 +11646,19 @@ function rGestion() {
       </div>`).join('') : '<div class="empty">Aucun passager inscrit</div>');
   } else if(gestTab==='courses') {
     const libellesStatut = {en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée', effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée', refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée', annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)'};
-    const courses = (DB.demandesCourse || []).filter(c => !q || [c.passager_nom, c.passager_tel, c.taxi_nom, c.taxi_plaque, c.depart, c.arrivee].some(x => nrm(x||'').includes(q)));
+    const courses = (DB.demandesCourse || []).filter(c => !q || [c.passagerNom, c.passagerTel, c.taxiNom, c.taxiPlaque, c.depart, c.arrivee].some(x => nrm(x||'').includes(q)));
     html = '<div class="sect" style="margin-top:0">🚕 Historique des courses taxi moto</div>' + (courses.length ? courses.sort((a,b) => new Date(b.created_at||b.date) - new Date(a.created_at||a.date)).map(d => `
       <div class="card" style="margin-bottom:14px;border-left:4px solid #EAB308">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
           <div>
             <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap">
               <span class="tag tag-orange">COURSE TAXI 🚕</span>
-              <span class="tag ${d.statut_attribution==='terminee'?'tag-green':d.statut_attribution==='annulee'?'tag-red':d.statut_attribution==='effectuee'?'tag-blue':'tag-gold'}">${libellesStatut[d.statut_attribution]||d.statut_attribution}</span>
+              <span class="tag ${d.statutAttribution==='terminee'?'tag-green':d.statutAttribution==='annulee'?'tag-red':d.statutAttribution==='effectuee'?'tag-blue':'tag-gold'}">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span>
             </div>
             <div style="font-weight:900;font-size:15px;color:#EAB308;margin-bottom:8px">📍 ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end">
-            ${d.prix_propose ? `<div style="font-size:16px;font-weight:900;color:#22C55E;margin-bottom:4px">${fmt(d.prix_propose)} GNF</div>` : ''}
+            ${d.prixPropose ? `<div style="font-size:16px;font-weight:900;color:#22C55E;margin-bottom:4px">${fmt(d.prixPropose)} GNF</div>` : ''}
             <div style="font-size:10px;color:var(--text2)">ID: ${esc(d.id)}</div>
           </div>
         </div>
@@ -11667,17 +11667,17 @@ function rGestion() {
           <!-- CLIENT -->
           <div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px">
             <div style="font-weight:700;color:#60A5FA;margin-bottom:6px;font-size:12px">👤 CLIENT / PASSAGER</div>
-            <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.passager_nom||'?')}</div>
-            <div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(d.passager_tel||'')}" style="color:#60A5FA;text-decoration:none">${esc(d.passager_tel||'—')}</a></div>
-            ${d.passager_email ? `<div style="font-size:11px;color:var(--text2)">✉️ ${esc(d.passager_email)}</div>` : ''}
+            <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.passagerNom||'?')}</div>
+            <div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(d.passagerTel||'')}" style="color:#60A5FA;text-decoration:none">${esc(d.passagerTel||'—')}</a></div>
+            ${d.passagerEmail ? `<div style="font-size:11px;color:var(--text2)">✉️ ${esc(d.passagerEmail)}</div>` : ''}
           </div>
           
           <!-- CHAUFFEUR -->
           <div style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:10px">
             <div style="font-weight:700;color:#f97316;margin-bottom:6px;font-size:12px">🏍️ CHAUFFEUR / TAXI</div>
-            <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.taxi_nom||'?')}</div>
-            <div style="font-size:11px;color:var(--text2)">📋 Plaque: <b>${esc(d.taxi_plaque||'—')}</b></div>
-            <div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(d.taxi_tel||'')}" style="color:#f97316;text-decoration:none">${esc(d.taxi_tel||'—')}</a></div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.taxiNom||'?')}</div>
+            <div style="font-size:11px;color:var(--text2)">📋 Plaque: <b>${esc(d.taxiPlaque||'—')}</b></div>
+            <div style="font-size:11px;color:var(--text2)">📞 <a href="tel:${esc(d.taxiTel||'')}" style="color:#f97316;text-decoration:none">${esc(d.taxiTel||'—')}</a></div>
           </div>
         </div>
         
@@ -11696,11 +11696,11 @@ function rGestion() {
         </div>
         
         <!-- DÉTAILS PRIX ET COMMISSION -->
-        ${d.prix_propose || d.commission ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:10px;margin-bottom:10px">
+        ${d.prixPropose || d.commission ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:10px;margin-bottom:10px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            ${d.prix_propose ? `<div>
+            ${d.prixPropose ? `<div>
               <div style="font-size:10px;color:var(--text2);margin-bottom:2px">💰 Prix de la course</div>
-              <div style="font-weight:700;font-size:13px;color:#22C55E">${fmt(d.prix_propose)} GNF</div>
+              <div style="font-weight:700;font-size:13px;color:#22C55E">${fmt(d.prixPropose)} GNF</div>
             </div>` : ''}
             ${d.commission ? `<div>
               <div style="font-size:10px;color:var(--text2);margin-bottom:2px">🏢 Commission plateforme</div>
@@ -13768,16 +13768,16 @@ function rHistorique() {
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap">
               <span class="tag tag-orange">COURSE TAXI 🚕</span>
-              <span class="tag ${d.statut_attribution==='terminee'?'tag-green':d.statut_attribution==='annulee'?'tag-red':'tag-blue'}">${libellesStatut[d.statut_attribution]||d.statut_attribution}</span>
+              <span class="tag ${d.statutAttribution==='terminee'?'tag-green':d.statutAttribution==='annulee'?'tag-red':'tag-blue'}">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span>
             </div>
             <div style="font-weight:700;margin-bottom:4px">${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
-            <div style="font-size:11px;color:var(--text2);margin-bottom:3px">🧑 ${esc(d.passager_nom||'?')} · 📞 ${esc(d.passager_tel||'?')}</div>
-            <div style="font-size:11px;color:var(--text2);margin-bottom:3px">🏍️ ${esc(d.taxi_nom||'?')} · 📋 ${esc(d.taxi_plaque||'?')}</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:3px">🧑 ${esc(d.passagerNom||'?')} · 📞 ${esc(d.passagerTel||'?')}</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:3px">🏍️ ${esc(d.taxiNom||'?')} · 📋 ${esc(d.taxiPlaque||'?')}</div>
             <div style="font-size:11px;color:var(--text2)">📅 ${fdt(d.created_at||d.date)}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-            ${d.prix_propose ? `<div style="font-size:14px;font-weight:900;color:#EAB308">${fmt(d.prix_propose)} GNF</div>` : ''}
-            <button class="btn-ghost" style="font-size:10px;padding:5px 8px" onclick="alert('📋 Détails course:\\n\\nPassager: ${esc(d.passager_nom||'?')}\\nTaxi: ${esc(d.taxi_nom||'?')}\\nStatut: ${libellesStatut[d.statut_attribution]||d.statut_attribution}\\n\\nPrix: ${fmt(d.prix_propose||0)} GNF\\nDate: ${fdt(d.created_at||d.date)}')">ℹ️ Détails</button>
+            ${d.prixPropose ? `<div style="font-size:14px;font-weight:900;color:#EAB308">${fmt(d.prixPropose)} GNF</div>` : ''}
+            <button class="btn-ghost" style="font-size:10px;padding:5px 8px" onclick="alert('📋 Détails course:\\n\\nPassager: ${esc(d.passagerNom||'?')}\\nTaxi: ${esc(d.taxiNom||'?')}\\nStatut: ${libellesStatut[d.statutAttribution]||d.statutAttribution}\\n\\nPrix: ${fmt(d.prixPropose||0)} GNF\\nDate: ${fdt(d.created_at||d.date)}')">ℹ️ Détails</button>
           </div>
         </div>
       </div>
