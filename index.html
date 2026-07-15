@@ -8,7 +8,7 @@
 <!-- ═══ SEO PRIMAIRE ═══ -->
 <title>Laouni AfriMoto GN — Registre sécurisé de trajets et véhicules à moteur en Guinée</title>
 <meta name="description" content="Laouni AfriMoto GN est le registre officiel sécurisé des véhicules à moteur en Guinée. Enregistrement moto, taxi, voiture · Anti-vol · Vérification QR · Trajets · Conakry, Labé, Kindia, Boké, Mamou, N'Zérékoré."/>
-<meta name="keywords" content="registre moto Guinée, enregistrement véhicule Conakry, anti-vol moto Guinée, vérification moto Guinée, moto volée Guinée, registre taxi Guinée, Laouni AfriMoto, sécurité moto Afrique de l'Ouest, immatriculation moto Guinée, QR code moto Guinée, trajet moto Conakry, vente moto Guinée, moto Conakry, taxi Conakry, sécurité routière Guinée, registre véhicule Afrique, anti-vol véhicule Afrique, enregistrement taxi Guinée, moto volée Conakry, base de données moto Guinée, plateforme véhicule Guinée, certificat moto Guinée, AfriMoto GN, moto sécurisée Guinée, taxi moto Conakry, ride sharing Guinée, covoiturage Guinée, moto immatriculée Guinée, chasseur de vol moto Guinée"/>
+<meta name="keywords" content="registre moto Guinée, enregistrement véhicule Conakry, anti-vol moto Guinée, vérification moto Guinée, moto volée Guinée, registre taxi Guinée, Laouni AfriMoto, sécurité moto Afrique de l'Ouest, immatriculation moto Guinée, QR code moto Guinée, trajet moto Conakry, vente moto Guinée, moto Conakry, taxi Conakry, sécurité routière Guinée, registre véhicule Afrique, anti-vol véhicule Afrique, enregistrement taxi Guinée, moto volée Conakry, base de données moto Guinée, plateforme véhicule Guinée, certificat moto Guinée, AfriMoto GN, moto sécurisée Guinée, taxi moto Conakry, ride sharing Guinée, voyager Guinée, moto immatriculée Guinée, chasseur de vol moto Guinée"/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"/>
 <meta name="author" content="Laouni AfriMoto GN"/>
 <meta name="copyright" content="Laouni AfriMoto GN 2026"/>
@@ -1133,7 +1133,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   const sbSaveTaxi = sbIgnoreErr(_sbSaveTaxi, 'sbSaveTaxi');
 
   async function _sbSaveTrajet(tr) {
-    // Modèle covoiturage complet : réservations, statut, conducteur, places restantes...
+    // Modèle voyager complet : réservations, statut, conducteur, places restantes...
     const _dh = tr.dateHeure ? new Date(tr.dateHeure) : null;
     const row = { id:tr.id,
       conducteur:tr.conducteur||'', telephone:tr.tel||null, pref:tr.pref||'',
@@ -1282,7 +1282,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="tab" onclick="goPage('vehs')">🏍️ Motos</button>
     <button class="tab" id="tab-taxis" style="display:none" onclick="goPage('taxis')">🏍️ Taxi moto</button>
     <button class="tab" id="tab-gps" style="display:none" onclick="goPage('gps')">🗺️ Suivi GPS</button>
-    <button class="tab" id="tab-trajets" onclick="goPage('trajets')">🚙 Covoiturage</button>
+    <button class="tab" id="tab-trajets" onclick="goPage('trajets')">🚙 Voyager</button>
     <button class="tab" id="tab-mes-trajets" onclick="goPage('mes-trajets')">🎫 Mes trajets</button>
     <button class="tab" id="tab-annonces" onclick="goPage('annonces')">🏷️ Annonces</button>
     <button class="tab" id="tab-alertes" onclick="goPage('alertes')">🔔 Alertes</button>
@@ -1327,7 +1327,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <div id="nav-bottom">
   <button onclick="goPage('home')" id="nb-home" class="nb-act"><span class="nb-icon">🏠</span>Accueil</button>
   <button onclick="goPage('vehs')" id="nb-vehs"><span class="nb-icon">🏍️</span>Motos</button>
-  <button onclick="goPage('trajets')" id="nb-trajets"><span class="nb-icon">🚙</span>Covoiturage</button>
+  <button onclick="goPage('trajets')" id="nb-trajets"><span class="nb-icon">🚙</span>Voyager</button>
   <button onclick="goPage('mes-trajets')" id="nb-mes-trajets"><span class="nb-icon">🎫</span>Mes trajets</button>
   <button onclick="goPage('annonces')" id="nb-annonces"><span class="nb-icon">🏷️</span>Annonces</button>
 
@@ -1340,7 +1340,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div class="hero-pub-tag">REGISTRE SÉCURISÉ · GUINÉE</div>
     <div class="hero-pub-title">Sécurisez<br>votre <span>véhicule</span></div>
     <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;opacity:.95">Registre ultra-sécurisé des trajets, des véhicules et des motos en Afrique</div>
-    <div class="hero-pub-sub">Enregistrement · Anti-vol · Vérification · Covoiturage</div>
+    <div class="hero-pub-sub">Enregistrement · Anti-vol · Vérification · Voyager</div>
     <div class="hero-pub-badges">
       <span class="hero-pub-badge">🛡️ Enregistré</span>
       <span class="hero-pub-badge">📱 QR Code</span>
@@ -1411,7 +1411,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div class="cat-item" onclick="goPage('trajets')">
       <div class="cat-icon" style="background:#eff6ff">🚙</div>
-      <div class="cat-label">Covoiturage</div>
+      <div class="cat-label">Voyager</div>
     </div>
     <div class="cat-item" onclick="goPage('annonces')">
       <div class="cat-icon" style="background:#fdf4ff">🏷️</div>
@@ -1427,11 +1427,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
   </div>
 
-  <!-- COVOITURAGE — TRAJETS & ALERTES EN PRIORITÉ -->
+  <!-- VOYAGER — TRAJETS & ALERTES EN PRIORITÉ -->
   <div class="pub-sect fu">
     <span class="pub-sect-title">🛵 Voyagez ensemble — chauffeur ou passager</span>
   </div>
-  <div id="home-covoiturage" style="margin-bottom:6px"></div>
+  <div id="home-voyager" style="margin-bottom:6px"></div>
 
   <!-- BANNIÈRE VOL -->
   <div id="stolen-banner"></div>
@@ -1446,7 +1446,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   <!-- Politique de confidentialité, accessible à tous -->
   <div style="text-align:center;margin-top:24px;padding-top:14px;border-top:1px solid var(--border)">
     <div style="max-width:680px;margin:0 auto 18px;font-size:11px;line-height:1.7;color:var(--text3);text-align:left;padding:0 16px">
-      <b>Laouni AfriMoto GN</b> est le registre sécurisé des motos et véhicules en Guinée. Vérifiez gratuitement si une <b>moto est volée</b> avant de l'acheter, par QR code, matricule ou numéro de châssis. Enregistrez votre moto, taxi moto ou voiture à Conakry, Labé, Kindia, Mamou, Boké, Kankan, N'Zérékoré et dans toute la Guinée auprès de nos agents agréés. Déclarez un vol en un clic, recevez la position et la photo de votre moto repérée par des citoyens, transférez la propriété en toute sécurité avec attestation de vente. Trouvez un <b>taxi moto en service</b> près de chez vous ou un <b>trajet de covoiturage</b> entre les villes de Guinée. Anti-vol · Vérification · Enregistrement · Covoiturage — la sécurité des véhicules en Guinée.
+      <b>Laouni AfriMoto GN</b> est le registre sécurisé des motos et véhicules en Guinée. Vérifiez gratuitement si une <b>moto est volée</b> avant de l'acheter, par QR code, matricule ou numéro de châssis. Enregistrez votre moto, taxi moto ou voiture à Conakry, Labé, Kindia, Mamou, Boké, Kankan, N'Zérékoré et dans toute la Guinée auprès de nos agents agréés. Déclarez un vol en un clic, recevez la position et la photo de votre moto repérée par des citoyens, transférez la propriété en toute sécurité avec attestation de vente. Trouvez un <b>taxi moto en service</b> près de chez vous ou un <b>trajet de voyager</b> entre les villes de Guinée. Anti-vol · Vérification · Enregistrement · Voyager — la sécurité des véhicules en Guinée.
     </div>
     <span onclick="openModal('m-confidentialite')" style="cursor:pointer;text-decoration:underline;color:var(--text3);font-size:11px">🔒 Politique de confidentialité</span>
     <span style="color:var(--text3);font-size:11px"> · </span>
@@ -1508,7 +1508,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <!-- TRAJETS -->
 <div id="page-trajets" class="page">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div class="h2">🚙 Trajet de covoiturage</div>
+    <div class="h2">🚙 Trajet de voyager</div>
     <button class="btn" id="btn-atr" style="display:none;font-size:13px" onclick="openModal('m-trajet')">➕ Publier</button>
   </div>
   <div class="lbl" style="margin-bottom:6px">Filtrer par préfecture / commune de départ</div>
@@ -1610,7 +1610,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('taxis')" id="gt-taxis" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto</button>
     <button class="btn-ghost" onclick="setGestTab('clients')" id="gt-clients" style="font-size:12px;padding:7px 11px">👤 Clients</button>
     <button class="btn-ghost" onclick="setGestTab('sas')" id="gt-sas" style="font-size:12px;padding:7px 11px">👥 S.Agents</button>
-    <button class="btn-ghost" onclick="setGestTab('trajets')" id="gt-trajets" style="font-size:12px;padding:7px 11px">🚙 Covoiturage</button>
+    <button class="btn-ghost" onclick="setGestTab('trajets')" id="gt-trajets" style="font-size:12px;padding:7px 11px">🚙 Voyager</button>
     <button class="btn-ghost" onclick="setGestTab('annonces')" id="gt-annonces" style="font-size:12px;padding:7px 11px">🏷️ Annonces</button>
     <button class="btn-ghost" onclick="setGestTab('alertes')" id="gt-alertes" style="font-size:12px;padding:7px 11px">🔔 Alertes</button>
     <button class="btn-ghost" onclick="setGestTab('mdp')" id="gt-mdp" style="font-size:12px;padding:7px 11px">🔑 MDP</button>
@@ -2126,10 +2126,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div style="font-size:12px;line-height:1.6;color:var(--text2)">
       <div class="sect" style="margin-top:0">Mentions légales — Identification de l'éditeur</div>
-      <p><b>Laouni AfriMoto GN</b> (laouni-securite-ultime.com) est un <b>service de sécurité intégré des véhicules</b> : registre sécurisé, identification par QR code, lutte contre le vol, traçabilité des propriétaires et services associés (motos-taxis, covoiturage, annonces). Il est édité et administré par <b>Mamadou Bassirou Barry</b> — Conakry, République de Guinée · ✉️ djoniwouri@gmail.com (contact officiel). Immatriculation au Registre du Commerce et du Crédit Mobilier (RCCM) : disponible sur demande auprès de l'administration. Le service étant fourni par voie électronique, la présente identification est donnée conformément à la Loi L/2016/035/AN du 26 juillet 2016 relative aux transactions électroniques (secteur régulé par l'ARPT).</p>
+      <p><b>Laouni AfriMoto GN</b> (laouni-securite-ultime.com) est un <b>service de sécurité intégré des véhicules</b> : registre sécurisé, identification par QR code, lutte contre le vol, traçabilité des propriétaires et services associés (motos-taxis, voyager, annonces). Il est édité et administré par <b>Mamadou Bassirou Barry</b> — Conakry, République de Guinée · ✉️ djoniwouri@gmail.com (contact officiel). Immatriculation au Registre du Commerce et du Crédit Mobilier (RCCM) : disponible sur demande auprès de l'administration. Le service étant fourni par voie électronique, la présente identification est donnée conformément à la Loi L/2016/035/AN du 26 juillet 2016 relative aux transactions électroniques (secteur régulé par l'ARPT).</p>
 
       <div class="sect">1. Objet du service</div>
-      <p>Laouni AfriMoto GN est un registre privé et sécurisé de véhicules (motos et voitures) en Guinée, offrant : l'enregistrement des véhicules avec QR code de vérification, la lutte contre le vol (déclarations, signalements citoyens, historique des vérifications), le transfert sécurisé de propriété, la gestion des motos-taxis, le covoiturage et les annonces de vente. La plateforme ne se substitue pas aux registres officiels de l'État guinéen ni aux forces de l'ordre.</p>
+      <p>Laouni AfriMoto GN est un registre privé et sécurisé de véhicules (motos et voitures) en Guinée, offrant : l'enregistrement des véhicules avec QR code de vérification, la lutte contre le vol (déclarations, signalements citoyens, historique des vérifications), le transfert sécurisé de propriété, la gestion des motos-taxis, le voyager et les annonces de vente. La plateforme ne se substitue pas aux registres officiels de l'État guinéen ni aux forces de l'ordre.</p>
 
       <div class="sect">2. Comptes et exactitude des informations</div>
       <p>L'utilisateur s'engage à fournir des informations exactes et des documents authentiques (pièce d'identité, facture ou attestation de vente, carte grise). Toute fausse déclaration — notamment une fausse déclaration de vol, l'enregistrement d'un véhicule ne vous appartenant pas, ou de faux documents — entraîne la suspension immédiate du compte et peut être signalée aux autorités compétentes. Il en va de même pour la création de faux comptes et toute tentative de modification frauduleuse du propriétaire d'un véhicule. Il est rappelé que la Loi L/2016/037/AN du 26 juillet 2016 punit sévèrement l'usurpation d'identité par voie électronique (article 51 : jusqu'à 2 ans d'emprisonnement et de lourdes amendes en Francs Guinéens) ainsi que la production ou diffusion de données de nature à troubler l'ordre public par un système informatique. Vos identifiants (code d'accès, mot de passe, numéro unique) sont strictement personnels : vous êtes responsable de leur confidentialité.</p>
@@ -2143,7 +2143,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <div class="sect">5. Signalements citoyens</div>
       <p>L'envoi de position ou de photo concernant un véhicule volé doit être fait de bonne foi. Les photos sont prises en direct via l'appareil photo. Les commentaires accompagnant les photos doivent rester factuels : les injures, expressions outrageantes ou accusations infondées visant une personne par un système informatique sont punies par l'article 29 de la Loi L/2016/037/AN (jusqu'à 1 an d'emprisonnement et amende). Il est interdit d'utiliser ces informations pour intervenir soi-même : contactez la Police (117) ou la Gendarmerie (122). La plateforme et le propriétaire ne sauraient être tenus responsables d'une intervention personnelle d'un utilisateur.</p>
 
-      <div class="sect">6. Covoiturage, taxis et annonces</div>
+      <div class="sect">6. Voyager, taxis et annonces</div>
       <p>La plateforme met en relation chauffeurs et passagers ; le contrat de transport se forme directement entre eux et le paiement s'effectue en espèces entre les parties. Conformément au Décret D/2021/092/PRG/SGG, tous les prix, frais de publication et commissions sont affichés de manière claire et non ambiguë, en Francs Guinéens (GNF), avant chaque opération ; ils ne sont pas remboursables une fois le service rendu. La plateforme n'est pas partie aux ventes de véhicules conclues via les annonces.</p>
 
       <div class="sect">7. Solde de services et options de recharge</div>
@@ -7002,10 +7002,10 @@ function rHome() {
     if(statsEl) { statsEl.style.display = 'none'; statsEl.innerHTML = ''; }
   }
 
-  // Covoiturage : trajets + alertes en priorité (incite chauffeurs et passagers)
+  // Voyager : trajets + alertes en priorité (incite chauffeurs et passagers)
   const trajetsApercu = trajetsValides().filter(t => t.statut==='actif' && t.placesDispos>0).slice(0,3);
   const alertesApercu = alertesValides().filter(a => a.statut==='active').slice(0,3);
-  const covoitEl = document.getElementById('home-covoiturage');
+  const covoitEl = document.getElementById('home-voyager');
   if(covoitEl) {
     let html = '';
     if(trajetsApercu.length === 0 && alertesApercu.length === 0) {
@@ -10525,7 +10525,7 @@ function chauffeurAnnulerReservation(trajetId, reservationId, raison) {
   recalculerPlaces(t);
   sbSaveTrajet(t); // Sauvegarder en Supabase
   rClientContent(); // Rafraîchir l'espace chauffeur
-  rTrajets(); // Rafraîchir l'espace public (Covoiturage)
+  rTrajets(); // Rafraîchir l'espace public (Voyager)
   toast('✅ Réservation de ' + r.prenom + ' ' + r.nom + ' annulée' + (raison ? ' · Motif : ' + raison : ''));
 }
 function chauffeurDemanderRaisonAnnulation(trajetId, reservationId) {
@@ -11657,7 +11657,7 @@ function rGestion() {
       matchVeh.some(v => { const taxiLie = DB.taxis.find(t => nrm(t.plaque||'')===nrm(v.mat||'')); return taxiLie && taxiLie.id===d.taxiId; })
     ).sort((a,b)=>new Date(b.date)-new Date(a.date)) : [];
 
-    // Trajets de covoiturage liés (chauffeur OU passager via réservation)
+    // Trajets de voyager liés (chauffeur OU passager via réservation)
     const trajetsTrouves = term ? DB.trajets.filter(t =>
       nrm(t.conducteur||'').includes(termN) || nrm(t.tel||'').includes(termN) ||
       matchClient.some(c => t.clientId === c.id) ||
@@ -11722,8 +11722,8 @@ function rGestion() {
       </div>`;
     }).join('') : '') +
 
-    // ── Trajets de covoiturage liés ──
-    (trajetsTrouves.length ? `<div class="sect">🚙 Covoiturage (${trajetsTrouves.length})</div>` + trajetsTrouves.map(t => {
+    // ── Trajets de voyager liés ──
+    (trajetsTrouves.length ? `<div class="sect">🚙 Voyager (${trajetsTrouves.length})</div>` + trajetsTrouves.map(t => {
       const resas = (t.reservations||[]);
       return `<div class="card" style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:var(--text2)">${fdt(t.dateHeure||t.date)}</span><span class="tag tag-${t.statut==='effectuee'||t.statut==='actif'?'green':'gold'}" style="font-size:9px">${esc(t.statut||'—')}</span></div>
@@ -12248,7 +12248,7 @@ function rSuppressionMasse() {
   window._supprType = type;
   const idsVisibles = new Set(items.map(x => x.id));
   supprSel = new Set([...supprSel].filter(id => idsVisibles.has(id)));
-  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🏍️ Taxi moto',taxis:'🏍️ Taxi moto',trajets:'🚙 Covoiturage',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
+  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🏍️ Taxi moto',taxis:'🏍️ Taxi moto',trajets:'🚙 Voyager',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
   return '<div class="card">' +
     '<div class="sect" style="margin-top:0">🧹 Suppression en masse — Admin</div>' +
     '<div class="grid2" style="margin-bottom:8px">' +
@@ -14132,7 +14132,7 @@ document.getElementById('sq').addEventListener('keydown', e => { if(e.key==='Ent
 document.getElementById('sq-taxi').addEventListener('keydown', e => { if(e.key==='Enter') doSearch('taxi'); });
 
 // ════ SURVEILLANCE TEMPS RÉEL (toutes les 10 s) ════
-// Un taxi moto en service et un chauffeur de covoiturage voient arriver leurs
+// Un taxi moto en service et un chauffeur de voyager voient arriver leurs
 // nouvelles courses/réservations sans rafraîchir : son 🔔 + vibration 📳 + bannière.
 let _survInterval = null;
 
@@ -14349,7 +14349,7 @@ async function _verifierNouveautesTempsReel() {
       }
     }
 
-    // ── 2. Nouvelles réservations sur MES trajets (covoiturage) ──
+    // ── 2. Nouvelles réservations sur MES trajets (voyager) ──
     const mesTrajets = DB.trajets.filter(t => t.clientId === cl.id && (t.statut === 'actif' || t.statut === 'en_cours'));
     if(mesTrajets.length) {
       const {data: trs} = await supabaseClient.from('trajets')
