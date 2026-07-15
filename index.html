@@ -9331,6 +9331,8 @@ function getPic(id) {
 // TAXIS
 // ════════════════════════════════════════════════
 let filtreTaxiZone = '';
+// Masquer l'onglet taxi moto jusqu'à ce qu'une zone soit sélectionnée
+setTimeout(() => { const tab = document.getElementById('tab-taxis'); if(tab) tab.style.display = 'none'; }, 100);
 function setFiltreTaxiZone(z) { filtreTaxiZone = z || ''; renderPrefFilterAvecVoisins('tq-pref-list', filtreTaxiZone, 'setFiltreTaxiZone'); const tabTaxis = document.getElementById('tab-taxis'); if(tabTaxis) tabTaxis.style.display = filtreTaxiZone ? '' : 'none'; rTaxis(); }
 let _dernierRefreshTaxis = 0;
 let taxiAutoRefreshInterval = null;
