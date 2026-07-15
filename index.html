@@ -5836,11 +5836,27 @@ function rClientContent() {
 
   } else if(clientTab === 'avis') {
     const mesAvis = DB.avisChauffeurs.filter(a => a.conducteur_nom === cl.nom || a.clientId === cl.id);
+    
+    // DEBUG: Afficher les infos pour comprendre pourquoi les avis ne s'affichent pas
+    let debugHTML = '<div class="card" style="background:#ffe5cc;border:2px solid #f97316;margin-bottom:15px;font-size:11px">';
+    debugHTML += '<div style="font-weight:700;color:#f97316">🔍 DEBUG INFO (à supprimer en production)</div>';
+    debugHTML += '<div style="margin-top:8px;color:#333;font-family:monospace;line-height:1.6">';
+    debugHTML += 'Ton nom: <b>' + (cl.nom || 'undefined') + '</b><br>';
+    debugHTML += 'Total avis en DB: <b>' + (DB.avisChauffeurs ? DB.avisChauffeurs.length : '0') + '</b><br>';
+    debugHTML += 'Avis trouvés pour toi: <b>' + mesAvis.length + '</b><br>';
+    if(DB.avisChauffeurs && DB.avisChauffeurs.length > 0) {
+      debugHTML += '<br>Premiers avis (conducteur_nom): ';
+      DB.avisChauffeurs.slice(0, 3).forEach((a, i) => {
+        debugHTML += `<br>&nbsp;&nbsp;${i+1}. "${a.conducteur_nom}" | note:${a.note}`;
+      });
+    }
+    debugHTML += '</div></div>';
+    
     if(!mesAvis.length) {
-      el.innerHTML = '<div class="empty">⭐<br>Aucun avis pour le moment</div>';
+      el.innerHTML = debugHTML + '<div class="empty">⭐<br>Aucun avis pour le moment</div>';
     } else {
       const moyenne = (mesAvis.reduce((s,a) => s + (a.note||0), 0) / mesAvis.length).toFixed(1);
-      el.innerHTML = '<div class="card" style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#EAB308">⭐ Vos avis clients</div><div style="font-size:13px;color:var(--text2);margin-top:6px">Moyenne: <b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div></div>' + mesAvis.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(a => '<div class="card" style="margin-bottom:8px"><div style="color:#EAB308;font-weight:700">★'.repeat(a.note) + '☆'.repeat(5-a.note) + ' <span style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</span></div>' + (a.comment ? '<div style="color:var(--text2);margin-top:6px;font-size:12px;line-height:1.4">« ' + esc(a.comment) + ' »</div>' : '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>') + '</div>').join('');
+      el.innerHTML = debugHTML + '<div class="card" style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);margin-bottom:10px"><div style="font-weight:700;font-size:14px;color:#EAB308">⭐ Vos avis clients</div><div style="font-size:13px;color:var(--text2);margin-top:6px">Moyenne: <b>' + moyenne + '/5</b> — <b>' + mesAvis.length + ' avis</b></div></div>' + mesAvis.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(a => '<div class="card" style="margin-bottom:8px"><div style="color:#EAB308;font-weight:700">★'.repeat(a.note) + '☆'.repeat(5-a.note) + ' <span style="color:var(--text2);font-size:11px">' + (a.created_at ? new Date(a.created_at).toLocaleDateString('fr-FR') : '') + '</span></div>' + (a.comment ? '<div style="color:var(--text2);margin-top:6px;font-size:12px;line-height:1.4">« ' + esc(a.comment) + ' »</div>' : '<div style="color:var(--text2);font-style:italic;font-size:11px">Pas de commentaire</div>') + '</div>').join('');
     }
   }
 }
