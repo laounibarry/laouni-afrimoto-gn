@@ -5844,8 +5844,15 @@ function rClientContent() {
              (a.client_id === cl.id);
     });
     
-    // Filtrer les avis vides/cassés (note null, conducteur_nom vide, etc.)
-    mesAvis = mesAvis.filter(a => a.note && (a.conducteur_nom || a.conducteur || a.client_id || a.clientId));
+    // Filtrer STRICTEMENT les avis cassés: note DOIT être 1-5, et au moins un champ nom/id
+    mesAvis = mesAvis.filter(a => {
+      const noteValide = (typeof a.note === 'number' && a.note >= 1 && a.note <= 5);
+      const nomValide = (a.conducteur_nom && a.conducteur_nom.trim()) || 
+                        (a.conducteur && a.conducteur.trim()) || 
+                        (a.clientId && a.clientId !== 'null') ||
+                        (a.client_id && a.client_id !== 'null');
+      return noteValide && nomValide;
+    });
     
     // DEBUG: Afficher les infos détaillées
     let debugHTML = '<div class="card" style="background:#ffe5cc;border:2px solid #f97316;margin-bottom:15px;font-size:11px">';
@@ -5856,10 +5863,10 @@ function rClientContent() {
     debugHTML += 'Total avis en DB: <b>' + (DB.avisChauffeurs ? DB.avisChauffeurs.length : '0') + '</b><br>';
     debugHTML += 'Avis trouvés (avant filtrage): <b>' + DB.avisChauffeurs.filter(a => (a.conducteur_nom === nomChauffeur) || (a.conducteur === nomChauffeur) || (a.clientId === cl.id) || (a.client_id === cl.id)).length + '</b><br>';
     debugHTML += 'Avis valides (après filtrage): <b>' + mesAvis.length + '</b><br>';
-    if(DB.avisChauffeurs && DB.avisChauffeurs.length > 0) {
-      debugHTML += '<br>Premiers 2 avis (tous champs): ';
-      DB.avisChauffeurs.slice(0, 2).forEach((a, i) => {
-        debugHTML += '<br>&nbsp;<b>' + (i+1) + '.</b> conducteur_nom:"' + (a.conducteur_nom||'—') + '" | client_id:"' + (a.client_id||'—') + '" | note:' + a.note;
+    if(mesAvis && mesAvis.length > 0) {
+      debugHTML += '<br>Premiers 2 avis valides: ';
+      mesAvis.slice(0, 2).forEach((a, i) => {
+        debugHTML += '<br>&nbsp;<b>' + (i+1) + '.</b> conducteur_nom:"' + (a.conducteur_nom||a.conducteur||'—') + '" | note:' + a.note;
       });
     }
     debugHTML += '</div></div>';
