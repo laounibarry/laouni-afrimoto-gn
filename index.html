@@ -13180,11 +13180,8 @@ function renderRechercheAvis(type, data) {
   } else if(type === "passager") {
     avis = (DB.avisCourses || []).filter(a => a.passagerId === data.id).slice(0, 20);
   } else if(type === "taxi") {
-    // Pour un taxi, chercher les avis par le nom du chauffeur (conducteur_nom)
-    const nomChauffeur = data.nom || data.conducteur;
-    avis = (DB.avisChauffeurs || []).filter(a => 
-      (a.conducteur_nom && a.conducteur_nom.toLowerCase()) === (nomChauffeur && nomChauffeur.toLowerCase())
-    ).slice(0, 20);
+    // TAXI: chercher les avis par clientId (numéro unique du chauffeur)
+    avis = (DB.avisChauffeurs || []).filter(a => a.clientId === data.id).slice(0, 20);
   }
   
   if(!avis.length) {
