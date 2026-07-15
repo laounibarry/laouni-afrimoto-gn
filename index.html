@@ -13174,15 +13174,33 @@ function adminToggleSuspendTaxi(taxiId, taxiNom) {
 
 function renderRechercheAvis(type, data) {
   let avis = [];
+  let clientIdAUTiliser = null;
   
   if(type === "client") {
-    avis = (DB.avisChauffeurs || []).filter(a => a.clientId === data.id).slice(0, 20);
+    clientIdAUTiliser = data.id;
+    avis = (DB.avisChauffeurs || []).filter(a => a.clientId === clientIdAUTiliser).slice(0, 20);
   } else if(type === "passager") {
     avis = (DB.avisCourses || []).filter(a => a.passagerId === data.id).slice(0, 20);
   } else if(type === "taxi") {
-    // Pour TAXI: on cherche via le clientId DU TAXI
-    const clientIdDuTaxi = data.clientId || data.id;
-    avis = (DB.avisChauffeurs || []).filter(a => a.clientId === clientIdDuTaxi).slice(0, 20);
+    // Pour TAXI: chercher LE CLIENT qui possède ce taxi
+    // 1. D'abord essayer par clientId du taxi
+    if(data.clientId) {
+      clientIdAUTiliser = data.clientId;
+    } else {
+      // 2. Sinon chercher le client par tel ou nom
+      const clientDuTaxi = DB.clients.find(c => 
+        (c.tel === data.tel) || 
+        (c.num === data.id) ||
+        (c.id === data.id)
+      );
+      if(clientDuTaxi) {
+        clientIdAUTiliser = clientDuTaxi.id;
+      }
+    }
+    
+    if(clientIdAUTiliser) {
+      avis = (DB.avisChauffeurs || []).filter(a => a.clientId === clientIdAUTiliser).slice(0, 20);
+    }
   }
   
   if(!avis.length) {
