@@ -14668,7 +14668,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','');if(!r)return;logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('✅ Avertissement enregistré');}
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
-// ========== RECHERCHE CLIENTS & AVIS ADMIN v9.106.2 ==========
+// ========== RECHERCHE CLIENTS & AVIS ADMIN v9.107 (avec RPC) ==========
 async function rechercherClientAvis() {
   const searchInput = (document.getElementById('admin-search-client')||{}).value.trim();
   const resultsDiv = document.getElementById('admin-search-results');
@@ -14715,48 +14715,37 @@ async function afficherAvisClient(clientId, clientNom) {
   body.innerHTML = '<div style="text-align:center;padding:20px">🔍 Chargement des avis...</div>';
   
   try {
-    // CORRECTION v9.106.2: Chercher dans avis_clients (nouvelle table)
-    const {data: avis} = await supabaseClient
-      .from('avis_clients')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', {ascending:false});
+    // RPC optimisée - cherche dans avis_chauffeurs
+    const {data, error} = await supabaseClient.rpc('chercher_avis_client', {
+      p_client_id: clientId
+    });
     
-    if(!avis || avis.length === 0) {
+    if(error) throw error;
+    
+    if(!data || data.length === 0) {
       body.innerHTML = '<div class="empty">Aucun avis trouvé pour ce client</div>';
       openModal('modal-avis-client');
       return;
     }
     
     let html = '';
-    for(const a of avis) {
-      const borderColor = a.suspendu ? '#ef4444' : '#22c55e';
+    for(const row of data) {
+      const a = row.data;
+      const borderColor = '#22c55e';
       html += '<div style="background:rgba(0,0,0,.2);border-left:4px solid ' + borderColor + ';border-radius:8px;padding:12px;margin-bottom:10px">';
       html += '<div style="font-weight:700">⭐ ' + a.note + '/5 · ' + fdt(a.created_at) + '</div>';
-      html += '<div style="font-size:12px;color:var(--text2);margin:6px 0">👤 ' + esc(a.passenger_nom || 'Anonyme') + '</div>';
-      html += '<div style="font-size:13px;margin:8px 0;color:var(--text1)">"' + esc(a.commentaire || '—') + '"</div>';
+      html += '<div style="font-size:13px;margin:8px 0;color:var(--text1)">"' + esc(a.comment || '—') + '"</div>';
       html += '<div style="display:flex;gap:6px">';
-      
-      if(!a.suspendu) {
-        html += '<button style="background:#ef4444;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="suspendreAvis(' + "'" + a.id + "'" + ')">🚫 Suspendre</button>';
-      } else {
-        html += '<span style="color:#ef4444;font-weight:700">🚫 SUSPENDU</span>';
-      }
-      
-      if(!a.avertissement) {
-        html += '<button style="background:#f97316;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="avertirAvis(' + "'" + a.id + "'" + ')">⚠️ Avertir</button>';
-      } else {
-        html += '<span style="color:#f97316;font-weight:700">⚠️ AVERTI</span>';
-      }
-      
+      html += '<button style="background:#ef4444;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="suspendreAvis(' + "'" + a.id + "'" + ')">🚫 Suspendre</button>';
+      html += '<button style="background:#f97316;color:white;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:none" onclick="avertirAvis(' + "'" + a.id + "'" + ')">⚠️ Avertir</button>';
       html += '</div></div>';
     }
     
     body.innerHTML = html;
     openModal('modal-avis-client');
   } catch(e) {
-    console.error('Erreur affichage avis:', e);
-    body.innerHTML = '<div class="empty">❌ Erreur lors du chargement des avis</div>';
+    console.error('Erreur RPC avis:', e);
+    body.innerHTML = '<div class="empty">❌ Erreur: ' + esc(e.message) + '</div>';
     openModal('modal-avis-client');
   }
 }
@@ -14765,26 +14754,26 @@ async function suspendreAvis(avisId) {
   if(!confirm('Suspendre cet avis?')) return;
   
   try {
-    const {error} = await supabaseClient.from('avis_clients').update({suspendu: true}).eq('id', avisId);
+    const {error} = await supabaseClient.from('avis_chauffeurs').update({suspendu: true}).eq('id', avisId);
     if(error) throw error;
     toast('✅ Avis suspendu');
     location.reload();
   } catch(e) {
-    console.error('Erreur suspension:', e);
+    console.error('Erreur:', e);
     toast('❌ Erreur', true);
   }
 }
 
 async function avertirAvis(avisId) {
-  if(!confirm('Enregistrer un avertissement?')) return;
+  if(!confirm('Avertir?')) return;
   
   try {
-    const {error} = await supabaseClient.from('avis_clients').update({avertissement: true}).eq('id', avisId);
+    const {error} = await supabaseClient.from('avis_chauffeurs').update({avertissement: true}).eq('id', avisId);
     if(error) throw error;
-    toast('✅ Avertissement enregistré');
+    toast('✅ Avertissement');
     location.reload();
   } catch(e) {
-    console.error('Erreur avertissement:', e);
+    console.error('Erreur:', e);
     toast('❌ Erreur', true);
   }
 }
