@@ -11647,6 +11647,8 @@ function rGestion() {
   } else if(gestTab==='recherche-unifiee') {
     html = renderGestionRechercheUnifiee(q);
   } else if(gestTab==='validation') {
+    const term = q;
+    const termN = nrm(term);
     const vehsAttente = DB.vehs.filter(v => v.valide===false);
     const coursesTaxi = term ? DB.demandesCourse.filter(d =>
       nrm(d.passagerNom||'').includes(termN) || nrm(d.passagerTel||'').includes(termN) ||
@@ -11801,6 +11803,8 @@ function rGestion() {
       </div>`;
       }).join('') : '<div class="empty">Aucune course trouvée</div>');
   } else if(gestTab==='validation') {
+    const term = q;
+    const termN = nrm(term);
     const vehsAttente = DB.vehs.filter(v => v.valide===false);
     const taxisAttente = DB.taxis.filter(t => t.valide===false);
     html = `
