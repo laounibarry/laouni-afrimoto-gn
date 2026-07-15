@@ -14647,11 +14647,23 @@ function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','')
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
 </script>
-  <div style="position:fixed;bottom:20px;right:20px;z-index:9999">
-    <button onclick="debugAvisAdmin()" style="background:#FF6B6B;color:#fff;border:none;border-radius:50%;width:50px;height:50px;cursor:pointer;font-size:18px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,.3)" title="Debug avis">🐛</button>
+  <div id="debug-avis-btn" style="position:fixed;top:20px;right:20px;z-index:9999;display:none">
+    <button onclick="debugAvisAdmin()" style="background:#FF6B6B;color:#fff;border:none;border-radius:50%;width:50px;height:50px;cursor:pointer;font-size:18px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,.3)" title="Debug avis admin">🐛</button>
   </div>
 
   <script>
+  // Afficher le bouton DEBUG SEULEMENT si admin
+  function showDebugButtonIfAdmin() {
+    const btn = document.getElementById('debug-avis-btn');
+    if(btn) {
+      btn.style.display = isAdmin() ? 'block' : 'none';
+    }
+  }
+  
+  // Vérifier au chargement et quand la page change
+  showDebugButtonIfAdmin();
+  setInterval(showDebugButtonIfAdmin, 500);
+  
   function debugAvisAdmin() {
     const info = [];
     info.push('=== DEBUG AVIS ADMIN ===\n');
