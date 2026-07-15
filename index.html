@@ -14668,7 +14668,7 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','');if(!r)return;logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('✅ Avertissement enregistré');}
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
-// ========== RECHERCHE CLIENTS & AVIS ADMIN ==========
+// ========== RECHERCHE CLIENTS & AVIS ADMIN v9.106.1 ==========
 async function rechercherClientAvis() {
   const searchInput = (document.getElementById('admin-search-client')||{}).value.trim();
   const resultsDiv = document.getElementById('admin-search-results');
@@ -14715,13 +14715,11 @@ async function afficherAvisClient(clientId, clientNom) {
   body.innerHTML = '<div style="text-align:center;padding:20px">🔍 Chargement des avis...</div>';
   
   try {
-    const {data: clientData} = await supabaseClient.from('clients').select('tel').eq('id', clientId).single();
-    if(!clientData) throw new Error('Client non trouvé');
-    
+    // CORRECTION: Chercher par client_id au lieu de tel
     const {data: avis} = await supabaseClient
       .from('avis_courses')
       .select('*')
-      .eq('tel', clientData.tel)
+      .eq('client_id', clientId)
       .order('created_at', {ascending:false});
     
     if(!avis || avis.length === 0) {
