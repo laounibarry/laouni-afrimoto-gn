@@ -593,8 +593,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         supabaseClient.from('mouvements').select('*'),
         supabaseClient.from('corbeille').select('*'),
         supabaseClient.from('demandes_course').select('*'),
-        supabaseClient.from('avis_chauffeurs').select('*').order('date', {ascending: false}).limit(20),
-        supabaseClient.from('avis_courses').select('*').order('date', {ascending: false}).limit(20),
+        supabaseClient.from('avis_chauffeurs').select('*').order('created_at', {ascending: false}),
+        supabaseClient.from('avis_courses').select('*').order('created_at', {ascending: false}),
         supabaseClient.from('chauffeurs_bloques_par_nom').select('*'),
         supabaseClient.from('journal_acces_sensibles').select('*'),
         supabaseClient.from('config_admin').select('*').limit(1),
@@ -5835,19 +5835,27 @@ function rClientContent() {
       ((!mesVehs.length && !mesTaxis.length) ? '<div class="empty">🏍️<br>Aucun véhicule enregistré à votre nom</div>' : '');
 
   } else if(clientTab === 'avis') {
-    const mesAvis = DB.avisChauffeurs.filter(a => a.conducteur_nom === cl.nom || a.clientId === cl.id);
+    // Chercher les avis pour ce chauffeur - essayer plusieurs champs possibles
+    const nomChauffeur = cl.nom;
+    const mesAvis = DB.avisChauffeurs.filter(a => {
+      return (a.conducteur_nom === nomChauffeur) || 
+             (a.conducteur === nomChauffeur) || 
+             (a.clientId === cl.id) ||
+             (a.client_id === cl.id);
+    });
     
-    // DEBUG: Afficher les infos pour comprendre pourquoi les avis ne s'affichent pas
+    // DEBUG: Afficher les infos détaillées
     let debugHTML = '<div class="card" style="background:#ffe5cc;border:2px solid #f97316;margin-bottom:15px;font-size:11px">';
     debugHTML += '<div style="font-weight:700;color:#f97316">🔍 DEBUG INFO (à supprimer en production)</div>';
     debugHTML += '<div style="margin-top:8px;color:#333;font-family:monospace;line-height:1.6">';
     debugHTML += 'Ton nom: <b>' + (cl.nom || 'undefined') + '</b><br>';
+    debugHTML += 'Ton ID: <b>' + (cl.id || 'undefined') + '</b><br>';
     debugHTML += 'Total avis en DB: <b>' + (DB.avisChauffeurs ? DB.avisChauffeurs.length : '0') + '</b><br>';
     debugHTML += 'Avis trouvés pour toi: <b>' + mesAvis.length + '</b><br>';
     if(DB.avisChauffeurs && DB.avisChauffeurs.length > 0) {
-      debugHTML += '<br>Premiers avis (conducteur_nom): ';
-      DB.avisChauffeurs.slice(0, 3).forEach((a, i) => {
-        debugHTML += `<br>&nbsp;&nbsp;${i+1}. "${a.conducteur_nom}" | note:${a.note}`;
+      debugHTML += '<br>Premiers 2 avis (tous champs): ';
+      DB.avisChauffeurs.slice(0, 2).forEach((a, i) => {
+        debugHTML += '<br>&nbsp;<b>' + (i+1) + '.</b> conducteur_nom:"' + (a.conducteur_nom||'—') + '" | client_id:"' + (a.client_id||'—') + '" | note:' + a.note;
       });
     }
     debugHTML += '</div></div>';
@@ -10111,6 +10119,12 @@ function publierAvisChauffeur() {
     }
     DB.avisChauffeurs = DB.avisChauffeurs || [];
     DB.avisChauffeurs.push(_nvAvis);
+    
+    // Recharger tous les avis depuis Supabase pour s'assurer que la liste est à jour
+    supabaseClient.from('avis_chauffeurs').select('*').then(({data}) => {
+      if(data) DB.avisChauffeurs = data.map(x=>({...x}));
+    }).catch(e => console.error('Erreur rechargement avis:', e));
+    
     closeModal('m-avis-chauffeur');
     rTrajets();
     logMvt('avis', '⭐ Avis chauffeur — '+t.depart+' → '+t.arrivee, 0, tel, t.conducteur, {cibleType:'trajet',cibleId:trajetId});
@@ -10186,9 +10200,13 @@ function publierAvisCourse() {
     }
     DB.avisCourses = DB.avisCourses || [];
     DB.avisCourses.push(_nvAvis);
+    
+    // Recharger tous les avis depuis Supabase pour s'assurer que la liste est à jour
+    supabaseClient.from('avis_courses').select('*').then(({data}) => {
+      if(data) DB.avisCourses = data.map(x=>({...x}));
+    }).catch(e => console.error('Erreur rechargement avis courses:', e));
+    
     closeModal('m-avis-course');
-    // Recharger les avis depuis Supabase    supabaseClient.from('avis_courses').select('*').order('created_at', {ascending: false}).then(({data}) => {      if(data) DB.avisCourses = data;      rPassager();    });
-    rPassager();
     logMvt('avis', '⭐ Avis cours taxi — '+d.depart+' → '+d.arrivee, 0, tel, d.taxiNom, {cibleType:'demande_course',cibleId:courseId});
     toast('✅ Merci pour votre avis !');
   }).catch(err => { 
