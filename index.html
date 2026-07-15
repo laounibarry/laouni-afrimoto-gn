@@ -10539,33 +10539,52 @@ async function rechercherMonTrajet() {
   const code = ((document.getElementById('mt-code')||{}).value||'').trim();
   const err = document.getElementById('mt-err');
   const res = document.getElementById('mt-resultat');
+  
   if(!tel || tel.length < 8) { err.textContent='⚠️ Entrez votre numéro de téléphone.'; err.style.display=''; res.innerHTML=''; return; }
   if(!code || code.length !== 4) { err.textContent='⚠️ Entrez le code à 4 chiffres reçu lors de votre réservation.'; err.style.display=''; res.innerHTML=''; return; }
+  
   err.style.display='none';
   res.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2)">🔍 Recherche en cours...</div>';
 
-  // Chercher directement en base (pas seulement en mémoire) pour ne jamais rater un trajet récent
   let trajetTrouve=null, resaTrouvee=null;
+  
   try {
-    const {data} = await supabaseClient.from('trajets').select('*').order('date_heure', {ascending:false}).limit(200);
-    const trajets = data ? data.map(mapTrajet) : DB.trajets;
-    for(const t of trajets) {
-      const r = (t.reservations||[]).find(x => x.tel && x.tel.replace(/\D/g,'')===tel && (String(x.pinDepart||x.pin_depart||x.pin||x.code||'')===code));
-      if(r) {
-        trajetTrouve=t; resaTrouvee=r; break;
+    // Appeler RPC - retourne une colonne JSONB 'data'
+    const {data, error} = await supabaseClient.rpc('chercher_trajet_par_reservation', {
+      p_tel: tel,
+      p_code: code
+    });
+    
+    if(error) throw error;
+    
+    if(data && data.length > 0) {
+      const row = data[0];
+      const trajetData = row.data;  // Extraire le JSONB
+      
+      if(trajetData) {
+        trajetTrouve = mapTrajet(trajetData);
+        
+        // Parser les réservations du trajet trouvé
+        const reservations = Array.isArray(trajetData.reservations) ? trajetData.reservations : 
+                            (typeof trajetData.reservations === 'string' ? JSON.parse(trajetData.reservations) : []);
+        
+        // Trouver la réservation exacte
+        resaTrouvee = reservations.find(x => {
+          const xTel = String(x.tel||'').replace(/\D/g,'');
+          const xCode = String(x.pinDepart || x.pin_depart || x.pin || x.code || '');
+          return xTel === tel && xCode === code;
+        });
       }
     }
   } catch(e) {
-    // Repli sur la mémoire locale si la requête échoue
-    for(const t of DB.trajets) {
-      const r = (t.reservations||[]).find(x => x.tel && x.tel.replace(/\D/g,'')===tel && (String(x.pinDepart||x.pin_depart||x.pin||x.code||'')===code));
-      if(r) {
-        trajetTrouve=t; resaTrouvee=r; break;
-      }
-    }
+    console.error('❌ Erreur RPC rechercherMonTrajet:', e);
   }
 
-  if(!trajetTrouve || !resaTrouvee) { res.innerHTML='<div class="empty">❌ Aucun trajet trouvé avec ces informations. Vérifiez votre numéro et votre code.</div>'; return; }
+  if(!trajetTrouve || !resaTrouvee) { 
+    res.innerHTML='<div class="empty">❌ Aucun trajet trouvé avec ces informations. Vérifiez votre numéro et votre code.</div>'; 
+    return; 
+  }
+  
   const moto = DB.vehs.find(v => v.id === trajetTrouve.vehId || nrm(v.mat||'') === nrm(trajetTrouve.vehMat||''));
   const statutLibelle = {actif:'🟢 Actif — départ prévu', en_cours:'🚗 En cours de route', effectue:'✅ Effectué', annule:'❌ Annulé'};
   res.innerHTML =
