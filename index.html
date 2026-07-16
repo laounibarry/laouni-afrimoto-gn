@@ -11647,30 +11647,30 @@ function rGestion() {
   } else if(gestTab==='courses') {
     const libellesStatut = {en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée', effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée', refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée', annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)'};
     const courses = (DB.demandesCourse || []).filter(c => !q || [c.passagerNom, c.passagerTel, c.taxiNom, c.taxiPlaque, c.depart, c.arrivee].some(x => nrm(x||'').includes(q)));
-    html = '<div class="sect" style="margin-top:0">🚕 Historique des courses taxi moto (' + courses.length + ')</div>' + (courses.length ? courses.sort((a,b) => new Date(b.date) - new Date(a.date)).map(d => `
-      <div class="card" style="margin-bottom:6px;padding:8px 10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:12px">${esc(d.passagerNom||'?')} <span style="font-family:monospace;color:#60A5FA;font-size:10px">${esc((DB.passagers.find(p=>p.id===d.passagerId)||{}).num||'—')}</span> → ${esc(d.taxiNom||'?')} (${esc(d.taxiPlaque||'—')})</div>
-            <div style="font-size:10px;color:var(--text2);margin-top:2px">🛣️ ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
-          </div>
-          <div style="flex-shrink:0;text-align:right">
+    html = '<div class="sect" style="margin-top:0">🚕 Historique des courses taxi moto (' + courses.length + ')</div>' + (courses.length ? courses.sort((a,b) => new Date(b.date) - new Date(a.date)).map(d => {
+      const ps = DB.passagers.find(p=>p.id===d.passagerId);
+      const dateDebut = new Date(d.date);
+      const dateFin = d.dateEffectuee ? new Date(d.dateEffectuee) : null;
+      const chrono = dateFin ? Math.floor((dateFin - dateDebut) / 60000) : null;
+      const chronoText = chrono ? (chrono < 60 ? chrono + ' min' : Math.floor(chrono/60) + 'h ' + (chrono%60) + 'min') : '—';
+      const admissibleCommission = d.statutAttribution === 'terminee' || d.statutAttribution === 'effectuee';
+      return `<div class="card" style="margin-bottom:8px;padding:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:30px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><b>👤 CLIENT:</b> ${esc(d.passagerNom||'?')} | <b>📞</b> ${esc(d.passagerTel||'—')} | 🔢 ${esc(ps?.num||'—')}</div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px"><b>📍 Position:</b> ${d.lat ? `Lat ${d.lat.toFixed(4)}, Lng ${d.lng.toFixed(4)}` : '—'} ${d.lat && d.lng ? `<a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#60A5FA;text-decoration:none">[Voir]</a>` : ''}</div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px"><b>📅 Dates:</b> ${fdt(d.date)} ${dateFin ? `→ ${fdt(d.dateEffectuee)}` : ''} | <b>⏱️ Durée:</b> ${chronoText}</div>
+          <div style="font-size:10px;color:var(--text2)"><b>🛣️</b> ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
+        </div>
+        <div style="flex:0 0 auto;border-left:1px solid rgba(255,255,255,.1);padding-left:30px;text-align:right;min-width:220px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><b>🏍️ TAXI:</b> ${esc(d.taxiNom||'?')} | <b>📞</b> ${esc(d.taxiTel||'—')} | 📋 ${esc(d.taxiPlaque||'—')}</div>
+          <div style="margin-bottom:6px">
             <span class="tag tag-orange" style="font-size:9px">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span>
-            ${d.prixPropose ? `<div style="font-size:13px;font-weight:900;color:#22C55E;margin-top:2px">${fmt(d.prixPropose)} GNF</div>` : ''}
           </div>
+          ${d.prixPropose ? `<div style="font-size:13px;font-weight:900;color:#22C55E;margin-bottom:4px">💰 ${fmt(d.prixPropose)} GNF</div>` : ''}
+          ${admissibleCommission && d.commission ? `<div style="font-size:11px;color:#EAB308;font-weight:700;border-top:1px solid rgba(234,179,8,.3);padding-top:6px">📊 Commission: ${fmt(d.commission)} GNF</div>` : ''}
         </div>
-        <div style="display:flex;gap:12px;font-size:9px;color:var(--text2)">
-          <span>📅 ${fdt(d.date)}</span>
-          ${d.dateEffectuee ? `<span>✅ ${fdt(d.dateEffectuee)}</span>` : ''}
-          ${d.lat && d.lng ? `<a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#60A5FA;text-decoration:none">📍 GPS</a>` : ''}
-        </div>
-      </div>
-    `).join('') : '<div class="empty">Aucune course enregistrée</div>');
-  } else if(gestTab==='recherche-unifiee') {
-    html = renderGestionRechercheUnifiee(q);
-  } else if(gestTab==='validation') {
-    const vehsAttente = DB.vehs.filter(v => v.valide===false);
-    const taxisAttente = DB.taxis.filter(t => t.valide===false);
+      </div>`;
+    }).join('') : '<div class="empty">Aucune course enregistrée</div>');
     html = `
       <div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
         Enregistrements effectués par des agents non habilités à valider directement. Ils restent invisibles publiquement tant qu'ils ne sont pas validés ici.
