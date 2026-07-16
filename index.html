@@ -11662,7 +11662,8 @@ function rGestion() {
           <div style="font-size:10px;color:var(--text2)"><b>🛣️</b> ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
         </div>
         <div style="flex:0 0 auto;border-left:1px solid rgba(255,255,255,.1);padding-left:30px;text-align:right;min-width:220px">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><b>🏍️ TAXI:</b> ${esc(d.taxiNom||'?')} | <b>📞</b> ${esc(d.taxiTel||'—')} | 📋 ${esc(d.taxiPlaque||'—')}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:3px"><b>🏍️ TAXI:</b> ${esc(d.taxiNom||'?')} | <b>📞</b> ${esc(d.taxiTel||'—')} | 🔢 ${esc((DB.taxis.find(t=>t.id===d.taxiId)||{}).num||'—')}</div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">📋 ${esc(d.taxiPlaque||'—')} | <b>⏱️ Durée:</b> ${chronoText}</div>
           <div style="margin-bottom:6px">
             <span class="tag tag-orange" style="font-size:9px">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span>
           </div>
