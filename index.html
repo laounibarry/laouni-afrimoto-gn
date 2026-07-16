@@ -11671,41 +11671,6 @@ function rGestion() {
         </div>
       </div>`;
     }).join('') : '<div class="empty">Aucune course enregistrée</div>');
-    html = `
-      <div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
-        Enregistrements effectués par des agents non habilités à valider directement. Ils restent invisibles publiquement tant qu'ils ne sont pas validés ici.
-      </div>` +
-      (vehsAttente.length ? '<div class="sect" style="margin-top:0">🏍️ Motos / Voitures en attente (' + vehsAttente.length + ')</div>' +
-        vehsAttente.map(v => {
-          const ag = DB.agents.find(a=>a.id===v.agId);
-          return `
-          <div class="card" style="margin-bottom:8px;border-color:rgba(234,179,8,.3)">
-            <div style="font-weight:700;font-size:14px">${v.mat || '— sans matricule —'} ${v.vin?'<span style="font-size:10px;color:var(--text2)">· VIN '+esc(v.vin)+'</span>':''}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.brand)} ${esc(v.model)} · ${esc(v.color)}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">👤 ${esc(v.owner)} · <a href="tel:${esc(v.phone)}" style="color:#f97316;font-weight:700;text-decoration:none">${esc(v.phone)}</a></div>
-            <div style="font-size:10px;color:var(--text2);margin-top:2px">Enregistré par ${ag?esc(ag.name):'—'} le ${fd(v.reg)}</div>
-            <div style="display:flex;gap:8px;margin-top:10px">
-              <button class="btn" style="flex:1;padding:9px;font-size:12px" onclick="validerVeh('${v.id}')">✅ Valider</button>
-              <button class="btn-red" style="flex:1;padding:9px;font-size:12px" onclick="rejeterVeh('${v.id}')">❌ Rejeter</button>
-            </div>
-          </div>`;
-        }).join('') : '') +
-      (taxisAttente.length ? '<div class="sect">🏍️ Taxi moto en attente (' + taxisAttente.length + ')</div>' +
-        taxisAttente.map(t => {
-          const ag = DB.agents.find(a=>a.id===t.agId);
-          return `
-          <div class="card" style="margin-bottom:8px;border-color:rgba(234,179,8,.3)">
-            <div style="font-weight:700;font-size:14px">${esc(t.nom)} — ${esc(t.plaque)}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">Gilet ${esc(t.gilet)} · ${esc(t.zone||'')}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px"><a href="tel:${esc(t.tel)}" style="color:#f97316;font-weight:700;text-decoration:none">${esc(t.tel)}</a></div>
-            <div style="font-size:10px;color:var(--text2);margin-top:2px">Enregistré par ${ag?esc(ag.name):'—'} le ${fd(t.reg)}</div>
-            <div style="display:flex;gap:8px;margin-top:10px">
-              <button class="btn" style="flex:1;padding:9px;font-size:12px" onclick="validerTaxi('${t.id}')">✅ Valider</button>
-              <button class="btn-red" style="flex:1;padding:9px;font-size:12px" onclick="rejeterTaxi('${t.id}')">❌ Rejeter</button>
-            </div>
-          </div>`;
-        }).join('') : '') +
-      ((!vehsAttente.length && !taxisAttente.length) ? '<div class="empty">✅<br>Aucun enregistrement en attente</div>' : '');
   } else if(gestTab==='recherche-unifiee') {
     html = renderGestionRechercheUnifiee(q);
   } else if(gestTab==='validation') {
