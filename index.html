@@ -4555,9 +4555,14 @@ function renderProfilCard(opts) {
 
 // Reprend une demande de course en attente du passager (prix proposé) même après navigation/reconnexion
 let _histCoursesOuvert = false;
+let _avisChauffeurOuvert = {};
 function toggleHistoriqueCourses() {
   _histCoursesOuvert = !_histCoursesOuvert;
   rPassager();
+}
+function toggleAvisChauffeur(key) {
+  _avisChauffeurOuvert[key] = !_avisChauffeurOuvert[key];
+  rGestion();
 }
 function supprimerHistoriqueCourse(demandeId) {
   askConfirm('Supprimer cette course de votre historique ? (Admin et agents pourront toujours y accéder)', function() {
@@ -12028,10 +12033,10 @@ function rGestion() {
       <div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           ${cl ? `
-            <div style="display:flex;gap:10px;flex:1;min-width:0">
+            <div style="display:flex;gap:10px;flex:1;min-width:0;cursor:pointer" onclick="toggleAvisChauffeur('${g.clientId || ('nom:'+nrm(g.conducteur))}')">
               ${cl.photoProfil ? `<img src="${cl.photoProfil}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(249,115,22,.3)"/>` : `<div style="width:60px;height:60px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🚕</div>`}
               <div style="flex:1">
-                <div style="font-weight:700;font-size:14px">${esc(cl.prenom)} ${esc(cl.nom)}</div>
+                <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">${esc(cl.prenom)} ${esc(cl.nom)} <span style="font-size:14px;color:var(--text2);">${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'▼':'▶'}</span></div>
                 <div style="font-size:11px;color:var(--text2)"><a href="tel:${esc(cl.tel)}" style="color:#f97316;font-weight:700;text-decoration:none">📞 ${esc(cl.tel)}</a> · @${cl.user}</div>
                 ${cl.permis?`<div style="font-size:11px;color:#60A5FA">🚗 Permis ${esc(cl.permis)}</div>`:''}
                 <div style="font-size:13px;color:#EAB308;font-weight:700;margin-top:4px">${'★'.repeat(Math.round(moyenne))}${'☆'.repeat(5-Math.round(moyenne))} ${moyenne.toFixed(1)} · ${g.avis.length} avis</div>
@@ -12039,8 +12044,8 @@ function rGestion() {
               </div>
             </div>
           ` : `
-            <div>
-              <div style="font-weight:700;font-size:14px">👤 ${esc(g.conducteur)}</div>
+            <div style="flex:1;cursor:pointer" onclick="toggleAvisChauffeur('${g.clientId || ('nom:'+nrm(g.conducteur))}')">
+              <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">👤 ${esc(g.conducteur)} <span style="font-size:14px;color:var(--text2);">${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'▼':'▶'}</span></div>
               <div style="font-size:11px;color:var(--text2);margin-top:3px">Pas de compte lié</div>
               <div style="font-size:13px;color:#EAB308;font-weight:700;margin-top:4px">${'★'.repeat(Math.round(moyenne))}${'☆'.repeat(5-Math.round(moyenne))} ${moyenne.toFixed(1)} · ${g.avis.length} avis</div>
               ${bloque ? '<span class="tag tag-red" style="font-size:9px;margin-top:4px;display:inline-block">⛔ BLOQUÉ</span>' : ''}
@@ -12056,7 +12061,7 @@ function rGestion() {
             `}
           </div>
         </div>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(249,115,22,.15)">
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(249,115,22,.15);display:${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'block':'none'}">
           ${g.avis.slice().reverse().map(a => {
             const avisTel = (a.tel||'').replace(/\D/g,'');
             const passager = avisTel ? DB.passagers.find(p => (p.tel||'').replace(/\D/g,'') === avisTel) : null;
