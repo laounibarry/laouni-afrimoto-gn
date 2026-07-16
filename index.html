@@ -4804,6 +4804,7 @@ function rPassager() {
   obtenirPositionPassager();
   rPassagerListe();
   startTaxiAutoRefresh(); // Rafraîchir taxis toutes les 10 sec
+  startPassagerHistoriqueRefresh(); // Rafraîchir historique courses toutes les 10 sec
 }
 // Position du passager, utilisée pour trier les taxis en service par distance réelle.
 // Reste null si la géolocalisation est refusée ou indisponible : la liste retombe alors sur l'ordre par zone.
@@ -6022,6 +6023,7 @@ function demarrerCourseAvecCode(demandeId) {
   sbMajStatutDemande(demandeId, {statut_attribution: 'effectuee', en_cours: true, date_depart: demande.dateDepart, heure_debut: Math.floor(demande.heureDebut instanceof Date ? demande.heureDebut.getHours() : typeof demande.heureDebut === 'number' ? demande.heureDebut : new Date(demande.heureDebut).getHours()), minute_debut: Math.floor(demande.minuteDebut instanceof Date ? demande.minuteDebut.getMinutes() : typeof demande.minuteDebut === 'number' ? demande.minuteDebut : new Date(demande.heureDebut).getMinutes())});
   toast('✅ Code correct — course démarrée !');
   rClientContent();
+  rPassager();
 }
 
 function demarrerCourseChauffeur(demandeId) {
@@ -9442,11 +9444,29 @@ setTimeout(() => { const tab = document.getElementById('tab-taxis'); if(tab) tab
 function setFiltreTaxiZone(z) { filtreTaxiZone = z || ''; renderPrefFilterAvecVoisins('tq-pref-list', filtreTaxiZone, 'setFiltreTaxiZone'); const tabTaxis = document.getElementById('tab-taxis'); if(tabTaxis) tabTaxis.style.display = filtreTaxiZone ? '' : 'none'; rTaxis(); }
 let _dernierRefreshTaxis = 0;
 let taxiAutoRefreshInterval = null;
+let passagerHistoriqueRefreshInterval = null;
 let mesTrajetsVisible = true; // État du toggle trajets
 
 function startTaxiAutoRefresh() { if(taxiAutoRefreshInterval) clearInterval(taxiAutoRefreshInterval); taxiAutoRefreshInterval = setInterval(async () => { try { const {data, error} = await supabaseClient.from('taxis').select('*'); if(!error && data) { DB.taxis = data.map(mapTaxi); DB.taxis = DB.taxis.filter(t => t.hors_service !== true && t.statut !== 'suspendu'); } } catch(e) { console.error('Erreur rafraîchissement taxis:', e); } _rTaxisAffichage(); }, 10000); }
 
 function stopTaxiAutoRefresh() { if(taxiAutoRefreshInterval) { clearInterval(taxiAutoRefreshInterval); taxiAutoRefreshInterval = null; } }
+function startPassagerHistoriqueRefresh() {
+  if(passagerHistoriqueRefreshInterval) clearInterval(passagerHistoriqueRefreshInterval);
+  passagerHistoriqueRefreshInterval = setInterval(async () => {
+    try {
+      if(!DB.user || DB.user.role !== 'passager') return;
+      const {data, error} = await supabaseClient.from('demandes_course').select('*');
+      if(!error && data) {
+        DB.demandesCourse = data.map(mapDemandeCourse);
+        const el = document.getElementById('passager-content');
+        if(el) rPassager();
+      }
+    } catch(e) {
+      console.error('Erreur rafraîchissement historique passager:', e);
+    }
+  }, 10000);
+}
+function stopPassagerHistoriqueRefresh() { if(passagerHistoriqueRefreshInterval) { clearInterval(passagerHistoriqueRefreshInterval); passagerHistoriqueRefreshInterval = null; } }
 function rTaxis() {
   // Public : rafraîchir l'état frais des taxis (en service / positions) au plus toutes les 10 s
   if(!DB.user && Date.now() - _dernierRefreshTaxis > 10000) {
@@ -11757,6 +11777,8 @@ function rGestion() {
     html = list.map(t=>{
       const confirmes = (t.reservations||[]).filter(r=>r.confirme);
       const enAttente = (t.reservations||[]).filter(r=>!r.confirme);
+      const placesConfirmes = confirmes.reduce((sum, r) => sum + (r.nbPlaces||1), 0);
+      const placesEnAttente = enAttente.reduce((sum, r) => sum + (r.nbPlaces||1), 0);
       return `
       <div class="card" style="margin-bottom:7px;${t.statut==='annulé'?'opacity:.55;border-style:dashed':''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -11773,7 +11795,7 @@ function rGestion() {
         </div>
         ${confirmes.length ? `
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.2)">
-            <div style="font-size:11px;color:#22C55E;font-weight:700;margin-bottom:6px">✅ ${confirmes.length} passager(s) confirmé(s) pour le départ</div>
+            <div style="font-size:11px;color:#22C55E;font-weight:700;margin-bottom:6px">✅ ${placesConfirmes} place(s) confirmée(s) (${confirmes.length} passager(s))</div>
             ${confirmes.map(r => `
               <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;background:rgba(34,197,94,.06);border-radius:7px;padding:6px 10px;margin-bottom:4px">
                 <span style="font-size:12px">👤 ${esc(r.prenom)} ${esc(r.nom)} · 💺${r.nbPlaces||1}</span>
@@ -11782,7 +11804,7 @@ function rGestion() {
           </div>` : ''}
         ${enAttente.length ? `
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(234,179,8,.2)">
-            <div style="font-size:11px;color:#EAB308;font-weight:700;margin-bottom:6px">⏳ ${enAttente.length} passager(s) en attente de confirmation</div>
+            <div style="font-size:11px;color:#EAB308;font-weight:700;margin-bottom:6px">⏳ ${placesEnAttente} place(s) en attente (${enAttente.length} passager(s))</div>
             ${enAttente.map(r => `
               <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;background:rgba(234,179,8,.06);border-radius:7px;padding:6px 10px;margin-bottom:4px">
                 <span style="font-size:12px">👤 ${esc(r.prenom)} ${esc(r.nom)} · 💺${r.nbPlaces||1}</span>
