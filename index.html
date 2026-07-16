@@ -3209,6 +3209,8 @@ function toast(msg, err=false) {
 let navHistory = [];
 function goPage(id, skipHistory) {
 // Vider le toast au changement de page  try { const t = document.getElementById('toast'); if(t) { t.textContent = ''; t.classList.remove('show'); } } catch(e) {}
+  // Si on appuie sur "Accueil", vider l'historique de navigation
+  if(id === 'home') navHistory = [];
   // Mapping rôle → page personnelle, utilisé dans plusieurs gardes ci-dessous
   const pagesPersonnelles = {owner:'owner', client:'client', sousagent:'sousagent', passager:'passager'};
   // Alertes : retiré de la navigation agent, mais l'admin garde accès complet (œil et main partout sur le site)
@@ -3276,7 +3278,10 @@ function goBack() {
 
 function updateBackBtn() {
   const btn = document.getElementById('btn-back');
-  if(btn) btn.style.display = navHistory.length > 0 ? '' : 'none';
+  const courante = document.querySelector('.page.act');
+  const curId = courante ? courante.id.replace('page-','') : null;
+  // Ne pas afficher le bouton retour si on est sur la page home
+  if(btn) btn.style.display = (navHistory.length > 0 && curId !== 'home') ? '' : 'none';
 }
 
 // ── Confirmation générique (remplace window.confirm, peu fiable dans certains WebView) ──
