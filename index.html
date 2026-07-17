@@ -14272,22 +14272,104 @@ function rHistorique() {
   const zone = document.getElementById('hist-list');
   if(!zone) return;
   
-  // Si onglet Recharges - afficher VRAIES recharges SANS commissions
+  // ════════════════════════════════════════════════════════════
+  // ENREGISTREMENTS - Tous les enregistrements avec détails
+  // ════════════════════════════════════════════════════════════
+  if(histTab === 'enreg') {
+    const mouvements = (DB.mouvements || []).filter(m => m.type === 'enreg');
+    zone.innerHTML = mouvements.length ? mouvements
+      .sort((a,b) => new Date(b.date||0) - new Date(a.date||0))
+      .map(m => {
+        const d = m.date ? new Date(m.date) : null;
+        const ds = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
+        return `
+        <div class="card fu" style="margin-bottom:10px;border-left:4px solid #3b82f6">
+          <div style="display:flex;gap:12px">
+            <div style="font-size:28px;flex-shrink:0">📋</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px;margin-bottom:8px">${esc(m.desc||'')}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px;color:var(--text2);margin-bottom:8px">
+                <div><strong>📅 Date:</strong> ${ds}</div>
+                <div><strong>👤 Par:</strong> ${esc(m.de||'Système')}</div>
+                <div><strong>🏷️ Véhicule:</strong> ${esc(m.vers||'—')}</div>
+                ${m.montant ? `<div><strong>💰 Frais:</strong> ${fmt(m.montant)} GNF</div>` : ''}
+              </div>
+              ${m.meta && Object.keys(m.meta).length > 0 ? `<div style="font-size:10px;background:rgba(255,255,255,.05);padding:6px;border-radius:6px;color:var(--text3)"><strong>📋 Détails:</strong> ${esc(JSON.stringify(m.meta).slice(0,200))}</div>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">📜<br>Aucun enregistrement</div>';
+    return;
+  }
+  
+  // ════════════════════════════════════════════════════════════
+  // RECHARGES - Transferts de solde (SANS commissions)
+  // ════════════════════════════════════════════════════════════
   if(histTab === 'rech') {
     const mouvements = (DB.mouvements || []).filter(m => 
       m.type === 'rech' && 
       !m.desc.includes('Commission course') && 
       !m.desc.includes('Frais de recherche')
     );
-    zone.innerHTML = mouvements.length ? mouvements.sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).map(m => {
-      const d = m.date ? new Date(m.date) : null;
-      const ds = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
-      return `<div class="card fu" style="margin-bottom:8px"><div style="display:flex;gap:10px"><div style="font-size:20px">💰</div><div style="flex:1"><div style="font-weight:700;color:#EAB308">${fmt(m.montant||0)} GNF</div><div style="font-size:11px;color:var(--text2)">${esc(m.desc||'')} · ${ds}</div></div></div></div>`;
-    }).join('') : '<div class="empty">📜<br>Aucune recharge</div>';
+    zone.innerHTML = mouvements.length ? mouvements
+      .sort((a,b) => new Date(b.date||0) - new Date(a.date||0))
+      .map(m => {
+        const d = m.date ? new Date(m.date) : null;
+        const ds = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
+        return `
+        <div class="card fu" style="margin-bottom:10px;border-left:4px solid #EAB308">
+          <div style="display:flex;gap:12px">
+            <div style="font-size:28px;flex-shrink:0">💰</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:900;font-size:16px;color:#EAB308;margin-bottom:8px">${fmt(m.montant||0)} GNF</div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px">${esc(m.desc||'')}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px;color:var(--text2);margin-bottom:8px">
+                <div><strong>📅 Date:</strong> ${ds}</div>
+                <div><strong>👤 De:</strong> ${esc(m.de||'Système')}</div>
+                <div><strong>➜ Vers:</strong> ${esc(m.vers||'—')}</div>
+                ${m.role ? `<div><strong>🔐 Rôle:</strong> ${esc(m.role)}</div>` : ''}
+              </div>
+              ${m.meta && Object.keys(m.meta).length > 0 ? `<div style="font-size:10px;background:rgba(255,255,255,.05);padding:6px;border-radius:6px;color:var(--text3)"><strong>📋 Détails:</strong> ${esc(JSON.stringify(m.meta).slice(0,200))}</div>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">📜<br>Aucune recharge</div>';
     return;
   }
   
-  // Sinon afficher les courses (défaut)
+  // ════════════════════════════════════════════════════════════
+  // TRAJETS - Trajets avec tous les détails
+  // ════════════════════════════════════════════════════════════
+  if(histTab === 'trajet') {
+    const mouvements = (DB.mouvements || []).filter(m => m.type === 'trajet');
+    zone.innerHTML = mouvements.length ? mouvements
+      .sort((a,b) => new Date(b.date||0) - new Date(a.date||0))
+      .map(m => {
+        const d = m.date ? new Date(m.date) : null;
+        const ds = d ? d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
+        return `
+        <div class="card fu" style="margin-bottom:10px;border-left:4px solid #10b981">
+          <div style="display:flex;gap:12px">
+            <div style="font-size:28px;flex-shrink:0">🛣️</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px;margin-bottom:8px">${esc(m.desc||'')}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px;color:var(--text2);margin-bottom:8px">
+                <div><strong>📅 Date:</strong> ${ds}</div>
+                <div><strong>👤 Passager:</strong> ${esc(m.de||'—')}</div>
+                <div><strong>🏍️ Taxi:</strong> ${esc(m.vers||'—')}</div>
+                ${m.montant ? `<div><strong>💰 Prix:</strong> ${fmt(m.montant)} GNF</div>` : ''}
+              </div>
+              ${m.meta && Object.keys(m.meta).length > 0 ? `<div style="font-size:10px;background:rgba(255,255,255,.05);padding:6px;border-radius:6px;color:var(--text3)"><strong>📋 Détails:</strong> ${esc(JSON.stringify(m.meta).slice(0,200))}</div>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">📜<br>Aucun trajet</div>';
+    return;
+  }
+  
+  // ════════════════════════════════════════════════════════════
+  // DÉFAUT - Courses taxi
+  // ════════════════════════════════════════════════════════════
   const libellesStatut = {
     en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée',
     effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée',
