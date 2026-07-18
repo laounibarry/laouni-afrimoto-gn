@@ -1627,6 +1627,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('suppression')" id="gt-suppression" style="font-size:12px;padding:7px 11px">🧹 Suppression</button>
     <button class="btn-ghost" onclick="setGestTab('journal')" id="gt-journal" style="font-size:12px;padding:7px 11px">📋 Journal accès</button>
     <button class="btn-ghost" onclick="setGestTab('securite')" id="gt-securite" style="font-size:12px;padding:7px 11px">🔒 Sécurité</button>
+    <button class="btn-ghost" onclick="setGestTab('annulation')" id="gt-annulation" style="font-size:12px;padding:7px 11px">💱 Annulation</button>
   </div>
   <input type="text" id="gest-q" placeholder="Rechercher..." style="margin-bottom:11px" oninput="rGestion()"/>
   <div id="gestion-content"></div>
@@ -11633,7 +11634,7 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','validation','corbeille','journal','recharges','securite','suppression'].forEach(x=>{
+  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','validation','corbeille','journal','recharges','securite','suppression','annulation'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
