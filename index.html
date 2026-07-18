@@ -9953,18 +9953,26 @@ function _publierTrajetDefinitif() {
 function openReserverTrajet(trajetId) {
   const _emCh = document.getElementById('rt-email'); if(_emCh) _emCh.value = '';
   const _tRes = DB.trajets.find(x => x.id === trajetId);
-  if(_tRes && (!_tRes.plAvant && !_tRes.plMilieu && !_tRes.plArriere)) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
+  if(_tRes && _tRes.placesDispos <= 0) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   
-  // Calculer les places disponibles
-  const totalPlaces = (t.plAvant || 0) + (t.plMilieu || 0) + (t.plArriere || 0);
-  const reservees = (t.reservations || []).length;
-  if(reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
+  // Calculer les places disponibles (pas le nombre de RÉSERVATIONS, mais le TOTAL de PLACES RÉSERVÉES!)
+  const totalPlaces = t.places || 0;
+  let placesReservees = 0;
+  (t.reservations || []).forEach(r => {
+    if(Array.isArray(r.places_positions)) {
+      placesReservees += r.places_positions.length;
+    } else {
+      placesReservees += 1;
+    }
+  });
+  const placesLibres = Math.max(0, totalPlaces - placesReservees);
+  if(placesLibres <= 0) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
   
   document.getElementById('rt-trajet-id').value = trajetId;
   document.getElementById('rt-trajet-info').innerHTML =
-    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${totalPlaces - reservees} place(s) restante(s) · ${fmt(t.prix)}/place`;
+    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${placesLibres} place(s) restante(s) · ${fmt(t.prix)}/place`;
   
   document.getElementById('rt-prenom').value = '';
   document.getElementById('rt-nom').value = '';
@@ -10065,7 +10073,7 @@ function getSelectedPlaces() {
 // Recalculer les places disponibles en fonction des réservations multi-places
 function recalculerPlaces(trajet) {
   if(!trajet) return;
-  const total = (trajet.plAvant || 0) + (trajet.plMilieu || 0) + (trajet.plArriere || 0);
+  const total = trajet.places || 0;
   if(total === 0) return;
   let reserved = 0;
   (trajet.reservations || []).forEach(r => {
