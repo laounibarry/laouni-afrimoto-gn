@@ -8137,7 +8137,7 @@ function openRechargeAdmin(type, id) {
   openModal('m-recharge-admin');
 }
 
-function validerRechargeAdmin() {
+async function validerRechargeAdmin() {
   const montant = parseInt(document.getElementById('rech-admin-montant').value)||0;
   const note = document.getElementById('rech-admin-note').value.trim();
   const err = document.getElementById('rech-admin-err');
@@ -8149,6 +8149,8 @@ function validerRechargeAdmin() {
   rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
   logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom,{cibleType:rechAdminCible.type==='client'?'client':'passager',cibleId:rechAdminCible.id});
   closeModal('m-recharge-admin');
+  // 🔄 Recharger les mouvements depuis Supabase pour avoir cibleType/cibleId à jour
+  try { const { data } = await supabaseClient.from('mouvements').select('*'); if(data && data.length > 0) DB.mouvements = data.map(mapMouvement); } catch(e) {}
   rGestion(); rClient();
   toast(`✅ +${fmt(montant)} GNF crédités sur le compte de ${rechAdminCible.nom}`);
 }
