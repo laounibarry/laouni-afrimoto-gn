@@ -8147,7 +8147,7 @@ function validerRechargeAdmin() {
   if(!obj) return;
   obj.solde = (obj.solde||0)+montant;
   rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
-  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom);
+  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom,{cibleType:rechAdminCible.type==='client'?'client':'passager',cibleId:rechAdminCible.id});
   closeModal('m-recharge-admin');
   rGestion(); rClient();
   toast(`✅ +${fmt(montant)} GNF crédités sur le compte de ${rechAdminCible.nom}`);
