@@ -8,7 +8,7 @@
 <!-- ═══ SEO PRIMAIRE ═══ -->
 <title>Laouni AfriMoto GN — Registre sécurisé de trajets et véhicules à moteur en Guinée</title>
 <meta name="description" content="Laouni AfriMoto GN est le registre officiel sécurisé des véhicules à moteur en Guinée. Enregistrement moto, taxi, voiture · Anti-vol · Vérification QR · Trajets · Conakry, Labé, Kindia, Boké, Mamou, N'Zérékoré."/>
-<meta name="keywords" content="registre moto Guinée, enregistrement véhicule Conakry, anti-vol moto Guinée, vérification moto Guinée, moto volée Guinée, registre taxi Guinée, Laouni AfriMoto, sécurité moto Afrique de l'Ouest, immatriculation moto Guinée, QR code moto Guinée, trajet moto Conakry, vente moto Guinée, moto Conakry, taxi Conakry, sécurité routière Guinée, registre véhicule Afrique, anti-vol véhicule Afrique, enregistrement taxi Guinée, moto volée Conakry, base de données moto Guinée, plateforme véhicule Guinée, certificat moto Guinée, AfriMoto GN, moto sécurisée Guinée, taxi moto Conakry, ride sharing Guinée, voyager Guinée, moto immatriculée Guinée, chasseur de vol moto Guinée"/>
+<meta name="keywords" content="registre moto Guinée, enregistrement véhicule Conakry, anti-vol moto Guinée, vérification moto Guinée, moto volée Guinée, registre taxi Guinée, Laouni AfriMoto, sécurité moto Afrique de l'Ouest, immatriculation moto Guinée, QR code moto Guinée, trajet moto Conakry, vente moto Guinée, moto Conakry, taxi Conakry, sécurité routière Guinée, registre véhicule Afrique, anti-vol véhicule Afrique, enregistrement taxi Guinée, moto volée Conakry, base de données moto Guinée, plateforme véhicule Guinée, certificat moto Guinée, AfriMoto GN, moto sécurisée Guinée, taxi moto Conakry, ride sharing Guinée, covoiturage Guinée, moto immatriculée Guinée, chasseur de vol moto Guinée"/>
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"/>
 <meta name="author" content="Laouni AfriMoto GN"/>
 <meta name="copyright" content="Laouni AfriMoto GN 2026"/>
@@ -202,7 +202,7 @@
 var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1})},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(o*r,n*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}(function(){return qrcode});
 /* ═══ VERSION & NETTOYAGE CACHE ═══
    Supprime tout ancien service worker / cache PWA qui servirait une vieille version du site. */
-window.AFRIMOTO_VERSION = 'v9.206 - CORRECTION: Email OBLIGATOIRE pour confirmer réservation (garantit envoi mail)';
+window.AFRIMOTO_VERSION = 'v9.206 - Mail confirmation COMPLET: infos passager+chauffeur+véhicule+trajet+PIN+instructions';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 try {
   if('serviceWorker' in navigator) {
@@ -800,7 +800,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       tel:r.telephone||r.tel||'',
       pref:r.pref||'',
       depart:r.depart||'', arrivee:r.arrivee||'',
-      dateHeure:r.date_heure||r.dateHeure||r.date_depart||r.created_at||null,
+      dateHeure:r.date_heure||r.dateHeure||r.date_depart||null,
       places:r.places||0,
       placesDispos:(r.places_dispos!==undefined&&r.places_dispos!==null)?r.places_dispos:(r.placesDispos!==undefined?r.placesDispos:(r.places||0)),
       prix:r.prix||0,
@@ -810,10 +810,6 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       parentId:r.parent_id||r.parentId||null,
       arriveLe:r.arrive_le||r.arriveLe||null,
       departConfirmeLe:r.depart_confirme_le||r.departConfirmeLe||null,
-      heureDebut:(r.heure_debut!==undefined&&r.heure_debut!==null)?r.heure_debut:(r.heureDebut!==undefined&&r.heureDebut!==null?r.heureDebut:null),
-      minuteDebut:(r.minute_debut!==undefined&&r.minute_debut!==null)?r.minute_debut:(r.minuteDebut!==undefined?r.minuteDebut:0),
-      heureFin:(r.heure_fin!==undefined&&r.heure_fin!==null)?r.heure_fin:(r.heureFin!==undefined&&r.heureFin!==null?r.heureFin:null),
-      minuteFin:(r.minute_fin!==undefined&&r.minute_fin!==null)?r.minute_fin:(r.minuteFin!==undefined?r.minuteFin:0),
       vehPhoto:r.veh_photo||r.vehPhoto||null,
       vehDesc:r.veh_desc||r.vehDesc||null,
       vehMat:r.veh_mat||r.vehMat||null,
@@ -1137,7 +1133,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   const sbSaveTaxi = sbIgnoreErr(_sbSaveTaxi, 'sbSaveTaxi');
 
   async function _sbSaveTrajet(tr) {
-    // Modèle voyager complet : réservations, statut, conducteur, places restantes...
+    // Modèle covoiturage complet : réservations, statut, conducteur, places restantes...
     const _dh = tr.dateHeure ? new Date(tr.dateHeure) : null;
     const row = { id:tr.id,
       conducteur:tr.conducteur||'', telephone:tr.tel||null, pref:tr.pref||'',
@@ -1286,7 +1282,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="tab" onclick="goPage('vehs')">🏍️ Motos</button>
     <button class="tab" id="tab-taxis" style="display:none" onclick="goPage('taxis')">🏍️ Taxi moto</button>
     <button class="tab" id="tab-gps" style="display:none" onclick="goPage('gps')">🗺️ Suivi GPS</button>
-    <button class="tab" id="tab-trajets" onclick="goPage('trajets')">🚙 Voyager</button>
+    <button class="tab" id="tab-trajets" onclick="goPage('trajets')">🚙 Covoiturage</button>
     <button class="tab" id="tab-mes-trajets" onclick="goPage('mes-trajets')">🎫 Mes trajets</button>
     <button class="tab" id="tab-annonces" onclick="goPage('annonces')">🏷️ Annonces</button>
     <button class="tab" id="tab-alertes" onclick="goPage('alertes')">🔔 Alertes</button>
@@ -1295,6 +1291,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="tab" id="tab-recherche-agent" style="display:none" onclick="goPage('recherche-agent')">🔎 Recherche</button>
     <button class="tab" id="tab-recharge" style="display:none" onclick="goPage('recharge')">💳 Recharge</button>
     <button class="tab" id="tab-sousagents" style="display:none" onclick="goPage('sousagents')">👥 Sous-agents</button>
+    <button class="tab" id="tab-historique" style="display:none" onclick="goPage('historique')">📜 Historique</button>
     <button class="tab" id="tab-tarifs" style="display:none" onclick="goPage('tarifs')">💰 Tarifs</button>
   </div>
 </div>
@@ -1330,7 +1327,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <div id="nav-bottom">
   <button onclick="goPage('home')" id="nb-home" class="nb-act"><span class="nb-icon">🏠</span>Accueil</button>
   <button onclick="goPage('vehs')" id="nb-vehs"><span class="nb-icon">🏍️</span>Motos</button>
-  <button onclick="goPage('trajets')" id="nb-trajets"><span class="nb-icon">🚙</span>Voyager</button>
+  <button onclick="goPage('trajets')" id="nb-trajets"><span class="nb-icon">🚙</span>Covoiturage</button>
   <button onclick="goPage('mes-trajets')" id="nb-mes-trajets"><span class="nb-icon">🎫</span>Mes trajets</button>
   <button onclick="goPage('annonces')" id="nb-annonces"><span class="nb-icon">🏷️</span>Annonces</button>
 
@@ -1343,7 +1340,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div class="hero-pub-tag">REGISTRE SÉCURISÉ · GUINÉE</div>
     <div class="hero-pub-title">Sécurisez<br>votre <span>véhicule</span></div>
     <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:6px;opacity:.95">Registre ultra-sécurisé des trajets, des véhicules et des motos en Afrique</div>
-    <div class="hero-pub-sub">Enregistrement · Anti-vol · Vérification · Voyager</div>
+    <div class="hero-pub-sub">Enregistrement · Anti-vol · Vérification · Covoiturage</div>
     <div class="hero-pub-badges">
       <span class="hero-pub-badge">🛡️ Enregistré</span>
       <span class="hero-pub-badge">📱 QR Code</span>
@@ -1414,7 +1411,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div class="cat-item" onclick="goPage('trajets')">
       <div class="cat-icon" style="background:#eff6ff">🚙</div>
-      <div class="cat-label">Voyager</div>
+      <div class="cat-label">Covoiturage</div>
     </div>
     <div class="cat-item" onclick="goPage('annonces')">
       <div class="cat-icon" style="background:#fdf4ff">🏷️</div>
@@ -1430,11 +1427,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
   </div>
 
-  <!-- VOYAGER — TRAJETS & ALERTES EN PRIORITÉ -->
+  <!-- COVOITURAGE — TRAJETS & ALERTES EN PRIORITÉ -->
   <div class="pub-sect fu">
     <span class="pub-sect-title">🛵 Voyagez ensemble — chauffeur ou passager</span>
   </div>
-  <div id="home-voyager" style="margin-bottom:6px"></div>
+  <div id="home-covoiturage" style="margin-bottom:6px"></div>
 
   <!-- BANNIÈRE VOL -->
   <div id="stolen-banner"></div>
@@ -1449,7 +1446,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   <!-- Politique de confidentialité, accessible à tous -->
   <div style="text-align:center;margin-top:24px;padding-top:14px;border-top:1px solid var(--border)">
     <div style="max-width:680px;margin:0 auto 18px;font-size:11px;line-height:1.7;color:var(--text3);text-align:left;padding:0 16px">
-      <b>Laouni AfriMoto GN</b> est le registre sécurisé des motos et véhicules en Guinée. Vérifiez gratuitement si une <b>moto est volée</b> avant de l'acheter, par QR code, matricule ou numéro de châssis. Enregistrez votre moto, taxi moto ou voiture à Conakry, Labé, Kindia, Mamou, Boké, Kankan, N'Zérékoré et dans toute la Guinée auprès de nos agents agréés. Déclarez un vol en un clic, recevez la position et la photo de votre moto repérée par des citoyens, transférez la propriété en toute sécurité avec attestation de vente. Trouvez un <b>taxi moto en service</b> près de chez vous ou un <b>trajet de voyager</b> entre les villes de Guinée. Anti-vol · Vérification · Enregistrement · Voyager — la sécurité des véhicules en Guinée.
+      <b>Laouni AfriMoto GN</b> est le registre sécurisé des motos et véhicules en Guinée. Vérifiez gratuitement si une <b>moto est volée</b> avant de l'acheter, par QR code, matricule ou numéro de châssis. Enregistrez votre moto, taxi moto ou voiture à Conakry, Labé, Kindia, Mamou, Boké, Kankan, N'Zérékoré et dans toute la Guinée auprès de nos agents agréés. Déclarez un vol en un clic, recevez la position et la photo de votre moto repérée par des citoyens, transférez la propriété en toute sécurité avec attestation de vente. Trouvez un <b>taxi moto en service</b> près de chez vous ou un <b>trajet de covoiturage</b> entre les villes de Guinée. Anti-vol · Vérification · Enregistrement · Covoiturage — la sécurité des véhicules en Guinée.
     </div>
     <span onclick="openModal('m-confidentialite')" style="cursor:pointer;text-decoration:underline;color:var(--text3);font-size:11px">🔒 Politique de confidentialité</span>
     <span style="color:var(--text3);font-size:11px"> · </span>
@@ -1511,7 +1508,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <!-- TRAJETS -->
 <div id="page-trajets" class="page">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div class="h2">🚙 Trajet de voyager</div>
+    <div class="h2">🚙 Trajet de covoiturage</div>
     <button class="btn" id="btn-atr" style="display:none;font-size:13px" onclick="openModal('m-trajet')">➕ Publier</button>
   </div>
   <div class="lbl" style="margin-bottom:6px">Filtrer par préfecture / commune de départ</div>
@@ -1613,7 +1610,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('taxis')" id="gt-taxis" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto</button>
     <button class="btn-ghost" onclick="setGestTab('clients')" id="gt-clients" style="font-size:12px;padding:7px 11px">👤 Clients</button>
     <button class="btn-ghost" onclick="setGestTab('sas')" id="gt-sas" style="font-size:12px;padding:7px 11px">👥 S.Agents</button>
-    <button class="btn-ghost" onclick="setGestTab('trajets')" id="gt-trajets" style="font-size:12px;padding:7px 11px">🚙 Voyager</button>
+    <button class="btn-ghost" onclick="setGestTab('trajets')" id="gt-trajets" style="font-size:12px;padding:7px 11px">🚙 Covoiturage</button>
     <button class="btn-ghost" onclick="setGestTab('annonces')" id="gt-annonces" style="font-size:12px;padding:7px 11px">🏷️ Annonces</button>
     <button class="btn-ghost" onclick="setGestTab('alertes')" id="gt-alertes" style="font-size:12px;padding:7px 11px">🔔 Alertes</button>
     <button class="btn-ghost" onclick="setGestTab('mdp')" id="gt-mdp" style="font-size:12px;padding:7px 11px">🔑 MDP</button>
@@ -1775,6 +1772,22 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 </div>
 
 <!-- HISTORIQUE -->
+<div id="page-historique" class="page">
+  <div class="h2">📜 Historique des mouvements</div>
+  <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn" onclick="setHistTab('all')" id="ht-all" style="font-size:12px;padding:7px 13px">Tous</button>
+    <button class="btn-ghost" onclick="setHistTab('enreg')" id="ht-enreg" style="font-size:12px;padding:7px 13px">Enregistrements</button>
+    <button class="btn-ghost" onclick="setHistTab('rech')" id="ht-rech" style="font-size:12px;padding:7px 13px">Recharges</button>
+    <button class="btn-ghost" onclick="setHistTab('trajet')" id="ht-trajet" style="font-size:12px;padding:7px 13px">Trajets</button>
+  </div>
+  <div style="margin-bottom:12px">
+    <input type="text" id="hist-veh-search" placeholder="🔍 Recherche par matricule ou châssis..." style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid rgba(249,115,22,.3);background:rgba(249,115,22,.06);color:inherit;font-size:13px" oninput="rHistoriqueVehicule()"/>
+  </div>
+  <div id="hist-veh-result" style="display:none"></div>
+  <div id="hist-list"></div>
+</div>
+
+<!-- TARIFS -->
 <div id="page-tarifs" class="page">
   <div class="h2">💰 Tarifs & Commissions</div>
   <div id="tarifs-content"></div>
@@ -2113,10 +2126,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div style="font-size:12px;line-height:1.6;color:var(--text2)">
       <div class="sect" style="margin-top:0">Mentions légales — Identification de l'éditeur</div>
-      <p><b>Laouni AfriMoto GN</b> (laouni-securite-ultime.com) est un <b>service de sécurité intégré des véhicules</b> : registre sécurisé, identification par QR code, lutte contre le vol, traçabilité des propriétaires et services associés (motos-taxis, voyager, annonces). Il est édité et administré par <b>Mamadou Bassirou Barry</b> — Conakry, République de Guinée · ✉️ djoniwouri@gmail.com (contact officiel). Immatriculation au Registre du Commerce et du Crédit Mobilier (RCCM) : disponible sur demande auprès de l'administration. Le service étant fourni par voie électronique, la présente identification est donnée conformément à la Loi L/2016/035/AN du 26 juillet 2016 relative aux transactions électroniques (secteur régulé par l'ARPT).</p>
+      <p><b>Laouni AfriMoto GN</b> (laouni-securite-ultime.com) est un <b>service de sécurité intégré des véhicules</b> : registre sécurisé, identification par QR code, lutte contre le vol, traçabilité des propriétaires et services associés (motos-taxis, covoiturage, annonces). Il est édité et administré par <b>Mamadou Bassirou Barry</b> — Conakry, République de Guinée · ✉️ djoniwouri@gmail.com (contact officiel). Immatriculation au Registre du Commerce et du Crédit Mobilier (RCCM) : disponible sur demande auprès de l'administration. Le service étant fourni par voie électronique, la présente identification est donnée conformément à la Loi L/2016/035/AN du 26 juillet 2016 relative aux transactions électroniques (secteur régulé par l'ARPT).</p>
 
       <div class="sect">1. Objet du service</div>
-      <p>Laouni AfriMoto GN est un registre privé et sécurisé de véhicules (motos et voitures) en Guinée, offrant : l'enregistrement des véhicules avec QR code de vérification, la lutte contre le vol (déclarations, signalements citoyens, historique des vérifications), le transfert sécurisé de propriété, la gestion des motos-taxis, le voyager et les annonces de vente. La plateforme ne se substitue pas aux registres officiels de l'État guinéen ni aux forces de l'ordre.</p>
+      <p>Laouni AfriMoto GN est un registre privé et sécurisé de véhicules (motos et voitures) en Guinée, offrant : l'enregistrement des véhicules avec QR code de vérification, la lutte contre le vol (déclarations, signalements citoyens, historique des vérifications), le transfert sécurisé de propriété, la gestion des motos-taxis, le covoiturage et les annonces de vente. La plateforme ne se substitue pas aux registres officiels de l'État guinéen ni aux forces de l'ordre.</p>
 
       <div class="sect">2. Comptes et exactitude des informations</div>
       <p>L'utilisateur s'engage à fournir des informations exactes et des documents authentiques (pièce d'identité, facture ou attestation de vente, carte grise). Toute fausse déclaration — notamment une fausse déclaration de vol, l'enregistrement d'un véhicule ne vous appartenant pas, ou de faux documents — entraîne la suspension immédiate du compte et peut être signalée aux autorités compétentes. Il en va de même pour la création de faux comptes et toute tentative de modification frauduleuse du propriétaire d'un véhicule. Il est rappelé que la Loi L/2016/037/AN du 26 juillet 2016 punit sévèrement l'usurpation d'identité par voie électronique (article 51 : jusqu'à 2 ans d'emprisonnement et de lourdes amendes en Francs Guinéens) ainsi que la production ou diffusion de données de nature à troubler l'ordre public par un système informatique. Vos identifiants (code d'accès, mot de passe, numéro unique) sont strictement personnels : vous êtes responsable de leur confidentialité.</p>
@@ -2130,7 +2143,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <div class="sect">5. Signalements citoyens</div>
       <p>L'envoi de position ou de photo concernant un véhicule volé doit être fait de bonne foi. Les photos sont prises en direct via l'appareil photo. Les commentaires accompagnant les photos doivent rester factuels : les injures, expressions outrageantes ou accusations infondées visant une personne par un système informatique sont punies par l'article 29 de la Loi L/2016/037/AN (jusqu'à 1 an d'emprisonnement et amende). Il est interdit d'utiliser ces informations pour intervenir soi-même : contactez la Police (117) ou la Gendarmerie (122). La plateforme et le propriétaire ne sauraient être tenus responsables d'une intervention personnelle d'un utilisateur.</p>
 
-      <div class="sect">6. Voyager, taxis et annonces</div>
+      <div class="sect">6. Covoiturage, taxis et annonces</div>
       <p>La plateforme met en relation chauffeurs et passagers ; le contrat de transport se forme directement entre eux et le paiement s'effectue en espèces entre les parties. Conformément au Décret D/2021/092/PRG/SGG, tous les prix, frais de publication et commissions sont affichés de manière claire et non ambiguë, en Francs Guinéens (GNF), avant chaque opération ; ils ne sont pas remboursables une fois le service rendu. La plateforme n'est pas partie aux ventes de véhicules conclues via les annonces.</p>
 
       <div class="sect">7. Solde de services et options de recharge</div>
@@ -2542,18 +2555,16 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <input type="number" id="mt-frais-especes" placeholder="Ex: 75000" min="0"/>
     </div>
     <div class="sect">Photo du conducteur *</div>
-    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;color:var(--text2)">
-      <b style="color:#EF4444">⚠️ SÉCURITÉ:</b> Cette photo doit être un SELFIE (autoportrait) du conducteur avec son gilet. Ne partagez pas la photo d'une autre personne.
-    </div>
     <div class="fld">
-      <div id="mt-photo-label" style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(239,68,68,.5);border-radius:10px;height:110px;cursor:pointer;overflow:hidden;background:rgba(239,68,68,.04);position:relative;flex-direction:column" onclick="ouvrirCameraTaxi(event)">
+      <label id="mt-photo-label" style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(239,68,68,.5);border-radius:10px;height:110px;cursor:pointer;overflow:hidden;background:rgba(239,68,68,.04);position:relative">
         <img id="mt-photo-preview" src="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px"/>
         <div id="mt-photo-ph" style="text-align:center">
           <div style="font-size:32px">📷</div>
-          <div style="font-size:11px;color:#9CA3AF;font-weight:600;margin-top:5px">CLIQUER POUR PRENDRE PHOTO</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">avec caméra selfie</div>
+          <div style="font-size:11px;color:#9CA3AF;font-weight:600;margin-top:5px">PHOTO (optionnel)</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">JPG · PNG · conducteur avec gilet</div>
         </div>
-      </div>
+        <input type="file" accept="image/*" id="mt-photo-input" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewTaxiPhoto(this)"/>
+      </label>
     </div>
     <div id="terr" class="warn" style="display:none"></div>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -2677,9 +2688,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="closeModal('m-avis-chauffeur')">✕</button>
     </div>
     <div id="av-etape1">
-      <div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">Renseignez le numéro de téléphone ET le code de départ (4 chiffres) reçu par email pour retrouver votre trajet.</div>
+      <div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">Renseignez le numéro de téléphone utilisé lors de votre réservation pour retrouver votre trajet effectué.</div>
       <div class="fld"><div class="lbl">Votre téléphone *</div><input type="tel" id="av-tel" placeholder="+224 6xx xxx xxx"/></div>
-      <div class="fld"><div class="lbl">Code de départ (4 chiffres) *</div><input type="text" id="av-pin" inputmode="numeric" maxlength="4" placeholder="XXXX" style="text-align:center;font-size:18px;font-weight:900;letter-spacing:4px"/></div>
       <div id="averr1" class="warn" style="display:none"></div>
       <button class="btn-blue" style="width:100%;padding:13px" onclick="chercherTrajetPourAvis()">🔍 Trouver mon trajet</button>
     </div>
@@ -3196,8 +3206,6 @@ function toast(msg, err=false) {
 let navHistory = [];
 function goPage(id, skipHistory) {
 // Vider le toast au changement de page  try { const t = document.getElementById('toast'); if(t) { t.textContent = ''; t.classList.remove('show'); } } catch(e) {}
-  // Si on appuie sur "Accueil", vider l'historique de navigation
-  if(id === 'home') navHistory = [];
   // Mapping rôle → page personnelle, utilisé dans plusieurs gardes ci-dessous
   const pagesPersonnelles = {owner:'owner', client:'client', sousagent:'sousagent', passager:'passager'};
   // Alertes : retiré de la navigation agent, mais l'admin garde accès complet (œil et main partout sur le site)
@@ -3265,10 +3273,7 @@ function goBack() {
 
 function updateBackBtn() {
   const btn = document.getElementById('btn-back');
-  const courante = document.querySelector('.page.act');
-  const curId = courante ? courante.id.replace('page-','') : null;
-  // Ne pas afficher le bouton retour si on est sur la page home
-  if(btn) btn.style.display = (navHistory.length > 0 && curId !== 'home') ? '' : 'none';
+  if(btn) btn.style.display = navHistory.length > 0 ? '' : 'none';
 }
 
 // ── Confirmation générique (remplace window.confirm, peu fiable dans certains WebView) ──
@@ -4237,14 +4242,6 @@ async function doLogin() {
     err.textContent = '🚨 Tentative non autorisée détectée.'; err.style.display = 'block'; return;
   }
 
-  // 🔄 Recharger données Supabase AVANT vérification (fix appareil B ancien mdp)
-  try {
-    if(curRole === 'client') { const { data } = await supabaseClient.from('clients').select('*'); if(data && data.length > 0) DB.clients = data.map(mapClient); }
-    else if(curRole === 'passager') { const { data } = await supabaseClient.from('passagers').select('*'); if(data && data.length > 0) DB.passagers = data.map(mapPassager); }
-    else if(curRole === 'agent') { const { data } = await supabaseClient.from('agents').select('*'); if(data && data.length > 0) DB.agents = data.map(mapAgent); }
-    else if(curRole === 'sousagent') { const { data } = await supabaseClient.from('sous_agents').select('*'); if(data && data.length > 0) DB.sousAgents = data.map(mapSousAgent); }
-  } catch(e) { }
-
   let user = null;
 
   if(curRole==='admin' && nrm(id)===nrm(DB.adminId) && (
@@ -4448,7 +4445,7 @@ function updateNav() {
   const hideAll = isOwner || isClient || isSousAgent || isPassager;
   document.getElementById('tabs-bar').style.display = hideAll ? 'none' : '';
 
-  const adminTabs = ['tab-registre','tab-gestion','tab-tarifs'];
+  const adminTabs = ['tab-registre','tab-gestion','tab-historique','tab-tarifs'];
   const agentTabs = ['tab-recherche-agent','tab-recharge','tab-sousagents'];
   const gpsTabs = ['tab-gps'];
   // Onglet Accueil : masqué pour admin/agent (contenu réservé au public)
@@ -4555,14 +4552,9 @@ function renderProfilCard(opts) {
 
 // Reprend une demande de course en attente du passager (prix proposé) même après navigation/reconnexion
 let _histCoursesOuvert = false;
-let _avisChauffeurOuvert = {};
 function toggleHistoriqueCourses() {
   _histCoursesOuvert = !_histCoursesOuvert;
   rPassager();
-}
-function toggleAvisChauffeur(key) {
-  _avisChauffeurOuvert[key] = !_avisChauffeurOuvert[key];
-  rGestion();
 }
 function supprimerHistoriqueCourse(demandeId) {
   askConfirm('Supprimer cette course de votre historique ? (Admin et agents pourront toujours y accéder)', function() {
@@ -4754,7 +4746,6 @@ function rPassager() {
               (d.depart||d.arrivee ? '<div style="color:#EAB308;font-size:11px;margin-top:2px">🛣️ '+esc(d.depart||'?')+' → '+esc(d.arrivee||'?')+'</div>' : '') +
               '<div style="color:var(--text2);font-size:10px;margin-top:2px">' + fdt(d.date) + '</div>' +
               '<div style="color:'+coul+';font-weight:700;font-size:11px;margin-top:3px">' + lib + (d.prixPropose ? ' · '+fmt(d.prixPropose) : '') + '</div>' +
-              (d.enCours ? '<div style="background:linear-gradient(135deg,#22C55E,#16A34A);border-radius:8px;padding:10px;margin-top:8px;color:#fff;font-size:12px;font-weight:700;line-height:1.6">Bienvenue à bord de Laouni AfriMoto. Installez-vous confortablement. Votre sécurité est notre priorité, votre tranquillité notre engagement. Profitez d\'un voyage serein et agréable. 🎉</div>' : '') +
               (() => {
                 const av = avisCourse(d.id);
                 if(!av) return (d.statutAttribution === 'terminee' ? '<button onclick="openModal(\'m-avis-course\')" style="background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.3);color:#EAB308;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer;margin-top:6px">⭐ Laisser un avis</button>' : '');
@@ -4809,7 +4800,6 @@ function rPassager() {
   obtenirPositionPassager();
   rPassagerListe();
   startTaxiAutoRefresh(); // Rafraîchir taxis toutes les 10 sec
-  startPassagerHistoriqueRefresh(); // Rafraîchir historique courses toutes les 10 sec
 }
 // Position du passager, utilisée pour trier les taxis en service par distance réelle.
 // Reste null si la géolocalisation est refusée ou indisponible : la liste retombe alors sur l'ordre par zone.
@@ -5571,7 +5561,6 @@ function rClient() {
       '<div style="font-size:32px;margin-bottom:5px">👤</div>' +
       '<div style="font-size:18px;font-weight:900;color:var(--text2)">' + cl.prenom + ' ' + cl.nom + '</div>' +
       '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + cl.tel + '</div>' +
-      (cl.email ? '<div style="font-size:11px;color:#f97316;margin-top:2px">📧 ' + esc(cl.email) + '</div>' : '') +
     '</div>' +
 
     // Solde + bouton recharge
@@ -5581,18 +5570,6 @@ function rClient() {
         '<div style="font-size:26px;font-weight:900;color:#fff;font-family:\'Poppins\',sans-serif">' + fmt(solde) + ' <span style="font-size:14px">GNF</span></div>' +
       '</div>' +
       '<button onclick="openRecharge()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer">💳 Recharger</button>' +
-    '</div>' +
-
-    // Avertissements & Appréciations
-    '<div style="display:flex;gap:8px;margin-bottom:12px">' +
-      '<div class="card" style="flex:1;text-align:center">' +
-        '<div style="font-size:24px;font-weight:900;color:' + (cl.avertissements > 0 ? '#EF4444' : '#22C55E') + '">' + (cl.avertissements || 0) + '</div>' +
-        '<div style="font-size:11px;color:var(--text2);margin-top:3px">⚠️ Avertissements</div>' +
-      '</div>' +
-      '<div class="card" style="flex:1;text-align:center">' +
-        '<div style="font-size:24px;font-weight:900;color:#EAB308">' + (cl.appreciations || 0) + '</div>' +
-        '<div style="font-size:11px;color:var(--text2);margin-top:3px">👍 Appréciations</div>' +
-      '</div>' +
     '</div>' +
 
     // Num unique masquable + changer MDP
@@ -5691,11 +5668,6 @@ function rClientContent() {
               <div style="font-weight:700;font-size:13px">${esc(t.depart)} → ${esc(t.arrivee)}</div>
               ${t.vehMat ? `<div style="font-size:11px;color:#60A5FA;margin-bottom:2px">🚗 ${esc(t.vehMat)}</div>` : ''}
               <div style="font-size:12px;color:var(--text2)">💺 ${t.placesDispos}/${t.places} · ${fmt(t.prix)}</div>
-              <div style="font-size:14px;color:#fff;font-weight:900;margin:8px 0;padding:10px;background:rgba(234,179,8,.15);border:2px solid #EAB308;border-radius:8px">
-                📅 ${fdt(t.departConfirmeLe || t.dateHeure || t.arriveLe || t.created_at) || '— sans date'}
-                ${t.heureDebut !== null && t.heureDebut !== undefined ? ' · 🕐 ' + ('0'+t.heureDebut).slice(-2) + 'h' + ('0'+(t.minuteDebut||0)).slice(-2) : ''}
-                ${t.heureFin !== null && t.heureFin !== undefined ? ' → ' + ('0'+t.heureFin).slice(-2) + 'h' + ('0'+(t.minuteFin||0)).slice(-2) : ''}
-              </div>
               <span class="tag ${t.statut==='actif'?'tag-green':t.statut==='en_cours'?'tag-gold':t.statut==='effectué'?'tag-blue':'tag-red'}" style="font-size:9px">${t.statut==='en_cours'?'🚗 EN ROUTE':t.statut.toUpperCase()}</span>
             </div>
             ${t.statut==='actif' ? `<button class="btn-red" style="font-size:10px;padding:6px 10px;flex-shrink:0" onclick="chauffeurAnnulerTrajet('${t.id}')">❌ Annuler le trajet</button>` : ''}
@@ -5704,19 +5676,12 @@ function rClientContent() {
           ${t.statut==='en_cours' ? '<div class="qr-note-txt" style="font-size:11px;margin-top:8px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 10px">🚗 Départ confirmé — vous ne pouvez plus annuler de réservation. Marquez "Arrivé" une fois le trajet terminé pour pouvoir en publier un nouveau.</div>' : ''}
           ${(t.reservations && t.reservations.length) ? `
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(249,115,22,.15)">
-              ${(() => {
-                let totalPlaces = 0;
-                t.reservations.forEach(r => {
-                  if(Array.isArray(r.places_positions)) totalPlaces += r.places_positions.length;
-                  else totalPlaces += (r.nbPlaces || 1);
-                });
-                return `<div style="font-size:11px;color:#60A5FA;font-weight:700;margin-bottom:6px">🎫 ${totalPlaces} place(s) réservée(s) (${t.reservations.length} passager(s))</div>`;
-              })()}
+              <div style="font-size:11px;color:#60A5FA;font-weight:700;margin-bottom:6px">🎫 ${t.reservations.length} passager(s) réservé(s)</div>
               ${t.reservations.map(r => `
                 <div style="background:rgba(0,0,0,.15);border-radius:7px;padding:7px 10px;margin-bottom:4px">
                   <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
-                    <span style="font-size:12px;flex:1;min-width:0">👤 ${esc(r.prenom)} ${esc(r.nom)} <span style="color:#EAB308">· 💺 ${Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces||1)}</span></span>
-                    ${(r.partagerTel && (t.statut === 'actif' || t.statut === 'en_cours')) ? `<a href="tel:${esc(r.tel)}" style="font-size:12px;color:#f97316;font-weight:700;text-decoration:none;flex-shrink:0">📞 ${esc(r.tel)}</a>` : '<span style="font-size:12px;color:#EF4444;font-weight:700;flex-shrink:0">🔒 MASQUÉ</span>'}
+                    <span style="font-size:12px;flex:1;min-width:0">👤 ${esc(r.prenom)} ${esc(r.nom)} <span style="color:#EAB308">· 💺${r.nbPlaces||1}</span></span>
+                    ${r.partagerTel ? `<a href="tel:${esc(r.tel)}" style="font-size:12px;color:#f97316;font-weight:700;text-decoration:none;flex-shrink:0">📞 ${esc(r.tel)}</a>` : '<span style="font-size:11px;color:var(--text2);font-style:italic;flex-shrink:0">🔒 Masqué</span>'}
                     ${(t.statut==='actif') ? `<button style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#EF4444;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0" onclick="chauffeurDemanderRaisonAnnulation('${t.id}','${r.id}')">✕</button>` : ''}
                   </div>
                   <div style="margin-top:5px">
@@ -5950,13 +5915,10 @@ function rClientContent() {
 // Un client peut proposer un trajet s'il a un permis vérifié OU une voiture enregistrée à son nom
 function clientPeutProposerTrajet(cl) {
   if(!cl) return false;
-  // ✅ Si permis enregistré → peut proposer
   if(cl.permis) return true;
-  // ✅ Ou si voiture enregistrée à son nom
-  if(DB.vehs.some(v => (v.clientId === cl.id || v.id === cl.vid) && v.type === 'voiture' && !v.stolen && v.statut !== 'vole' && v.statut !== 'suspendu')) return true;
-  // ✅ OU: agent/sous-agent peut proposer trajets en taxi-moto (pas besoin de voiture!)
-  if(cl.user && (DB.agents.find(a => a.id === cl.id) || DB.sousAgents.find(s => s.id === cl.id))) return true;
-  return false;
+  return DB.vehs.some(v =>
+    (v.clientId === cl.id || v.id === cl.vid || (cl.tel && v.phone === cl.tel)) &&
+    v.type === 'voiture' && !v.stolen && v.statut !== 'vole' && v.statut !== 'suspendu');
 }
 function openClientTrajet() {
   const cl = DB.clients.find(x=>x.id===DB.user.id);
@@ -6049,7 +6011,6 @@ function demarrerCourseAvecCode(demandeId) {
   sbMajStatutDemande(demandeId, {statut_attribution: 'effectuee', en_cours: true, date_depart: demande.dateDepart, heure_debut: Math.floor(demande.heureDebut instanceof Date ? demande.heureDebut.getHours() : typeof demande.heureDebut === 'number' ? demande.heureDebut : new Date(demande.heureDebut).getHours()), minute_debut: Math.floor(demande.minuteDebut instanceof Date ? demande.minuteDebut.getMinutes() : typeof demande.minuteDebut === 'number' ? demande.minuteDebut : new Date(demande.heureDebut).getMinutes())});
   toast('✅ Code correct — course démarrée !');
   rClientContent();
-  rPassager();
 }
 
 function demarrerCourseChauffeur(demandeId) {
@@ -7041,11 +7002,11 @@ function rHome() {
     if(statsEl) { statsEl.style.display = 'none'; statsEl.innerHTML = ''; }
   }
 
-  // Voyager : trajets + alertes en priorité (incite chauffeurs et passagers)
+  // Covoiturage : trajets + alertes en priorité (incite chauffeurs et passagers)
   const trajetsApercu = trajetsValides().filter(t => t.statut==='actif' && t.placesDispos>0).slice(0,3);
   const alertesApercu = alertesValides().filter(a => a.statut==='active').slice(0,3);
-  const voyagerEl = document.getElementById('home-voyager');
-  if(voyagerEl) {
+  const covoitEl = document.getElementById('home-covoiturage');
+  if(covoitEl) {
     let html = '';
     if(trajetsApercu.length === 0 && alertesApercu.length === 0) {
       html = '<div class="card fu" style="text-align:center;padding:18px">' +
@@ -7079,7 +7040,7 @@ function rHome() {
         '<button class="btn-blue" style="flex:1;font-size:12px;padding:10px" onclick="goPage(\'alertes\')">🔔 Voir les alertes →</button>' +
       '</div>';
     }
-    voyagerEl.innerHTML = html;
+    covoitEl.innerHTML = html;
   }
 
   // Bannière vol
@@ -7195,86 +7156,42 @@ function envoyerPhotoSignalement(vehId) {
   if(inp) inp.remove();
   inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
-  inp.setAttribute('capture', 'environment');
+  inp.setAttribute('capture', 'environment'); // force l'appareil photo (pas la galerie)
   inp.id = 'inp-photo-signalement'; inp.style.display = 'none';
   document.body.appendChild(inp);
   inp.onchange = function() {
     const f = inp.files && inp.files[0];
     if(!f) return;
-    
-    console.log('📸 [1] Fichier sélectionné:', f.name, f.size, 'bytes');
-    
     const btn = document.getElementById('btn-photo-signalement');
-    if(btn) { btn.disabled = true; btn.textContent = '⏳ Compression...'; }
-    
+    if(btn) { btn.disabled = true; btn.textContent = '⏳ Envoi de la photo...'; }
     const rd = new FileReader();
     rd.onload = function(ev) {
-      console.log('📸 [2] FileReader onload');
-      
+      // Compression : max 900px, JPEG qualité 0.72
       const img = new Image();
       img.onload = function() {
-        console.log('📸 [3] Image chargée:', img.width, 'x', img.height);
-        
-        // Compression OPTIMALE pour Supabase
-        const max = 600;
+        const max = 900;
         const ratio = Math.min(1, max / Math.max(img.width, img.height));
         const cv = document.createElement('canvas');
-        cv.width = Math.round(img.width * ratio);
-        cv.height = Math.round(img.height * ratio);
+        cv.width = Math.round(img.width * ratio); cv.height = Math.round(img.height * ratio);
         cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-        
-        console.log('📸 [4] Canvas créé:', cv.width, 'x', cv.height);
-        
-        const dataURL = cv.toDataURL('image/jpeg', 0.65);
-        const sizeKB = Math.round(dataURL.length / 1024);
-        
-        console.log('📸 [5] Compression:', sizeKB, 'KB');
-        
-        if(sizeKB > 400) {
-          console.warn('⚠️ Image trop grosse:', sizeKB, 'KB');
-          if(btn) { btn.disabled = false; btn.textContent = '⚠️ Photo trop grosse'; }
-          toast('⚠️ Photo trop grosse ('+sizeKB+' KB) - max 400 KB', true);
-          return;
-        }
-        
-        console.log('✅ [6] OK - Commentaire');
-        if(btn) btn.textContent = '⏳ Envoi...';
-        
+        const dataURL = cv.toDataURL('image/jpeg', 0.72);
+        // Commentaire optionnel envoyé avec la photo — modal stylé (le prompt natif s'affiche mal sur certains Android)
         demanderCommentairePhoto(function(commentaire) {
-          console.log('📸 [7] Envoi Supabase...');
-          
-          supabaseClient.from('verifications').insert({
-            veh_id: vehId, mode: 'photo', photo: dataURL, commentaire: commentaire || null
-          }).then(({error}) => {
-            console.log('📸 [8] Réponse:', error ? 'ERREUR' : 'OK');
-            
-            if(error) {
-              console.error('❌ Erreur:', error.message);
-              if(btn) { btn.disabled = false; btn.textContent = '📷 Envoyer la photo de la moto'; }
-              toast('⚠️ Envoi impossible: ' + error.message, true);
-            } else if(btn) {
-              console.log('✅ Succès');
-              btn.style.background = '#16A34A'; btn.style.color = '#fff';
-              btn.textContent = '✅ Photo envoyée au propriétaire — merci !';
-            }
-          }).catch(err => {
-            console.error('❌ Catch:', err);
+        supabaseClient.from('verifications').insert({
+          veh_id: vehId, mode: 'photo', photo: dataURL, commentaire: commentaire || null
+        }).then(({error}) => {
+          if(error) {
+            console.warn('photo signalement:', error.message);
             if(btn) { btn.disabled = false; btn.textContent = '📷 Envoyer la photo de la moto'; }
-            toast('⚠️ Erreur: ' + (err.message || 'Impossible'), true);
-          });
+            alert('⚠️ Envoi impossible pour le moment. Réessayez.');
+          } else if(btn) {
+            btn.style.background = '#16A34A'; btn.style.color = '#fff';
+            btn.textContent = '✅ Photo envoyée au propriétaire — merci !';
+          }
+        });
         });
       };
-      img.onerror = function() {
-        console.error('❌ Erreur image');
-        if(btn) { btn.disabled = false; btn.textContent = '❌ Erreur image'; }
-        toast('⚠️ Erreur chargement image', true);
-      };
       img.src = ev.target.result;
-    };
-    rd.onerror = function() {
-      console.error('❌ Erreur FileReader');
-      if(btn) { btn.disabled = false; btn.textContent = '❌ Erreur'; }
-      toast('⚠️ Erreur lecture fichier', true);
     };
     rd.readAsDataURL(f);
   };
@@ -8121,7 +8038,7 @@ function openRechargeAdmin(type, id) {
   openModal('m-recharge-admin');
 }
 
-async function validerRechargeAdmin() {
+function validerRechargeAdmin() {
   const montant = parseInt(document.getElementById('rech-admin-montant').value)||0;
   const note = document.getElementById('rech-admin-note').value.trim();
   const err = document.getElementById('rech-admin-err');
@@ -8131,10 +8048,8 @@ async function validerRechargeAdmin() {
   if(!obj) return;
   obj.solde = (obj.solde||0)+montant;
   rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
-  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom,{cibleType:rechAdminCible.type==='client'?'client':'passager',cibleId:rechAdminCible.id,sourceType:DB.user.role==='admin'?'admin':DB.user.role==='agent'?'agent':'',sourceId:DB.user.agId||DB.user.saId||null});
+  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom);
   closeModal('m-recharge-admin');
-  // 🔄 Recharger les mouvements depuis Supabase pour avoir cibleType/cibleId à jour
-  try { const { data } = await supabaseClient.from('mouvements').select('*'); if(data && data.length > 0) DB.mouvements = data.map(mapMouvement); } catch(e) {}
   rGestion(); rClient();
   toast(`✅ +${fmt(montant)} GNF crédités sur le compte de ${rechAdminCible.nom}`);
 }
@@ -9472,29 +9387,11 @@ setTimeout(() => { const tab = document.getElementById('tab-taxis'); if(tab) tab
 function setFiltreTaxiZone(z) { filtreTaxiZone = z || ''; renderPrefFilterAvecVoisins('tq-pref-list', filtreTaxiZone, 'setFiltreTaxiZone'); const tabTaxis = document.getElementById('tab-taxis'); if(tabTaxis) tabTaxis.style.display = filtreTaxiZone ? '' : 'none'; rTaxis(); }
 let _dernierRefreshTaxis = 0;
 let taxiAutoRefreshInterval = null;
-let passagerHistoriqueRefreshInterval = null;
 let mesTrajetsVisible = true; // État du toggle trajets
 
 function startTaxiAutoRefresh() { if(taxiAutoRefreshInterval) clearInterval(taxiAutoRefreshInterval); taxiAutoRefreshInterval = setInterval(async () => { try { const {data, error} = await supabaseClient.from('taxis').select('*'); if(!error && data) { DB.taxis = data.map(mapTaxi); DB.taxis = DB.taxis.filter(t => t.hors_service !== true && t.statut !== 'suspendu'); } } catch(e) { console.error('Erreur rafraîchissement taxis:', e); } _rTaxisAffichage(); }, 10000); }
 
 function stopTaxiAutoRefresh() { if(taxiAutoRefreshInterval) { clearInterval(taxiAutoRefreshInterval); taxiAutoRefreshInterval = null; } }
-function startPassagerHistoriqueRefresh() {
-  if(passagerHistoriqueRefreshInterval) clearInterval(passagerHistoriqueRefreshInterval);
-  passagerHistoriqueRefreshInterval = setInterval(async () => {
-    try {
-      if(!DB.user || DB.user.role !== 'passager') return;
-      const {data, error} = await supabaseClient.from('demandes_course').select('*');
-      if(!error && data) {
-        DB.demandesCourse = data.map(mapDemandeCourse);
-        const el = document.getElementById('passager-content');
-        if(el) rPassager();
-      }
-    } catch(e) {
-      console.error('Erreur rafraîchissement historique passager:', e);
-    }
-  }, 10000);
-}
-function stopPassagerHistoriqueRefresh() { if(passagerHistoriqueRefreshInterval) { clearInterval(passagerHistoriqueRefreshInterval); passagerHistoriqueRefreshInterval = null; } }
 function rTaxis() {
   // Public : rafraîchir l'état frais des taxis (en service / positions) au plus toutes les 10 s
   if(!DB.user && Date.now() - _dernierRefreshTaxis > 10000) {
@@ -9651,231 +9548,17 @@ function delTaxi(id) {
   envoyerCorbeille('taxis', id, 'Taxi : ' + t.nom + ' — ' + t.plaque, 'Supprimer ce taxi (' + t.nom + ' — ' + t.plaque + ') ? Récupérable pendant 48h dans la corbeille.', () => rTaxis());
 }
 
-async function ouvrirCameraTaxi(e) {
-  if(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  
-  console.log('📸 [1] Tentative ouverture caméra...');
-  
-  // Vérifier que getUserMedia est supporté
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.error('❌ getUserMedia NOT SUPPORTED');
-    console.log('📸 [FALLBACK] Utiliser input file avec capture');
-    // Créer un input file en fallback
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'user';
-    input.onchange = () => previewTaxiPhoto(input);
-    input.click();
-    return;
-  }
-  
-  try {
-    console.log('📸 [2] Demander permissions caméra...');
-    
-    const constraints = {
-      video: { 
-        facingMode: 'user', 
-        width: { ideal: 1280 }, 
-        height: { ideal: 720 } 
-      },
-      audio: false
-    };
-    
-    console.log('📸 [3] Constraints:', constraints);
-    
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    
-    console.log('✅ [4] Caméra ouverte! Stream:', stream);
-    
-    // Créer élément video
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-    video.style.transform = 'scaleX(-1)';
-    
-    console.log('📸 [5] Élément vidéo créé');
-    
-    // Créer modal
-    const modal = document.createElement('div');
-    modal.id = 'camera-modal-taxi';
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif';
-    
-    const container = document.createElement('div');
-    container.style.cssText = 'width:100%;max-width:400px;display:flex;flex-direction:column;gap:15px;align-items:center';
-    
-    // Titre
-    const titre = document.createElement('div');
-    titre.textContent = '📸 CAMÉRA SELFIE';
-    titre.style.cssText = 'color:white;font-weight:700;font-size:16px;margin-bottom:10px';
-    container.appendChild(titre);
-    
-    // Vidéo
-    video.style.cssText = 'width:100%;aspect-ratio:1;border-radius:10px;background:#000;border:3px solid #22C55E';
-    container.appendChild(video);
-    
-    // Instructions
-    const instructions = document.createElement('div');
-    instructions.style.cssText = 'color:#FFF;text-align:center;font-size:12px;width:100%';
-    instructions.innerHTML = '📱 Cadrez votre visage<br>Appuyez sur le bouton pour prendre la photo';
-    container.appendChild(instructions);
-    
-    // Boutons
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.style.cssText = 'display:flex;gap:10px;width:100%';
-    
-    const btnCapture = document.createElement('button');
-    btnCapture.textContent = '📸 PRENDRE';
-    btnCapture.style.cssText = 'flex:1;padding:15px;background:#22C55E;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px';
-    btnCapture.onclick = () => {
-      console.log('📸 [6] Capture en cours...');
-      capturerPhotoTaxi(video, stream, modal);
-    };
-    
-    const btnAnnuler = document.createElement('button');
-    btnAnnuler.textContent = '❌ ANNULER';
-    btnAnnuler.style.cssText = 'flex:1;padding:15px;background:#EF4444;color:#FFF;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px';
-    btnAnnuler.onclick = () => {
-      console.log('❌ Caméra fermée par utilisateur');
-      stream.getTracks().forEach(t => t.stop());
-      modal.remove();
-    };
-    
-    buttonsDiv.appendChild(btnCapture);
-    buttonsDiv.appendChild(btnAnnuler);
-    container.appendChild(buttonsDiv);
-    
-    modal.appendChild(container);
-    document.body.appendChild(modal);
-    
-    console.log('✅ [7] Interface caméra affichée');
-    
-  } catch(err) {
-    console.error('❌ ERREUR CAMÉRA:', err.name, err.message);
-    
-    let msg = '';
-    if(err.name === 'NotAllowedError') {
-      msg = '⚠️ Vous avez refusé l\'accès à la caméra.\n\nVérifiez les permissions du navigateur (⚙️ Paramètres > Permissions > Caméra)';
-    } else if(err.name === 'NotFoundError') {
-      msg = '⚠️ Aucune caméra trouvée sur ce téléphone';
-    } else if(err.name === 'NotReadableError') {
-      msg = '⚠️ La caméra est utilisée par une autre application.\n\nFermez les autres apps et réessayez.';
-    } else {
-      msg = '⚠️ Erreur caméra: ' + err.message;
-    }
-    
-    console.log('📸 [FALLBACK] Utiliser input file');
-    
-    // FALLBACK: utiliser input file simple
-    toast(msg + '\n\n📱 Utilisation du sélecteur de fichiers...', true);
-    
-    setTimeout(() => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.capture = 'user';
-      input.onchange = () => previewTaxiPhoto(input);
-      input.click();
-    }, 500);
-  }
-}
-
-function capturerPhotoTaxi(video, stream, modal) {
-  try {
-    console.log('📷 Capture en cours...');
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    
-    if(canvas.width === 0 || canvas.height === 0) {
-      toast('⚠️ Erreur: vidéo pas encore disponible', true);
-      return;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Dessiner le flux vidéo (avec miroir)
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -canvas.width, 0);
-    ctx.restore();
-    
-    // Convertir en image JPEG
-    canvas.toBlob(blob => {
-      if(!blob) {
-        toast('⚠️ Erreur: impossible de créer l\'image', true);
-        return;
-      }
-      
-      console.log('✅ Image capturée:', blob.size, 'bytes');
-      
-      if(blob.size < 5000) {
-        toast('⚠️ Photo trop petite — Réessayez avec plus de lumière', true);
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = document.getElementById('mt-photo-preview');
-        img.src = e.target.result;
-        img.style.display = 'block';
-        
-        const ph = document.getElementById('mt-photo-ph');
-        if(ph) ph.style.display = 'none';
-        
-        const label = document.getElementById('mt-photo-label');
-        if(label) {
-          label.style.borderColor = '#22C55E';
-          label.style.background = 'rgba(34,197,94,.08)';
-        }
-        
-        toast('✅ Photo enregistrée!', false);
-        
-        // Fermer caméra et modal
-        stream.getTracks().forEach(t => t.stop());
-        modal.remove();
-        
-        console.log('✅ Caméra fermée, photo sauvegardée');
-      };
-      reader.readAsDataURL(blob);
-    }, 'image/jpeg', 0.9);
-    
-  } catch(err) {
-    console.error('❌ Erreur capture:', err);
-    toast('⚠️ Erreur de capture: ' + err.message, true);
-  }
-}
-
 function previewTaxiPhoto(inp) {
   const file = inp.files[0];
   if(!file) return;
-  
-  if(!file.type.startsWith('image/')) {
-    toast('⚠️ Veuillez sélectionner une image', true);
-    return;
-  }
-  
-  if(file.size < 5000) {
-    toast('⚠️ Image trop petite — Prenez une photo claire', true);
-    return;
-  }
-  
   const r = new FileReader();
   r.onload = e => {
     const img = document.getElementById('mt-photo-preview');
-    img.src = e.target.result;
-    img.style.display = 'block';
+    img.src = e.target.result; img.style.display = 'block';
     document.getElementById('mt-photo-ph').style.display = 'none';
-    
-    document.getElementById('mt-photo-label').style.borderColor = '#22C55E';
-    document.getElementById('mt-photo-label').style.background = 'rgba(34,197,94,.08)';
-    toast('✅ Photo enregistrée', false);
+    // Bordure verte = photo OK
+    document.getElementById('mt-photo-label').style.borderColor = 'rgba(249,115,22,.5)';
+    document.getElementById('mt-photo-label').style.background = 'rgba(249,115,22,.04)';
   };
   r.readAsDataURL(file);
 }
@@ -10081,16 +9764,6 @@ function rTrajets() {
         <span style="color:#f97316">💺 ${t.placesDispos}/${t.places}</span>
         <span style="color:#EAB308;font-weight:700">${fmt(t.prix)}</span>
       </div>
-      ${(t.reservations||[]).filter(r => r.confirme).length > 0 ? `
-      <div style="font-size:11px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 10px;margin-top:8px">
-        <div style="font-weight:800;color:#22C55E;margin-bottom:5px">✅ Réservations confirmées (${(t.reservations||[]).filter(r => r.confirme).length}):</div>
-        ${(t.reservations||[]).filter(r => r.confirme).map(r => `
-        <div style="font-size:10px;color:var(--text2);padding:2px 0;border-top:1px solid rgba(34,197,94,.15);padding-top:3px">
-          👤 ${esc(r.prenom||'')} ${esc(r.nom||'')} · 💺 ${r.nbPlaces||1} place(s)
-        </div>
-        `).join('')}
-      </div>
-      ` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         ${t.clim ? '<span style="font-size:11px;background:rgba(96,165,250,.15);color:#60A5FA;border-radius:6px;padding:3px 8px;font-weight:700">❄️ Climatisé</span>' : '<span style="font-size:11px;background:rgba(249,115,22,.08);color:var(--text2);border-radius:6px;padding:3px 8px">🌡️ Non climatisé</span>'}
         ${t.bagages ? '<span style="font-size:11px;background:rgba(34,197,94,.15);color:#22C55E;border-radius:6px;padding:3px 8px;font-weight:700">🧳 Bagages volumineux acceptés</span>' : '<span style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-radius:6px;padding:3px 8px;font-weight:700">🚫 Pas de gros bagages</span>'}
@@ -10280,26 +9953,18 @@ function _publierTrajetDefinitif() {
 function openReserverTrajet(trajetId) {
   const _emCh = document.getElementById('rt-email'); if(_emCh) _emCh.value = '';
   const _tRes = DB.trajets.find(x => x.id === trajetId);
-  if(_tRes && _tRes.placesDispos <= 0) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
+  if(_tRes && (!_tRes.plAvant && !_tRes.plMilieu && !_tRes.plArriere)) { toast('🔒 Ce trajet est complet — plus aucune place disponible.', true); return; }
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   
-  // Calculer les places disponibles (pas le nombre de réservations, mais le TOTAL de places réservées!)
-  const totalPlaces = t.places || 0;
-  let placesReservees = 0;
-  (t.reservations || []).forEach(r => {
-    if(Array.isArray(r.places_positions)) {
-      placesReservees += r.places_positions.length;
-    } else {
-      placesReservees += 1;
-    }
-  });
-  const placesLibres = Math.max(0, totalPlaces - placesReservees);
-  if(placesLibres <= 0) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
+  // Calculer les places disponibles
+  const totalPlaces = (t.plAvant || 0) + (t.plMilieu || 0) + (t.plArriere || 0);
+  const reservees = (t.reservations || []).length;
+  if(reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
   
   document.getElementById('rt-trajet-id').value = trajetId;
   document.getElementById('rt-trajet-info').innerHTML =
-    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${placesLibres} place(s) restante(s) · ${fmt(t.prix)}/place`;
+    `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${totalPlaces - reservees} place(s) restante(s) · ${fmt(t.prix)}/place`;
   
   document.getElementById('rt-prenom').value = '';
   document.getElementById('rt-nom').value = '';
@@ -10400,8 +10065,7 @@ function getSelectedPlaces() {
 // Recalculer les places disponibles en fonction des réservations multi-places
 function recalculerPlaces(trajet) {
   if(!trajet) return;
-  // Utiliser trajet.places (le vrai total) au lieu de plAvant+plMilieu+plArriere
-  const total = trajet.places || 0;
+  const total = (trajet.plAvant || 0) + (trajet.plMilieu || 0) + (trajet.plArriere || 0);
   if(total === 0) return;
   let reserved = 0;
   (trajet.reservations || []).forEach(r => {
@@ -10420,7 +10084,7 @@ function saveReservationTrajet() {
   const err = document.getElementById('rterr');
   if(!t) { err.textContent='⚠️ Trajet introuvable.'; err.style.display='block'; return; }
   
-  const totalPlaces = t.places || 0;
+  const totalPlaces = (t.plAvant || 0) + (t.plMilieu || 0) + (t.plArriere || 0);
   const reservees = (t.reservations || []).length;
   if(reservees >= totalPlaces) { err.textContent='⛔ Plus de place disponible sur ce trajet.'; err.style.display='block'; return; }
   
@@ -10451,40 +10115,7 @@ function saveReservationTrajet() {
     return; 
   }
   
-  // CHERCHER L'EMAIL: D'abord la DB, puis le formulaire
-  let email = '';
-  
-  // Si passager connecté → chercher son email dans DB.passagers
-  if(DB.user && DB.user.role === 'passager') {
-    const passager = DB.passagers.find(p => p.id === DB.user.id);
-    if(passager && passager.email) {
-      email = passager.email;
-    }
-  }
-  
-  // Sinon chercher par nom+prénom dans DB.passagers
-  if(!email) {
-    const passager = DB.passagers.find(p => 
-      (p.prenom || '').toLowerCase() === prenom.toLowerCase() && 
-      (p.nom || '').toLowerCase() === nom.toLowerCase()
-    );
-    if(passager && passager.email) {
-      email = passager.email;
-    }
-  }
-  
-  // Sinon utiliser le champ du formulaire
-  if(!email) {
-    email = (document.getElementById('rt-email')||{}).value.trim();
-  }
-  
-  // ⚠️ VÉRIFIER QUE L'EMAIL EXISTE - OBLIGATOIRE POUR CONFIRMATION
-  if(!email) {
-    err.textContent='⚠️ Email obligatoire pour confirmer la réservation et recevoir la confirmation.';
-    err.style.display='block';
-    return;
-  }
-  
+  const email = (document.getElementById('rt-email')||{}).value.trim();
   const partagerTel = document.getElementById('rt-partager-tel').value === '1';
   if(!t.reservations) t.reservations = [];
   
@@ -10515,95 +10146,6 @@ function saveReservationTrajet() {
   if(email) {
     envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, t, placesSelectionnees, pinDepart);
   }
-  
-  // 📧 ENVOYER EMAIL AU CHAUFFEUR pour qu'il sache qu'il y a une nouvelle réservation
-  envoyerEmailChauffeurReservation(t, prenom, nom, tel, placesSelectionnees);
-}
-
-function envoyerEmailChauffeurReservation(trajet, prenom, nom, tel, places_positions) {
-  let emailChauffeur = null;
-  let nomChauffeur = trajet.conducteur || '';
-  
-  // CHERCHER L'EMAIL DU CHAUFFEUR (qui est un CLIENT)
-  if(trajet.clientId) {
-    const client = DB.clients.find(c => c.id === trajet.clientId);
-    if(client && client.email) {
-      emailChauffeur = client.email;
-    }
-  }
-  
-  // SINON chercher par nom dans les clients
-  if(!emailChauffeur && nomChauffeur) {
-    const client = DB.clients.find(c => 
-      ((c.prenom||'') + ' ' + (c.nom||'')).toLowerCase() === nomChauffeur.toLowerCase()
-    );
-    if(client && client.email) {
-      emailChauffeur = client.email;
-    }
-  }
-  
-  // SINON chercher dans les agents
-  if(!emailChauffeur && trajet.agentId) {
-    const agent = DB.agents.find(a => a.id === trajet.agentId);
-    if(agent && agent.email) {
-      emailChauffeur = agent.email;
-    }
-  }
-  
-  // SINON chercher par nom dans agents
-  if(!emailChauffeur && nomChauffeur) {
-    const agent = DB.agents.find(a => (a.name || '').toLowerCase() === nomChauffeur.toLowerCase());
-    if(agent && agent.email) {
-      emailChauffeur = agent.email;
-    }
-  }
-  
-  if(!emailChauffeur) return; // Pas d'email, on envoie pas
-  
-  // Calculer l'état actuel du trajet
-  const totalPlaces = trajet.places || 6;
-  const totalReserves = (trajet.reservations || []).length;
-  const placesLibres = Math.max(0, totalPlaces - totalReserves);
-  const pourcentageRempli = Math.round((totalReserves / totalPlaces) * 100);
-  
-  // Construire l'email
-  const lignes = [];
-  lignes.push('═════════════════════════════════════════');
-  lignes.push('🚗 NOUVELLE RÉSERVATION SUR VOTRE TRAJET');
-  lignes.push('═════════════════════════════════════════');
-  lignes.push('');
-  
-  lignes.push('👤 PASSAGER QUI VIENT DE RÉSERVER');
-  lignes.push('  • Nom: ' + nom + ' ' + prenom);
-  lignes.push('  • Téléphone: ' + tel);
-  lignes.push('');
-  
-  lignes.push('📍 VOTRE TRAJET');
-  lignes.push('  • Départ: ' + trajet.depart);
-  lignes.push('  • Arrivée: ' + trajet.arrivee);
-  lignes.push('  • Date & Heure: ' + fdt(trajet.dateHeure));
-  if(trajet.vehMat) lignes.push('  • Véhicule: ' + trajet.vehMat);
-  lignes.push('  • Prix: ' + fmt(trajet.prix) + ' par place');
-  lignes.push('');
-  
-  lignes.push('📊 ÉTAT ACTUEL DE VOTRE TRAJET');
-  lignes.push('  ✅ Places libres: ' + placesLibres + ' / ' + totalPlaces);
-  lignes.push('  ❌ Places réservées: ' + totalReserves + ' / ' + totalPlaces);
-  lignes.push('  📈 Remplissage: ' + pourcentageRempli + '%');
-  lignes.push('');
-  
-  if(placesLibres === 0) {
-    lignes.push('🎉 TRAJET COMPLET! Plus aucune place disponible.');
-  } else if(placesLibres <= 2) {
-    lignes.push('⚠️ ATTENTION: Plus que ' + placesLibres + ' place(s) disponible(s)!');
-  }
-  
-  lignes.push('');
-  lignes.push('═════════════════════════════════════════');
-  lignes.push('Consultez votre espace chauffeur pour plus de détails');
-  lignes.push('═════════════════════════════════════════');
-  
-  envoyerEmailConfirmation(emailChauffeur, '🚗 Nouvelle réservation - ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
 }
 
 function envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, trajet, places_positions, pinDepart) {
@@ -10621,6 +10163,15 @@ function envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, trajet, pla
     return zoneCapital + ' - ' + nomDynamique;
   });
   
+  // Chercher le véhicule pour les infos détaillées
+  let vehicule = null;
+  if(trajet.vehId) {
+    vehicule = DB.vehs.find(v => v.id === trajet.vehId);
+  }
+  if(!vehicule && trajet.vehMat) {
+    vehicule = DB.vehs.find(v => v.mat === trajet.vehMat);
+  }
+  
   const lignes = [];
   lignes.push('═════════════════════════════════════════');
   lignes.push('✅ CONFIRMATION DE RÉSERVATION');
@@ -10631,52 +10182,91 @@ function envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, trajet, pla
   lignes.push('─────────────────────────────────────────');
   lignes.push('');
   
-  lignes.push('👤 PASSAGER');
-  lignes.push('  • Nom: ' + nom + ' ' + prenom);
+  lignes.push('👤 INFORMATIONS PASSAGER');
+  lignes.push('  • Prénom: ' + prenom);
+  lignes.push('  • Nom: ' + nom);
   lignes.push('  • Téléphone: ' + tel);
   lignes.push('');
   
-  lignes.push('🚗 TRAJET');
-  lignes.push('  • Départ: ' + trajet.depart);
-  lignes.push('  • Arrivée: ' + trajet.arrivee);
-  lignes.push('  • Date & Heure: ' + fdt(trajet.dateHeure));
-  if(trajet.vehMat) lignes.push('  • Véhicule: ' + trajet.vehMat);
+  lignes.push('📍 TRAJET');
+  lignes.push('  • Lieu de départ: ' + trajet.depart);
+  lignes.push('  • Destination: ' + trajet.arrivee);
+  lignes.push('  • Date: ' + fdt(trajet.dateHeure));
+  lignes.push('  • Heure: ' + (trajet.dateHeure ? new Date(trajet.dateHeure).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'));
+  lignes.push('  • Prix: ' + fmt(trajet.prix) + ' GNF par place');
   lignes.push('');
   
-  lignes.push('👨‍✈️ CHAUFFEUR');
+  lignes.push('👨‍✈️ INFORMATIONS CHAUFFEUR');
   lignes.push('  • Nom: ' + trajet.conducteur);
   lignes.push('  • Téléphone: ' + trajet.tel);
-  lignes.push('  • Prix: ' + fmt(trajet.prix) + ' par place (à régler en espèces)');
+  lignes.push('  • Mode de paiement: Espèces directement au chauffeur');
+  lignes.push('');
+  
+  lignes.push('🚗 INFORMATIONS VÉHICULE');
+  if(vehicule) {
+    if(vehicule.type) lignes.push('  • Type: ' + vehicule.type);
+    if(vehicule.brand || vehicule.model) lignes.push('  • Marque/Modèle: ' + ((vehicule.brand || '') + ' ' + (vehicule.model || '')).trim());
+    if(vehicule.color) lignes.push('  • Couleur: ' + vehicule.color);
+    if(vehicule.mat) lignes.push('  • Immatriculation: ' + vehicule.mat);
+    if(vehicule.year || vehicule.annee) lignes.push('  • Année: ' + (vehicule.year || vehicule.annee));
+  }
+  if(trajet.vehMat) lignes.push('  • Numéro du trajet: ' + trajet.vehMat);
   lignes.push('');
   
   lignes.push('💺 VOS PLACES RÉSERVÉES');
+  lignes.push('  Total: ' + places_positions.length + ' place(s)');
   nomsPlaces.forEach(nom => {
     lignes.push('  • ' + nom + ' ✓');
   });
   lignes.push('');
   
-  lignes.push('🔐 CODE DE CONFIRMATION');
+  lignes.push('🔐 CODE DE CONFIRMATION / PIN DE DÉPART');
   lignes.push('  ⭐⭐⭐ ' + pinDepart + ' ⭐⭐⭐');
-  lignes.push('  (Communiquez ce code au chauffeur le jour du voyage)');
+  lignes.push('  ⚠️ IMPORTANT: Notez bien ce code!');
+  lignes.push('  Communiquez ce code au chauffeur pour confirmer votre identité');
   lignes.push('');
   
   lignes.push('═════════════════════════════════════════');
-  lignes.push('📌 INSTRUCTIONS IMPORTANTES');
+  lignes.push('📌 INSTRUCTIONS & CONSEILS');
   lignes.push('═════════════════════════════════════════');
   lignes.push('');
-  lignes.push('1. Présentez-vous 10 minutes avant l\'heure de départ');
-  lignes.push('2. Appelez le chauffeur: ' + trajet.tel);
-  lignes.push('3. Donnez le code de confirmation: ' + pinDepart);
-  lignes.push('4. Paiement en espèces directement au chauffeur');
+  lignes.push('AVANT LE DÉPART:');
+  lignes.push('  1. Vérifiez vos informations ci-dessus');
+  lignes.push('  2. Notez bien le code de confirmation (PIN): ' + pinDepart);
+  lignes.push('  3. Gardez cette confirmation accessible');
+  lignes.push('');
+  lignes.push('LE JOUR DU VOYAGE:');
+  lignes.push('  1. Présentez-vous 10 minutes avant l\'heure de départ');
+  lignes.push('  2. Rendez-vous au point de rassemblement: ' + trajet.depart);
+  lignes.push('  3. Identifiez le véhicule: ' + (trajet.vehMat || 'N° à confirmer'));
+  lignes.push('  4. Présentez votre code de confirmation: ' + pinDepart);
+  lignes.push('  5. Installez-vous à vos places réservées');
+  lignes.push('');
+  lignes.push('PAIEMENT:');
+  lignes.push('  • Montant total: ' + fmt((trajet.prix || 0) * places_positions.length) + ' GNF');
+  lignes.push('  • Devises acceptées: Espèces uniquement');
+  lignes.push('  • À régler directement au chauffeur');
+  lignes.push('');
+  lignes.push('EN CAS DE PROBLÈME:');
+  lignes.push('  • Appelez immédiatement le chauffeur: ' + trajet.tel);
+  lignes.push('  • Contactez le support via l\'application');
   lignes.push('');
   
-  lignes.push('⚠️ ANNULATION');
+  lignes.push('⚠️ ANNULATION:');
   lignes.push('  • Vous pouvez annuler jusqu\'à 1 heure avant le départ');
-  lignes.push('  • Pour annuler: rendez-vous dans l\'application');
+  lignes.push('  • Les frais d\'annulation dépendent du délai');
+  lignes.push('  • Pour annuler: ouvrez l\'application et cherchez votre réservation');
+  lignes.push('');
+  
+  lignes.push('📋 RÈGLES DE SÉCURITÉ:');
+  lignes.push('  • Veuillez arriver avec vos documents d\'identité');
+  lignes.push('  • Attachez votre ceinture de sécurité');
+  lignes.push('  • Respectez les consignes du chauffeur');
+  lignes.push('  • Les bagages volumineux doivent être signalés à l\'avance');
   lignes.push('');
   
   lignes.push('═════════════════════════════════════════');
-  lignes.push('Merci d\'avoir choisi Laouni AfriMoto GN !');
+  lignes.push('Bon voyage avec Laouni AfriMoto GN! 🚗');
   lignes.push('═════════════════════════════════════════');
   
   envoyerEmailConfirmation(email, 'Confirmation de réservation - ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
@@ -10711,10 +10301,9 @@ function chercherEtAnnulerReservation() {
     zone.innerHTML =
       '<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.3);border-radius:10px;padding:12px;margin-top:10px">' +
         '<div style="font-weight:800;font-size:14px;margin-bottom:4px">🎫 ' + esc(trouve.depart) + ' → ' + esc(trouve.arrivee) + '</div>' +
-        '<div style="font-size:12px;color:var(--text2)">📅 ' + fdt(trouve.dateHeure) + ' · 💺 ' + (Array.isArray(resaTrouvee.places_positions) ? resaTrouvee.places_positions.length : (resaTrouvee.nbPlaces||1)) + ' place(s) · ' + fmt(trouve.prix) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)">📅 ' + fdt(trouve.dateHeure) + ' · 💺 ' + (resaTrouvee.nbPlaces||1) + ' place(s) · ' + fmt(trouve.prix) + '</div>' +
         '<div style="font-size:12px;color:var(--text2);margin-top:2px">👤 ' + esc(trouve.conducteur) + '</div>' +
         (resaTrouvee.pinDepart ? '<div style="margin-top:10px;padding:12px;background:linear-gradient(135deg,#f97316,#ea6c00);border-radius:9px;text-align:center"><div style="font-size:11px;color:rgba(255,255,255,.85);margin-bottom:4px">🔢 CODE DE DÉPART — à communiquer au chauffeur</div><div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:8px">' + esc(resaTrouvee.pinDepart) + '</div></div>' : '') +
-        '<div style="font-size:12px;background:' + (resaTrouvee.confirme ? 'rgba(34,197,94,.08)' : 'rgba(234,179,8,.08)') + ';border:1px solid ' + (resaTrouvee.confirme ? 'rgba(34,197,94,.2)' : 'rgba(234,179,8,.2)') + ';border-radius:8px;padding:8px 10px;margin-top:10px;font-weight:700;color:' + (resaTrouvee.confirme ? '#22C55E' : '#EAB308') + '">' + (resaTrouvee.confirme ? '✅ Statut: Confirmée pour le départ' : '⏳ Statut: En attente de confirmation') + '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px">' +
           '<a href="tel:' + esc(trouve.tel) + '" style="flex:1;text-align:center;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22C55E;border-radius:9px;padding:11px;font-weight:800;font-size:13px;text-decoration:none">📞 Contacter</a>' +
           (resaTrouvee.confirme ? '<div style="flex:1;text-align:center;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#EF4444;border-radius:9px;padding:11px;font-weight:800;font-size:13px">✅ Départ confirmé</div>' : '<button class="btn-red" style="flex:1;padding:11px;font-size:13px" onclick="confirmerAnnulationResa(\'' + trouve.id + '\',\'' + resaTrouvee.id + '\')">❌ Annuler</button>') +
@@ -10728,8 +10317,6 @@ function confirmerAnnulationResa(trajetId, resaId) {
     if(!trouve) return;
     const resa = (trouve.reservations||[]).find(x => x.id === resaId);
     if(!resa) return;
-    // Notifier le chauffeur AVANT de supprimer
-    notifierChauffeurAnnulationPassager(trouve, resa);
     trouve.reservations = trouve.reservations.filter(x => x.id !== resaId);
     recalculerPlaces(trouve);
     trouve.derniereAnnulation = new Date().toISOString(); // détectée par le chauffeur pour la sonnerie courte
@@ -10744,7 +10331,6 @@ function confirmerAnnulationResa(trajetId, resaId) {
 // ── Avis passager sur le chauffeur, après un trajet effectué (espace public, sans compte) ──
 function openAvisChauffeurModal() {
   document.getElementById('av-tel').value = '';
-  document.getElementById('av-pin').value = '';
   document.getElementById('averr1').style.display = 'none';
   document.getElementById('av-etape1').style.display = '';
   document.getElementById('av-etape2').style.display = 'none';
@@ -10752,29 +10338,23 @@ function openAvisChauffeurModal() {
 }
 function chercherTrajetPourAvis() {
   const tel = document.getElementById('av-tel').value.trim();
-  const pin = document.getElementById('av-pin').value.trim();
   const err = document.getElementById('averr1');
   err.style.display = 'none';
   if(!tel) { err.textContent='⚠️ Renseignez votre numéro de téléphone.'; err.style.display='block'; return; }
-  if(!pin || pin.length !== 4) { err.textContent='⚠️ Entrez le code de départ à 4 chiffres.'; err.style.display='block'; return; }
   const telN = tel.replace(/\D/g,'');
   let trouve = null, resaTrouvee = null;
-  // Chercher le trajet avec CE PIN EXACT
   for(const t of DB.trajets) {
-    if(t.statut !== 'effectué') continue;
-    const r = (t.reservations||[]).find(x => {
-      const xTel = (x.tel||'').replace(/\D/g,'');
-      const xPin = String(x.pinDepart||'');
-      return xTel === telN && xPin === pin;
-    });
+    if(t.statut !== 'effectué') continue; // seuls les trajets réellement terminés peuvent être notés
+    const r = (t.reservations||[]).find(x => (x.tel||'').replace(/\D/g,'') === telN);
     if(r) { trouve = t; resaTrouvee = r; break; }
   }
-  if(!trouve) { err.textContent='❌ Aucun trajet trouvé avec ce numéro et ce code. Vérifiez vos données.'; err.style.display='block'; return; }
+  if(!trouve) { err.textContent='❌ Aucun trajet terminé trouvé avec ce numéro. L\'avis n\'est possible qu\'après la fin du trajet.'; err.style.display='block'; return; }
   // Empêcher un double avis pour le même trajet par le même passager
   const dejaAvis = DB.avisChauffeurs.find(a => (a.trajet_id === trouve.id || a.trajetId === trouve.id) && (a.tel||'').replace(/\D/g,'') === telN);
   if(dejaAvis) { err.textContent='❌ Vous avez déjà laissé un avis pour ce trajet.'; err.style.display='block'; return; }
+
   document.getElementById('av-trajet-id').value = trouve.id;
-  document.getElementById('av-trajet-info').innerHTML = `<b>${esc(trouve.depart)} → ${esc(trouve.arrivee)}</b><br>👤 Chauffeur : ${esc(trouve.conducteur)}<br><span style="font-size:11px;color:#22C55E;font-weight:700;margin-top:6px;display:inline-block">✅ Statut: Confirmée pour le départ</span>`;
+  document.getElementById('av-trajet-info').innerHTML = `<b>${esc(trouve.depart)} → ${esc(trouve.arrivee)}</b><br>👤 Chauffeur : ${esc(trouve.conducteur)}`;
   document.getElementById('av-note').value = '0';
   document.getElementById('av-comment').value = '';
   renderEtoilesAvis(0);
@@ -10782,7 +10362,6 @@ function chercherTrajetPourAvis() {
   document.getElementById('av-etape2').style.display = '';
   document.getElementById('averr2').style.display = 'none';
 }
-
 function renderEtoilesAvis(note) {
   const el = document.getElementById('av-etoiles');
   el.innerHTML = [1,2,3,4,5].map(n => `<span style="cursor:pointer;color:${n<=note?'#EAB308':'#4b5563'}" onclick="setNoteAvis(${n})">★</span>`).join('');
@@ -10853,16 +10432,7 @@ function chercherCoursePourAvis() {
   err.style.display = 'none';
   if(!tel) { err.textContent='⚠️ Renseignez votre numéro de téléphone.'; err.style.display='block'; return; }
   const telN = tel.replace(/\D/g,'');
-  let trouve = null;
-  // Chercher TOUTES les courses et prendre la PLUS RÉCENTE
-  for(const d of DB.demandesCourse) {
-    if(d.statutAttribution !== 'terminee') continue;
-    if((d.passagerTel||'').replace(/\D/g,'') !== telN) continue;
-    // Prendre la course la plus récente (date la plus grande)
-    if(!trouve || new Date(d.date) > new Date(trouve.date)) {
-      trouve = d;
-    }
-  }
+  const trouve = DB.demandesCourse.find(d => d.statutAttribution === 'terminee' && (d.passagerTel||'').replace(/\D/g,'') === telN);
   if(!trouve) { err.textContent='❌ Aucune course terminée trouvée avec ce numéro. L\'avis n\'est possible qu\'après la fin de la course.'; err.style.display='block'; return; }
   const dejaAvis = DB.avisCourses.find(a => (a.course_id === trouve.id || a.courseId === trouve.id) && (a.tel||'').replace(/\D/g,'') === telN);
   if(dejaAvis) { err.textContent='❌ Vous avez déjà laissé un avis pour cette course.'; err.style.display='block'; return; }
@@ -10998,14 +10568,12 @@ function chauffeurAnnulerReservation(trajetId, reservationId, raison) {
   if(t.statut === 'en_cours' || t.statut === 'effectué') { toast('⛔ Le départ est déjà confirmé, impossible d\'annuler une réservation', true); return; }
   const r = (t.reservations||[]).find(x=>x.id===reservationId);
   if(!r) return;
-  // Notifier le passager AVANT de supprimer
-  notifierPassagerAnnulationReservation(t, r);
   t.reservations = t.reservations.filter(x=>x.id!==reservationId);
   // Recalculer les places disponibles correctement
   recalculerPlaces(t);
   sbSaveTrajet(t); // Sauvegarder en Supabase
   rClientContent(); // Rafraîchir l'espace chauffeur
-  rTrajets(); // Rafraîchir l'espace public (Voyager)
+  rTrajets(); // Rafraîchir l'espace public (Covoiturage)
   toast('✅ Réservation de ' + r.prenom + ' ' + r.nom + ' annulée' + (raison ? ' · Motif : ' + raison : ''));
 }
 function chauffeurDemanderRaisonAnnulation(trajetId, reservationId) {
@@ -11019,52 +10587,37 @@ async function rechercherMonTrajet() {
   const code = ((document.getElementById('mt-code')||{}).value||'').trim();
   const err = document.getElementById('mt-err');
   const res = document.getElementById('mt-resultat');
-  
   if(!tel || tel.length < 8) { err.textContent='⚠️ Entrez votre numéro de téléphone.'; err.style.display=''; res.innerHTML=''; return; }
   if(!code || code.length !== 4) { err.textContent='⚠️ Entrez le code à 4 chiffres reçu lors de votre réservation.'; err.style.display=''; res.innerHTML=''; return; }
-  
   err.style.display='none';
   res.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2)">🔍 Recherche en cours...</div>';
 
+  // Chercher directement en base (pas seulement en mémoire) pour ne jamais rater un trajet récent
   let trajetTrouve=null, resaTrouvee=null;
-  
   try {
-    // Appeler RPC - retourne une colonne JSONB 'data'
-    const {data, error} = await supabaseClient.rpc('chercher_trajet_par_reservation', {
-      p_tel: tel,
-      p_code: code
-    });
-    
-    if(error) throw error;
-    
-    if(data && data.length > 0) {
-      const row = data[0];
-      const trajetData = row.data;  // Extraire le JSONB
-      
-      if(trajetData) {
-        trajetTrouve = mapTrajet(trajetData);
-        
-        // Parser les réservations du trajet trouvé
-        const reservations = Array.isArray(trajetData.reservations) ? trajetData.reservations : 
-                            (typeof trajetData.reservations === 'string' ? JSON.parse(trajetData.reservations) : []);
-        
-        // Trouver la réservation exacte
-        resaTrouvee = reservations.find(x => {
-          const xTel = String(x.tel||'').replace(/\D/g,'');
-          const xCode = String(x.pinDepart || x.pin_depart || x.pin || x.code || '');
-          return xTel === tel && xCode === code;
-        });
+    const {data} = await supabaseClient.from('trajets').select('*').order('date_heure', {ascending:false}).limit(200);
+    const trajets = data ? data.map(mapTrajet) : DB.trajets;
+    for(const t of trajets) {
+      const r = (t.reservations||[]).find(x => x.tel && x.tel.replace(/\D/g,'')===tel && String(x.pinDepart)===code);
+      if(r) {
+        const trajetTermine = t.statut==='effectue'||t.statut==='effectué';
+        if(trajetTermine && !r.confirme) continue; // absent au départ : ne pas afficher
+        trajetTrouve=t; resaTrouvee=r; break;
       }
     }
   } catch(e) {
-    console.error('❌ Erreur RPC rechercherMonTrajet:', e);
+    // Repli sur la mémoire locale si la requête échoue
+    for(const t of DB.trajets) {
+      const r = (t.reservations||[]).find(x => x.tel && x.tel.replace(/\D/g,'')===tel && String(x.pinDepart)===code);
+      if(r) {
+        const trajetTermine = t.statut==='effectue'||t.statut==='effectué';
+        if(trajetTermine && !r.confirme) continue;
+        trajetTrouve=t; resaTrouvee=r; break;
+      }
+    }
   }
 
-  if(!trajetTrouve || !resaTrouvee) { 
-    res.innerHTML='<div class="empty">❌ Aucun trajet trouvé avec ces informations. Vérifiez votre numéro et votre code.</div>'; 
-    return; 
-  }
-  
+  if(!trajetTrouve || !resaTrouvee) { res.innerHTML='<div class="empty">❌ Aucun trajet trouvé avec ces informations. Vérifiez votre numéro et votre code.</div>'; return; }
   const moto = DB.vehs.find(v => v.id === trajetTrouve.vehId || nrm(v.mat||'') === nrm(trajetTrouve.vehMat||''));
   const statutLibelle = {actif:'🟢 Actif — départ prévu', en_cours:'🚗 En cours de route', effectue:'✅ Effectué', annule:'❌ Annulé'};
   res.innerHTML =
@@ -11080,7 +10633,7 @@ async function rechercherMonTrajet() {
       '</div>' +
       '<div style="background:rgba(0,0,0,.12);border-radius:10px;padding:10px;font-size:12px">' +
         '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">🎟️ VOTRE RÉSERVATION</div>' +
-        '<div><b>' + esc(resaTrouvee.prenom+' '+resaTrouvee.nom) + '</b> · ' + (Array.isArray(resaTrouvee.places_positions) ? resaTrouvee.places_positions.length : (resaTrouvee.nbPlaces||1)) + ' place(s)</div>' +
+        '<div><b>' + esc(resaTrouvee.prenom+' '+resaTrouvee.nom) + '</b> · ' + (resaTrouvee.nbPlaces||1) + ' place(s)</div>' +
         (resaTrouvee.confirme ? '<div style="color:#22C55E;font-weight:700;margin-top:4px">✅ Départ confirmé</div>' :
           '<div style="margin-top:8px;padding:10px;background:linear-gradient(135deg,#f97316,#ea6c00);border-radius:8px;text-align:center"><div style="font-size:11px;color:rgba(255,255,255,.85);margin-bottom:3px">🔢 VOTRE CODE DE DÉPART</div><div style="font-size:24px;font-weight:900;color:#fff;letter-spacing:6px">' + esc(resaTrouvee.pinDepart||'—') + '</div><div style="font-size:10px;color:rgba(255,255,255,.8);margin-top:3px">Communiquez ce code au chauffeur au moment du départ</div></div>') +
       '</div>' +
@@ -11118,16 +10671,11 @@ function chauffeurConfirmerPassager(trajetId, reservationId) {
   // Verrouillage automatique : si toutes les réservations sont traitées (confirmées ou annulées)
   const actives = (t.reservations||[]).filter(x => !x.annule);
   if(actives.length > 0 && actives.every(x => x.confirme)) {
-    notifierPassagersTrajet(t, 'debut_trajet');
     t.statut = 'en_cours';
-    const maintenant = new Date();
-    t.departConfirmeLe = maintenant.toISOString();
-    t.heureDebut = maintenant.getHours();
-    t.minuteDebut = maintenant.getMinutes();
+    t.departConfirmeLe = new Date().toISOString();
     sbSaveTrajet(t);
-    logMvt('debut_trajet', '🚗 Départ réel du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
     rClientContent();
-    toast('🚗 Tous les passagers sont confirmés — départ RÉEL enregistré, bon voyage !');
+    toast('🚗 Tous les passagers sont confirmés — départ verrouillé, bon voyage !');
     return;
   }
   const nonTraites = (t.reservations||[]).filter(x => !x.confirme && !x.annule);
@@ -11150,12 +10698,8 @@ function chauffeurMarquerAbsent(trajetId, reservationId) {
     const nonTraites = (t.reservations||[]).filter(x => !x.confirme && !x.annule);
     if(nonTraites.length === 0 && (t.reservations||[]).some(x=>x.confirme)) {
       t.statut = 'en_cours';
-      const maintenant = new Date();
-      t.departConfirmeLe = maintenant.toISOString();
-      t.heureDebut = maintenant.getHours();
-      t.minuteDebut = maintenant.getMinutes();
-      logMvt('debut_trajet', '🚗 Départ RÉEL du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
-      toast('🚗 Départ RÉEL enregistré à ' + ('0'+maintenant.getHours()).slice(-2) + ':' + ('0'+maintenant.getMinutes()).slice(-2) + ' !');
+      t.departConfirmeLe = new Date().toISOString();
+      toast('🚗 Tous les passagers présents sont confirmés — départ verrouillé !');
     } else {
       toast('❌ ' + r.prenom + ' ' + r.nom + ' marqué(e) absent(e) — place libérée.');
     }
@@ -11164,148 +10708,21 @@ function chauffeurMarquerAbsent(trajetId, reservationId) {
   });
 }
 
-// ── Notifier tous les passagers d'un trajet par email ──
-async function notifierPassagersTrajet(trajet, typeNotif, details) {
-  if(!trajet || !trajet.reservations || !trajet.reservations.length) return;
-  
-  const messages = {
-    annulation_chauffeur: {
-      titre: '❌ Annulation du trajet ' + trajet.depart + ' → ' + trajet.arrivee,
-      texte: 'Le chauffeur a annulé ce trajet. Votre réservation est annulée et aucun frais n\'a été appliqué.'
-    },
-    debut_trajet: {
-      titre: '🚗 Trajet en cours — ' + trajet.depart + ' → ' + trajet.arrivee,
-      texte: 'Bienvenue à bord de Laouni AfriMoto. Installez-vous confortablement. Votre sécurité est notre priorité, votre tranquillité notre engagement. Profitez d\'un voyage serein et agréable. 🎉'
-    },
-    fin_trajet: {
-      titre: '✅ Trajet terminé — ' + trajet.depart + ' → ' + trajet.arrivee,
-      texte: 'Votre trajet est maintenant terminé. Merci d\'avoir utilisé Laouni AfriMoto ! N\'hésitez pas à laisser un avis.'
-    },
-    annulation_reservation: {
-      titre: '❌ Réservation annulée — ' + trajet.depart + ' → ' + trajet.arrivee,
-      texte: 'Votre réservation a été annulée. Une place s\'est libérée sur le trajet.'
-    }
-  };
-  
-  const msg = messages[typeNotif];
-  if(!msg) return;
-  
-  // Envoyer à chaque passager
-  for(const resa of trajet.reservations) {
-    if(!resa.email && resa.tel) {
-      // Si pas d'email mais tel, chercher dans la DB
-      const passager = DB.trajets.some(t => t.reservations && t.reservations.some(r => r.tel === resa.tel))
-        ? DB.passagers.find(p => p.tel === resa.tel)
-        : null;
-      if(passager && passager.email) resa.email = passager.email;
-    }
-    
-    if(resa.email) {
-      const lignes = [
-        'Bonjour ' + (resa.prenom||'') + ',',
-        '',
-        msg.texte,
-        '',
-        '📍 Trajet : ' + trajet.depart + ' → ' + trajet.arrivee,
-        '📅 Date : ' + fdt(trajet.dateHeure),
-        '👤 Chauffeur : ' + trajet.conducteur,
-        '',
-        'À bientôt sur Laouni AfriMoto !'
-      ];
-      await envoyerEmailConfirmation(resa.email, msg.titre, lignes);
-    }
-  }
-}
-
-// ── Notifier le chauffeur quand un passager annule ──
-async function notifierChauffeurAnnulationPassager(trajet, passager) {
-  if(!trajet || !passager) return;
-  
-  const chauffeurEmail = trajet.email || DB.clients.find(c => c.id === trajet.clientId)?.email;
-  if(!chauffeurEmail) return;
-  
-  const lignes = [
-    'Bonjour,',
-    '',
-    passager.prenom + ' ' + passager.nom + ' a annulé sa réservation.',
-    '',
-    '📍 Trajet : ' + trajet.depart + ' → ' + trajet.arrivee,
-    '📅 Date : ' + fdt(trajet.dateHeure),
-    '💺 Places libérées : ' + (Array.isArray(passager.places_positions) ? passager.places_positions.length : (passager.nbPlaces||1)),
-    '',
-    'Le nombre de places disponibles a été mis à jour automatiquement.'
-  ];
-  
-  await envoyerEmailConfirmation(chauffeurEmail, '📢 Annulation de réservation — ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
-}
-// ── Notifier un passager quand le chauffeur annule sa réservation ──
-async function notifierPassagerAnnulationReservation(trajet, passager) {
-  if(!trajet || !passager) return;
-  
-  if(!passager.email && passager.tel) {
-    const p = DB.passagers.find(x => x.tel === passager.tel);
-    if(p && p.email) passager.email = p.email;
-  }
-  
-  if(!passager.email) return;
-  
-  const nbPlaces = Array.isArray(passager.places_positions) ? passager.places_positions.length : (passager.nbPlaces||1);
-  const lignes = [
-    'Bonjour ' + (passager.prenom||'') + ',',
-    '',
-    'Le chauffeur a annulé votre réservation pour ce trajet.',
-    '',
-    '📍 Trajet : ' + trajet.depart + ' → ' + trajet.arrivee,
-    '📅 Date : ' + fdt(trajet.dateHeure),
-    '👤 Chauffeur : ' + trajet.conducteur,
-    '💺 Places annulées : ' + nbPlaces,
-    '',
-    'Vous pouvez chercher un autre trajet dans l\'application ou contacter directement le chauffeur pour plus de détails.'
-  ];
-  
-  await envoyerEmailConfirmation(passager.email, '❌ Annulation de votre réservation — ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
-}
-
-
-function demanderConfirmationAnnulationTrajet(trajetId) {
-  const t = DB.trajets.find(x=>x.id===trajetId);
-  if(!t) return;
-  
-  const nbPassagers = (t.reservations||[]).length;
-  const msg = (nbPassagers ? '💔 Ces ' + nbPassagers + ' passager(s) ont attendu ce trajet avec impatience. Annuler maintenant, c\'est les laisser dans l\'embarras et les forcer à changer leurs plans de dernière minute. Êtes-vous certain(e)?\n\n' : '⚠️ Confirmez l\'annulation de ce trajet?\n\n') +
-    '📍 ' + t.depart + ' → ' + t.arrivee + '\n' +
-    '📅 ' + fdt(t.dateHeure) + '\n' +
-    (nbPassagers ? '👥 ' + nbPassagers + ' passager(s) sera/seront notifié(s) par email\n' : '') +
-    '\nCette action ne peut pas être annulée.';
-  
-  askConfirm(msg, function() {
-    chauffeurAnnulerTrajetConfirme(trajetId);
-  });
-}
-
 function chauffeurAnnulerTrajet(trajetId) {
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
   if(t.statut === 'en_cours' || t.statut === 'effectué') { toast('⛔ Le départ est déjà confirmé, impossible d\'annuler le trajet', true); return; }
-  demanderConfirmationAnnulationTrajet(trajetId);
-}
-
-function chauffeurAnnulerTrajetConfirme(trajetId) {
-  const t = DB.trajets.find(x=>x.id===trajetId);
-  if(!t) return;
-  if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
-  if(t.statut === 'en_cours' || t.statut === 'effectué') { toast('⛔ Le départ est déjà confirmé, impossible d\'annuler le trajet', true); return; }
-  notifierPassagersTrajet(t, 'annulation_chauffeur');
   t.statut = 'annulé';
   t.placesDispos = 0;
+  // Trajet complémentaire annulé : restituer les sièges au trajet parent encore en cours
   if(t.parentId) {
     const parent = DB.trajets.find(x => x.id === t.parentId && x.statut === 'en_cours');
     if(parent) { parent.placesDispos += (t.places || 0); sbSaveTrajet(parent); }
   }
-  sbSaveTrajet(t);
+  sbSaveTrajet(t); // AUDIT : annulation jamais persistée
   rClientContent();
-  toast('✅ Trajet annulé' + ((t.reservations&&t.reservations.length) ? ' · les ' + t.reservations.length + ' passager(s) ont été notifiés par email' : ''));
+  toast('✅ Trajet annulé' + ((t.reservations&&t.reservations.length) ? ' · pensez à prévenir les ' + t.reservations.length + ' passager(s) inscrit(s)' : ''));
 }
 // ── Le chauffeur marque son arrivée : termine le trajet (rétention 45 jours côté admin, puis suppression auto) ──
 function chauffeurMarquerArrive(trajetId) {
@@ -11313,16 +10730,11 @@ function chauffeurMarquerArrive(trajetId) {
   if(!t) return;
   if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
   if(t.statut !== 'en_cours') { toast('⛔ Ce trajet n\'est pas en cours', true); return; }
-  notifierPassagersTrajet(t, 'fin_trajet');
   t.statut = 'effectué';
-  const maintenant = new Date();
-  t.arriveLe = maintenant.toISOString();
-  t.heureFin = maintenant.getHours();
-  t.minuteFin = maintenant.getMinutes();
-  sbSaveTrajet(t);
-  logMvt('fin_trajet', '🏁 Arrivée réelle du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
+  t.arriveLe = new Date().toISOString();
+  sbSaveTrajet(t); // AUDIT : fin de trajet jamais persistée
   rClientContent();
-  toast('✅ Trajet marqué comme terminé le ' + fd(maintenant) + ' à ' + ('0'+maintenant.getHours()).slice(-2) + ':' + ('0'+maintenant.getMinutes()).slice(-2) + '. Vous pouvez maintenant proposer un nouveau trajet.');
+  toast('✅ Trajet marqué comme terminé. Vous pouvez maintenant proposer un nouveau trajet.');
 }
 // ── Vérifie si le chauffeur a un trajet en cours non terminé : bloque la publication d'un nouveau trajet ──
 function chauffeurATrajetEnCours(clientId) {
@@ -11959,16 +11371,14 @@ function rGestion() {
     html = list.map(t=>{
       const confirmes = (t.reservations||[]).filter(r=>r.confirme);
       const enAttente = (t.reservations||[]).filter(r=>!r.confirme);
-      const placesConfirmes = confirmes.reduce((sum, r) => sum + (r.nbPlaces||1), 0);
-      const placesEnAttente = enAttente.reduce((sum, r) => sum + (r.nbPlaces||1), 0);
       return `
       <div class="card" style="margin-bottom:7px;${t.statut==='annulé'?'opacity:.55;border-style:dashed':''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:13px">${esc(t.depart)} → ${esc(t.arrivee)}</div>
-            <div style="font-size:11px;color:var(--text2)">👤 ${esc(t.conducteur)} · 💺 ${t.placesDispos}/${t.places} · 📅 ${fdt(t.dateHeure)}</div>
+            <div style="font-size:11px;color:var(--text2)">👤 ${esc(t.conducteur)} · 💺 ${t.placesDispos}/${t.places}</div>
             <div style="font-size:12px;color:#EAB308;font-weight:700">${fmt(t.prix)}</div>
-            <span class="tag ${t.statut==='actif'?'tag-green':t.statut==='en_cours' || t.enCours?'tag-gold':t.statut==='effectué'?'tag-blue':'tag-red'}" style="font-size:9px">${(t.statut==='en_cours' || t.enCours)?'🚗 EN ROUTE':t.statut.toUpperCase()}</span>
+            <span class="tag ${t.statut==='actif'?'tag-green':t.statut==='en_cours'?'tag-gold':t.statut==='effectué'?'tag-blue':'tag-red'}" style="font-size:9px">${t.statut==='en_cours'?'🚗 EN ROUTE':t.statut.toUpperCase()}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
             ${(t.statut==='en_cours' || t.statut==='effectué') ? '' : `<button class="${t.statut==='annulé'?'btn-ghost':'btn-gold'}" style="font-size:10px;padding:5px 8px" onclick="toggleTrajet('${t.id}')">${t.statut==='annulé'?'✅':'⏸️'}</button>`}
@@ -11977,7 +11387,7 @@ function rGestion() {
         </div>
         ${confirmes.length ? `
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.2)">
-            <div style="font-size:11px;color:#22C55E;font-weight:700;margin-bottom:6px">✅ ${placesConfirmes} place(s) confirmée(s) (${confirmes.length} passager(s))</div>
+            <div style="font-size:11px;color:#22C55E;font-weight:700;margin-bottom:6px">✅ ${confirmes.length} passager(s) confirmé(s) pour le départ</div>
             ${confirmes.map(r => `
               <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;background:rgba(34,197,94,.06);border-radius:7px;padding:6px 10px;margin-bottom:4px">
                 <span style="font-size:12px">👤 ${esc(r.prenom)} ${esc(r.nom)} · 💺${r.nbPlaces||1}</span>
@@ -11986,7 +11396,7 @@ function rGestion() {
           </div>` : ''}
         ${enAttente.length ? `
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(234,179,8,.2)">
-            <div style="font-size:11px;color:#EAB308;font-weight:700;margin-bottom:6px">⏳ ${placesEnAttente} place(s) en attente (${enAttente.length} passager(s))</div>
+            <div style="font-size:11px;color:#EAB308;font-weight:700;margin-bottom:6px">⏳ ${enAttente.length} passager(s) en attente de confirmation</div>
             ${enAttente.map(r => `
               <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;background:rgba(234,179,8,.06);border-radius:7px;padding:6px 10px;margin-bottom:4px">
                 <span style="font-size:12px">👤 ${esc(r.prenom)} ${esc(r.nom)} · 💺${r.nbPlaces||1}</span>
@@ -12192,10 +11602,8 @@ function rGestion() {
     // Regroupe les avis par chauffeur (clientId si compte réel, sinon par nom)
     const groupes = {};
     DB.avisChauffeurs.forEach(a => {
-      const clientId = a.clientId || a.client_id;
-      const conducteur = a.conducteur || a.conducteur_nom;
-      const key = clientId || ('nom:'+nrm(conducteur));
-      if(!groupes[key]) groupes[key] = { clientId: clientId, conducteur: conducteur, avis: [] };
+      const key = a.clientId || ('nom:'+nrm(a.conducteur));
+      if(!groupes[key]) groupes[key] = { clientId: a.clientId, conducteur: a.conducteur, avis: [] };
       groupes[key].avis.push(a);
     });
     let liste = Object.values(groupes);
@@ -12204,74 +11612,33 @@ function rGestion() {
 
     html = liste.length ? liste.map(g => {
       const moyenne = g.avis.reduce((s,a)=>s+a.note,0) / g.avis.length;
-      const cl = g.clientId ? DB.clients.find(c=>c.id===g.clientId) : DB.clients.find(c => nrm(c.prenom+' '+c.nom) === nrm(g.conducteur));
+      const cl = g.clientId ? DB.clients.find(c=>c.id===g.clientId) : null;
       const bloque = cl ? cl.chauffeurBloque : chauffeurBloqueParNom(g.conducteur);
       return `
       <div class="card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          ${cl ? `
-            <div style="display:flex;gap:10px;flex:1;min-width:0;cursor:pointer" onclick="toggleAvisChauffeur('${g.clientId || ('nom:'+nrm(g.conducteur))}')">
-              ${cl.photoProfil ? `<img src="${cl.photoProfil}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(249,115,22,.3)"/>` : `<div style="width:60px;height:60px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🚕</div>`}
-              <div style="flex:1">
-                <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">${esc(cl.prenom)} ${esc(cl.nom)} <span style="font-size:14px;color:var(--text2);">${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'▼':'▶'}</span></div>
-                <div style="font-size:11px;color:var(--text2)"><a href="tel:${esc(cl.tel)}" style="color:#f97316;font-weight:700;text-decoration:none">📞 ${esc(cl.tel)}</a> · @${cl.user}</div>
-                ${cl.permis?`<div style="font-size:11px;color:#60A5FA">🚗 Permis ${esc(cl.permis)}</div>`:''}
-                <div style="font-size:13px;color:#EAB308;font-weight:700;margin-top:4px">${'★'.repeat(Math.round(moyenne))}${'☆'.repeat(5-Math.round(moyenne))} ${moyenne.toFixed(1)} · ${g.avis.length} avis</div>
-                ${bloque ? '<span class="tag tag-red" style="font-size:9px;margin-top:4px;display:inline-block">⛔ BLOQUÉ</span>' : ''}
-              </div>
-            </div>
-          ` : `
-            <div style="flex:1;cursor:pointer" onclick="toggleAvisChauffeur('${g.clientId || ('nom:'+nrm(g.conducteur))}')">
-              <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">👤 ${esc(g.conducteur)} <span style="font-size:14px;color:var(--text2);">${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'▼':'▶'}</span></div>
-              <div style="font-size:11px;color:var(--text2);margin-top:3px">Pas de compte lié</div>
-              <div style="font-size:13px;color:#EAB308;font-weight:700;margin-top:4px">${'★'.repeat(Math.round(moyenne))}${'☆'.repeat(5-Math.round(moyenne))} ${moyenne.toFixed(1)} · ${g.avis.length} avis</div>
-              ${bloque ? '<span class="tag tag-red" style="font-size:9px;margin-top:4px;display:inline-block">⛔ BLOQUÉ</span>' : ''}
-            </div>
-          `}
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div style="font-weight:700;font-size:14px">👤 ${esc(g.conducteur)}</div>
+            <div style="font-size:13px;color:#EAB308;margin-top:2px">${'★'.repeat(Math.round(moyenne))}${'☆'.repeat(5-Math.round(moyenne))} ${moyenne.toFixed(1)} · ${g.avis.length} avis</div>
+            ${bloque ? '<span class="tag tag-red" style="font-size:9px;margin-top:4px;display:inline-block">⛔ CHAUFFEUR BLOQUÉ</span>' : ''}
+          </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
             ${cl ? `
-              <button class="btn-gold" style="font-size:10px;padding:6px 10px" onclick="avertirChauffeur('${cl.id}','${esc(cl.prenom)} ${esc(cl.nom)}')">⚠️ Avertir</button>
-              <button class="btn-red" style="font-size:10px;padding:6px 10px" onclick="suspendreChauffeur('${cl.id}','${esc(cl.prenom)} ${esc(cl.nom)}')">⛔ Suspendre</button>
-              <button class="btn-blue" style="font-size:10px;padding:6px 10px" onclick="apprecierChauffeur('${cl.id}','${esc(cl.prenom)} ${esc(cl.nom)}')">👍 Apprécier</button>
               <button class="${bloque?'btn':'btn-red'}" style="font-size:10px;padding:6px 10px" onclick="${bloque?`debloquerChauffeur('${cl.id}')`:`bloquerChauffeur('${cl.id}')`}">${bloque?'✅ Débloquer':'⛔ Bloquer'}</button>
               <button class="btn-ghost" style="font-size:10px;padding:6px 10px;color:#EF4444;border-color:rgba(239,68,68,.4)" onclick="supprimerStatutChauffeur('${cl.id}')">🗑️ Suppr. statut</button>
             ` : `
-              <button class="btn-gold" style="font-size:10px;padding:6px 10px" onclick="avertirChauffeurParNom('${esc(g.conducteur)}')">⚠️ Avertir</button>
-              <button class="btn-red" style="font-size:10px;padding:6px 10px" onclick="suspendreChauffeurParNom('${esc(g.conducteur)}')">⛔ Suspendre</button>
               <button class="${bloque?'btn':'btn-red'}" style="font-size:10px;padding:6px 10px" onclick="${bloque?`debloquerChauffeurParNom('${esc(g.conducteur)}')`:`bloquerChauffeurParNom('${esc(g.conducteur)}')`}">${bloque?'✅ Débloquer':'⛔ Bloquer'}</button>
               <div style="font-size:9px;color:var(--text2);text-align:right;max-width:90px">Pas de compte client lié</div>
             `}
           </div>
         </div>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(249,115,22,.15);display:${_avisChauffeurOuvert[g.clientId || ('nom:'+nrm(g.conducteur))]?'block':'none'}">
-          ${g.avis.slice().reverse().map(a => {
-            const avisTel = (a.tel||'').replace(/\D/g,'');
-            const passager = avisTel ? DB.passagers.find(p => (p.tel||'').replace(/\D/g,'') === avisTel) : null;
-            return `
-            <div style="background:rgba(0,0,0,.15);border-radius:7px;padding:10px;margin-bottom:8px">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-                <div style="flex:1">
-                  ${passager ? `
-                    <div style="display:flex;gap:8px;margin-bottom:8px">
-                      ${passager.photoProfil ? `<img src="${passager.photoProfil}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid rgba(249,115,22,.3)"/>` : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(249,115,22,.1);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👤</div>`}
-                      <div style="flex:1">
-                        <div style="font-weight:700;font-size:12px">${esc(passager.prenom)} ${esc(passager.nom)}</div>
-                        <a href="tel:${esc(passager.tel)}" style="display:block;font-size:10px;color:#f97316;font-weight:700;text-decoration:none;margin-top:2px">📞 ${esc(passager.tel)}</a>
-                      </div>
-                    </div>
-                  ` : `<div style="font-size:11px;color:var(--text2);margin-bottom:6px">📞 ${esc(a.tel)}</div>`}
-                  <div style="font-size:12px;color:#EAB308;font-weight:700;margin-top:6px">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} <span style="color:var(--text2);font-size:11px">· ${fdt(a.date)}</span></div>
-                  ${a.comment ? `<div style="font-size:12px;margin-top:4px;color:var(--text2)">"${esc(a.comment)}"</div>` : ''}
-                </div>
-                <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-                  ${passager ? `
-                    <button class="btn-gold" style="font-size:9px;padding:5px 8px;white-space:nowrap" onclick="avertirPassager('${passager.id}','${esc(passager.prenom)} ${esc(passager.nom)}')">⚠️ Avertir</button>
-                    <button class="btn-blue" style="font-size:9px;padding:5px 8px;white-space:nowrap" onclick="apprecierPassager('${passager.id}')">👍 Apprécier</button>
-                  ` : ''}
-                </div>
-              </div>
-            </div>`;
-          }).join('')}
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(249,115,22,.15)">
+          ${g.avis.slice().reverse().map(a => `
+            <div style="background:rgba(0,0,0,.15);border-radius:7px;padding:8px 10px;margin-bottom:5px">
+              <div style="font-size:12px;color:#EAB308">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} <span style="color:var(--text2);font-size:11px">· ${fdt(a.date)}</span></div>
+              ${a.comment ? `<div style="font-size:12px;margin-top:3px">"${esc(a.comment)}"</div>` : ''}
+              <a href="tel:${esc(a.tel)}" style="display:block;font-size:11px;color:#f97316;font-weight:700;margin-top:3px;text-decoration:none">📞 ${esc(a.tel)}</a>
+            </div>`).join('')}
         </div>
       </div>`;
     }).join('') : '<div class="empty">Aucun avis pour le moment</div>';
@@ -12310,60 +11677,162 @@ function rGestion() {
           </div>
         </div>
       </div>`).join('') : '<div class="empty">Aucun passager inscrit</div>');
-  } else if(gestTab==='courses') {
-    const libellesStatut = {en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée', effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée', refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée', annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)'};
-    const courses = (DB.demandesCourse || []).filter(c => !q || [c.passagerNom, c.passagerTel, c.taxiNom, c.taxiPlaque, c.depart, c.arrivee].some(x => nrm(x||'').includes(q)));
-    html = '<div class="sect" style="margin-top:0">🚕 Historique des courses taxi moto (' + courses.length + ')</div>' + (courses.length ? courses.sort((a,b) => new Date(b.date) - new Date(a.date)).map(d => {
-      const ps = DB.passagers.find(p=>p.id===d.passagerId);
-      
-      // Calculer la durée
-      let chrono = null;
-      
-      // Méthode 1: Utiliser heure_debut et heure_fin (si disponible)
-      if(d.heureDebut !== null && d.heureDebut !== undefined && d.heureFin !== null && d.heureFin !== undefined) {
-        chrono = Math.abs((d.heureFin * 60 + (d.minuteFin||0)) - (d.heureDebut * 60 + (d.minuteDebut||0)));
-      }
-      // Méthode 2: Utiliser date et dateEffectuee
-      else if(d.date && d.dateEffectuee) {
-        const dateDebut = new Date(d.date);
-        const dateFin = new Date(d.dateEffectuee);
-        chrono = Math.floor((dateFin - dateDebut) / 60000);
-      }
-      // Méthode 3: Utiliser created_at comme base (si course terminée)
-      else if(d.created_at && (d.statutAttribution === 'terminee' || d.statutAttribution === 'effectuee')) {
-        const dateDebut = new Date(d.created_at);
-        const dateFin = new Date();
-        chrono = Math.floor((dateFin - dateDebut) / 60000);
-      }
-      // Méthode 4: Utiliser date (fallback dernier)
-      else if(d.date && (d.statutAttribution === 'terminee' || d.statutAttribution === 'effectuee')) {
-        const dateDebut = new Date(d.date);
-        const dateFin = new Date();
-        chrono = Math.floor((dateFin - dateDebut) / 60000);
-      }
-      
-      const chronoText = chrono && chrono > 0 ? (chrono < 60 ? chrono + ' min' : Math.floor(chrono/60) + 'h ' + (chrono%60) + 'min') : '—';
-      const admissibleCommission = d.statutAttribution === 'terminee' || d.statutAttribution === 'effectuee';
-      return `<div class="card" style="margin-bottom:8px;padding:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:30px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><b>👤 CLIENT:</b> ${esc(d.passagerNom||'?')} | <b>📞</b> ${esc(d.passagerTel||'—')} | 🔢 ${esc(ps?.num||'—')}</div>
-          <div style="font-size:10px;color:var(--text2);margin-bottom:4px"><b>📍 Position:</b> ${d.lat ? `Lat ${d.lat.toFixed(4)}, Lng ${d.lng.toFixed(4)}` : '—'} ${d.lat && d.lng ? `<a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="color:#60A5FA;text-decoration:none">[Voir]</a>` : ''}</div>
-          <div style="font-size:10px;color:var(--text2);margin-bottom:4px"><b>📅 Date:</b> ${fdt(d.date)} | <b>⏱️ Durée:</b> ${chronoText}</div>
-          <div style="font-size:10px;color:var(--text2)"><b>🛣️</b> ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>
-        </div>
-        <div style="flex:0 0 auto;border-left:1px solid rgba(255,255,255,.1);padding-left:30px;text-align:right;min-width:220px">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:3px"><b>🏍️ TAXI:</b> ${esc(d.taxiNom||'?')} | <b>📞</b> ${esc(d.taxiTel||'—')} | 🔢 ${esc((DB.taxis.find(t=>t.id===d.taxiId)||{}).num||'—')}</div>
-          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">📋 ${esc(d.taxiPlaque||'—')} | <b>⏱️ Durée:</b> ${chronoText}</div>
-          <div style="margin-bottom:6px">
-            <span class="tag tag-orange" style="font-size:9px">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span>
-          </div>
-          ${d.prixPropose ? `<div style="font-size:13px;font-weight:900;color:#22C55E;margin-bottom:4px">💰 ${fmt(d.prixPropose)} GNF</div>` : ''}
-          ${admissibleCommission && d.commission ? `<div style="font-size:11px;color:#EAB308;font-weight:700;border-top:1px solid rgba(234,179,8,.3);padding-top:6px">📊 Commission: ${fmt(d.commission)} GNF</div>` : ''}
-        </div>
-      </div>`;
-    }).join('') : '<div class="empty">Aucune course enregistrée</div>');
   } else if(gestTab==='recherche-unifiee') {
     html = renderGestionRechercheUnifiee(q);
+  } else if(gestTab==='validation') {
+    const vehsAttente = DB.vehs.filter(v => v.valide===false);
+    const coursesTaxi = term ? DB.demandesCourse.filter(d =>
+      nrm(d.passagerNom||'').includes(termN) || nrm(d.passagerTel||'').includes(termN) ||
+      nrm(d.taxiNom||'').includes(termN) || nrm(d.taxiPlaque||'').includes(termN) ||
+      matchPassager.some(p => p.id === d.passagerId) ||
+      matchTaxi.some(t => t.id === d.taxiId) ||
+      matchClient.some(c => DB.taxis.filter(t=>t.tel===c.tel).some(t=>t.id===d.taxiId)) ||
+      matchVeh.some(v => { const taxiLie = DB.taxis.find(t => nrm(t.plaque||'')===nrm(v.mat||'')); return taxiLie && taxiLie.id===d.taxiId; })
+    ).sort((a,b)=>new Date(b.date)-new Date(a.date)) : [];
+
+    // Trajets de covoiturage liés (chauffeur OU passager via réservation)
+    const trajetsTrouves = term ? DB.trajets.filter(t =>
+      nrm(t.conducteur||'').includes(termN) || nrm(t.tel||'').includes(termN) ||
+      matchClient.some(c => t.clientId === c.id) ||
+      (t.reservations||[]).some(r => nrm(r.tel||'').includes(termN) || nrm(r.prenom+' '+r.nom).includes(termN) || nrm(r.tel||'').replace(/\D/g,'').includes(termN.replace(/\D/g,'')))
+    ).sort((a,b)=>new Date(b.dateHeure||b.date)-new Date(a.dateHeure||a.date)) : [];
+
+    const libellesStatutAdmin = {
+      en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée',
+      effectuee:'🏍️ En cours', terminee:'✅ Terminée — service rendu', refusee:'❌ Refusée',
+      refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée',
+      annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)', annulee_suspect:'🚨 Annulée (véhicule suspect)'
+    };
+
+    html = `<div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
+      🔎 Entrez dans la barre de recherche ci-dessus un <b>numéro unique</b>, <b>numéro de téléphone</b>, <b>matricule</b> ou <b>nom</b> pour voir tous les mouvements liés à ce compte — courses, trajets, véhicules enregistrés. Utile en cas de litige pour transmettre aux autorités.
+    </div>` +
+    (!term ? '<div class="empty">Entrez un identifiant dans la barre de recherche pour commencer.</div>' :
+    (matchClient.length || matchPassager.length || matchTaxi.length || matchVeh.length || coursesTaxi.length || trajetsTrouves.length ?
+
+    // ── Profils trouvés ──
+    (matchClient.length ? `<div class="sect">👤 Clients / Chauffeurs (${matchClient.length})</div>` + matchClient.map(c=>`
+      <div class="card" style="margin-bottom:8px">
+        <div style="font-weight:800">${esc(c.prenom+' '+c.nom)} <span style="font-size:11px;color:var(--text2)">${esc(c.num||c.id)}</span></div>
+        <div style="font-size:12px;color:var(--text2)">📞 ${esc(c.tel)} · Solde : ${fmt(c.solde||0)}</div>
+        ${c.suspendu ? '<div style="font-size:11px;color:#EF4444;font-weight:700">⛔ Compte suspendu</div>' : ''}
+      </div>`).join('') : '') +
+
+    (matchPassager.length ? `<div class="sect">🧍 Passagers (${matchPassager.length})</div>` + matchPassager.map(p=>`
+      <div class="card" style="margin-bottom:8px">
+        <div style="font-weight:800">${esc(p.prenom+' '+p.nom)} <span style="font-size:11px;color:var(--text2)">${esc(p.num||p.id)}</span></div>
+        <div style="font-size:12px;color:var(--text2)">📞 ${esc(p.tel)} · Solde : ${fmt(p.solde||0)}</div>
+      </div>`).join('') : '') +
+
+    (matchTaxi.length ? `<div class="sect">🏍️ Taxis moto (${matchTaxi.length})</div>` + matchTaxi.map(t=>`
+      <div class="card" style="margin-bottom:8px">
+        <div style="font-weight:800">${esc(t.nom)} · <span style="color:#EAB308">${esc(t.plaque)}</span></div>
+        <div style="font-size:12px;color:var(--text2)">📞 ${esc(t.tel)} · Gilet n° ${esc(t.gilet||'—')} · ${t.enService?'🟢 En service':'⚪ Hors service'}</div>
+        ${t.valide===false ? '<div style="font-size:11px;color:#EAB308">⏳ En attente de validation</div>' : ''}
+      </div>`).join('') : '') +
+
+    (matchVeh.length ? `<div class="sect">🏍️ Véhicules (${matchVeh.length})</div>` + matchVeh.map(v=>`
+      <div class="card" style="margin-bottom:8px">
+        <div style="font-weight:800">${esc(v.mat)} · ${esc(v.brand)} ${esc(v.model)}</div>
+        <div style="font-size:12px;color:var(--text2)">👤 ${esc(v.owner)} · 📞 ${esc(v.phone)}</div>
+        ${v.stolen ? '<div style="font-size:11px;color:#EF4444;font-weight:700">🚨 Déclaré volé</div>' : ''}
+      </div>`).join('') : '') +
+
+    // ── Courses liées ──
+    (coursesTaxi.length ? `<div class="sect">🚕 Courses taxi moto (${coursesTaxi.length})</div>` + coursesTaxi.map(d => {
+      const ps = DB.passagers.find(x=>x.id===d.passagerId);
+      const t = DB.taxis.find(x=>x.id===d.taxiId);
+      const lib = _libsStatutCourses[d.statutAttribution] || d.statutAttribution;
+      const labCoul = d.statutAttribution==='terminee' ? '#22C55E' : d.statutAttribution==='annulee_chauffeur'||d.statutAttribution.startsWith('annulee') ? '#EF4444' : 'var(--text2)';
+      return `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:var(--text2)">${fdt(d.date)}</span><span style="font-size:11px;font-weight:700;color:${labCoul}">${lib}</span></div>
+        ${d.depart||d.arrivee ? `<div style="font-weight:700;font-size:12px;color:#EAB308;margin-top:2px">🛣️ ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <div style="flex:1;background:rgba(0,0,0,.12);border-radius:6px;padding:6px;font-size:11px"><b>🧍 ${esc(d.passagerNom)}</b><br>${(['refusee','refusee_passager','expiree','annulee','annulee_chauffeur','annulee_suspect','annulee_passager','terminee'].includes(d.statutAttribution) && !isAdmin()) ? '<span style="color:var(--text2);font-style:italic">🔒 Contact masqué</span>' : esc(d.passagerTel)}${ps?'<br><span style="color:var(--text2)">'+esc(ps.num)+'</span>':''}</div>
+          <div style="flex:1;background:rgba(0,0,0,.12);border-radius:6px;padding:6px;font-size:11px"><b>🏍️ ${esc(d.taxiNom)}</b><br>${esc(d.taxiPlaque||'—')}${t?'<br>'+esc(t.tel):''}</div>
+        </div>
+        ${d.prixPropose ? `<div style="font-size:11px;color:#f97316;margin-top:4px">Prix course : ${fmt(d.prixPropose)}</div>` : ''}
+      </div>`;
+    }).join('') : '') +
+
+    // ── Trajets de covoiturage liés ──
+    (trajetsTrouves.length ? `<div class="sect">🚙 Covoiturage (${trajetsTrouves.length})</div>` + trajetsTrouves.map(t => {
+      const resas = (t.reservations||[]);
+      return `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:var(--text2)">${fdt(t.dateHeure||t.date)}</span><span class="tag tag-${t.statut==='effectuee'||t.statut==='actif'?'green':'gold'}" style="font-size:9px">${esc(t.statut||'—')}</span></div>
+        <div style="font-weight:800;font-size:13px;margin-top:3px">${esc(t.depart)} → ${esc(t.arrivee)}</div>
+        ${t.vehMat ? `<div style="font-size:12px;color:#60A5FA;margin-bottom:2px">🚗 ${esc(t.vehMat)}</div>` : ''}
+        <div style="font-size:12px;color:var(--text2)">👤 ${esc(t.conducteur)} · 📞 ${esc(t.tel)}</div>
+        ${resas.length ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">💺 ${resas.length} passager(s) : ${resas.map(r=>esc(r.prenom+' '+r.nom)+' ('+esc(r.tel)+')').join(' · ')}</div>` : ''}
+      </div>`;
+    }).join('') : '')
+
+    : '<div class="empty">Aucun résultat pour « ' + esc(term) + ' »</div>'));
+    let list = q ? DB.demandesCourse.filter(d => {
+      const t = DB.taxis.find(x => x.id === d.taxiId);
+      const ps = DB.passagers.find(x => x.id === d.passagerId);
+      return [d.passagerNom, d.passagerTel, d.taxiNom, d.taxiPlaque, t&&t.gilet, t&&t.code, ps&&ps.num]
+        .some(x => nrm(x).includes(q));
+    }) : DB.demandesCourse;
+    list = [...list].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const totalCommissions = list.reduce((s,d)=>s+(d.commission||0), 0);
+    const _libsStatutCourses = {
+      en_attente:['⏳ En attente','#EAB308'], prix_propose:['💰 Prix proposé','#60A5FA'],
+      acceptee:['✅ Acceptée — en route','#22C55E'], effectuee:['🏍️ Présence confirmée','#22C55E'],
+      terminee:['✅ Terminée — service rendu','#22C55E'], refusee:['❌ Refusée (taxi)','#EF4444'],
+      refusee_passager:['❌ Prix refusé (passager)','#EF4444'], expiree:['⏱️ Expirée','var(--text2)'],
+      annulee:['❌ Annulée','#EF4444'], annulee_chauffeur:['🚨 Annulée par le chauffeur','#EF4444'],
+      annulee_passager:['❌ Annulée par le passager','#EF4444'],
+      annulee_suspect:['🚨 Annulée — véhicule suspect','#EF4444']
+    };
+    html = `
+      <div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
+        📜 Historique complet des courses, avec statut final réel — utile en cas de litige entre un passager et un chauffeur. Recherchez par nom, téléphone, plaque, gilet, code taxi, ou numéro unique passager.<br>
+        Total commissions affichées : <b>${fmt(totalCommissions)}</b> (${list.length} course${list.length>1?'s':''}).
+      </div>` +
+      (isAdmin() ? `
+      <div class="card" style="margin-bottom:14px;border-color:rgba(239,68,68,.35)">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">🗑️ Suppression par période — réservé à l'administrateur</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:130px"><div class="lbl">Du</div><input type="date" id="crs-du" style="width:100%"/></div>
+          <div style="flex:1;min-width:130px"><div class="lbl">Au</div><input type="date" id="crs-au" style="width:100%"/></div>
+          <button class="btn-red" style="padding:10px 14px;font-size:12px;flex-shrink:0" onclick="supprimerCoursesPeriode()">🗑️ Supprimer la période</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">Toutes les courses comprises entre ces deux dates (incluses) seront supprimées définitivement, du site et de la base de données.</div>
+      </div>` : '') +
+      (list.length ? list.map(d => {
+        const t = DB.taxis.find(x => x.id === d.taxiId);
+        const ps = DB.passagers.find(x => x.id === d.passagerId);
+        const [lib, coul] = _libsStatutCourses[d.statutAttribution] || ['—','var(--text2)'];
+        const libAffiche = d.enCours ? ['🚗 Course en cours', '#f97316'] : [lib, coul];
+        return `
+      <div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+          <span style="font-size:9px;color:var(--text2)">${fdt(d.date)}</span>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700;color:#f97316">💰 ${fmt(d.commission||0)}</div>
+            ${d.prixPropose ? `<div style="font-size:11px;color:#EAB308;font-weight:700">Prix course : ${fmt(d.prixPropose)}</div>` : ''}
+          </div>
+        </div>
+        <div style="font-weight:800;color:${libAffiche[1]};font-size:12px;margin-bottom:8px">${libAffiche[0]}</div>
+        ${d.depart||d.arrivee ? `<div style="font-size:12px;color:#EAB308;margin-bottom:8px">🛣️ ${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div>` : ''}
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;background:rgba(0,0,0,.15);border-radius:8px;padding:8px">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:3px">🧍 PASSAGER</div>
+            <div style="font-weight:700;font-size:12px">${esc(d.passagerNom)}</div>
+            ${(['refusee','refusee_passager','expiree','annulee','annulee_chauffeur','annulee_suspect','annulee_passager','terminee'].includes(d.statutAttribution) && !isAdmin()) ? '<div style="font-size:11px;color:var(--text2);font-style:italic">🔒 Contact masqué</div>' : `<a href="tel:${esc(d.passagerTel)}" style="display:block;font-size:11px;color:#f97316;font-weight:700;text-decoration:none">${esc(d.passagerTel)}</a>`}
+            ${ps ? `<div style="font-size:10px;color:var(--text2);margin-top:2px">N° unique : ${esc(ps.num)}</div>` : ''}
+          </div>
+          <div style="flex:1;background:rgba(0,0,0,.15);border-radius:8px;padding:8px">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:3px">🏍️ TAXI MOTO</div>
+            <div style="font-weight:700;font-size:12px">${esc(d.taxiNom)}</div>
+            <div style="font-size:11px;color:var(--text2)">${esc(d.taxiPlaque||'—')}${t&&t.gilet?' · Gilet n° '+esc(t.gilet):''}</div>
+            ${t ? `<a href="tel:${esc(t.tel)}" style="display:block;font-size:11px;color:#60A5FA;font-weight:700;text-decoration:none;margin-top:2px">${esc(t.tel)}</a>` : ''}
+          </div>
+        </div>
+        ${d.lat && d.lng ? `<a href="https://www.google.com/maps?q=${d.lat},${d.lng}" target="_blank" style="display:block;font-size:11px;color:#60A5FA;text-decoration:none;margin-top:8px">📍 Position au moment de la demande</a>` : ''}
+      </div>`;
+      }).join('') : '<div class="empty">Aucune course trouvée</div>');
   } else if(gestTab==='validation') {
     const vehsAttente = DB.vehs.filter(v => v.valide===false);
     const taxisAttente = DB.taxis.filter(t => t.valide===false);
@@ -12406,8 +11875,7 @@ function rGestion() {
     html += rSuppressionMasse();
 
   } else if(gestTab==='corbeille') {
-    let list = corbeilleValide(); // Filtrer pour 48h
-    list = q ? list.filter(c=>nrm(c.label).includes(q)) : list;
+    let list = q ? DB.corbeille.filter(c=>nrm(c.label).includes(q)) : DB.corbeille;
     html = `
       <div class="qr-note-txt" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">
         Tous les éléments supprimés (agents, clients, passagers, véhicules, taxis, trajets, annonces, alertes...) restent récupérables ici pendant 48h, puis sont automatiquement et définitivement effacés.
@@ -12504,28 +11972,6 @@ function rGestion() {
 }
 
 // ── Changement de mot de passe (admin seulement) ──
-// ════ ANNULATION DE TRANSACTIONS ════
-async function annulerMouvement(mouvId, benefType, benefId, montant) {
-  if(!confirm('Êtes-vous CERTAIN? Le solde sera restauré à l\'émetteur et retiré du bénéficiaire.')) return;
-  const m = DB.mouvements.find(x => x.id === mouvId);
-  if(!m) { toast('Mouvement non trouvé', true); return; }
-  m.annule = true;
-  
-  // Retirer du bénéficiaire
-  if(benefType === 'client') { const c = DB.clients.find(x => x.id === benefId); if(c) { c.solde -= montant; sbSaveClient(c); } }
-  else if(benefType === 'agent') { const a = DB.agents.find(x => x.id === benefId); if(a) { a.solde -= montant; sbSaveAgent(a); } }
-  
-  // Remettre à l'émetteur (source)
-  if(m.sourceType === 'agent') { const a = DB.agents.find(x => x.id === m.sourceId); if(a) { a.solde += montant; sbSaveAgent(a); } }
-  else if(m.sourceType === 'sousagent') { const s = DB.sousAgents.find(x => x.id === m.sourceId); if(s) { s.solde += montant; sbSaveSousAgent(s); } }
-  else if(m.sourceType === 'client') { const c = DB.clients.find(x => x.id === m.sourceId); if(c) { c.solde += montant; sbSaveClient(c); } }
-  // Si sourceType est vide ou "Admin", pas besoin (l'admin n'a pas de solde)
-  
-  try { await supabaseClient.from('mouvements').update({ annule: true }).eq('id', mouvId); } catch(e) {}
-  toast('✅ Transaction annulée · Solde restauré de ' + fmt(montant));
-  rHistorique();
-}
-
 async function changeMdpAdmin() {
   const newId = document.getElementById('mdp-admin-id').value.trim();
   const newEmail = document.getElementById('mdp-admin-email').value.trim();
@@ -12594,30 +12040,24 @@ async function changeMdp(type, id) {
   obj[champ] = champ==='pass' ? await hashPw(val) : val;
   toast('✅ ' + (champ==='code'?'Code accès':'Mot de passe') + ' modifié · ' + (obj.name||obj.prenom||obj.mat||obj.owner));
   rGestion();
-  // 💾 SAUVEGARDER DANS SUPABASE (BUG FIX: c'était oublié — mots de passe n'étaient jamais persistés!)
-  if(type==='client') sbSaveClient(obj);
-  else if(type==='agent') sbSaveAgent(obj);
-  else if(type==='sousagent') sbSaveSousAgent(obj);
-  else if(type==='passager') sbSavePassager(obj);
-  else if(type==='veh') sbSaveVehicule(obj);
 }
 
 // ── Actions générales ──
 function toggleAg(id) { const ag=DB.agents.find(x=>x.id===id); if(ag){ag.actif=!ag.actif; sbSaveAgent(ag); toast(ag.actif?'✅ Agent activé':'⏸️ Agent suspendu');rGestion();} }
 // ── Habiliter ou retirer à un agent le pouvoir de valider lui-même ses enregistrements (sans passer par l'admin) ──
-async function toggleAgentPeutValider(id) {
+function toggleAgentPeutValider(id) {
   const ag = DB.agents.find(x=>x.id===id);
   if(!ag) return;
   ag.peutValider = !ag.peutValider;
-  await sbSaveAgent(ag);  // ATTENDRE que la sauvegarde soit finie avant de rafraîchir!
+  sbSaveAgent(ag);
   toast(ag.peutValider ? '✅ ' + ag.name + ' peut désormais valider ses enregistrements' : '⏳ ' + ag.name + ' doit désormais passer par la validation admin');
   rGestion();
 }
-async function toggleAgentPeutVoirCourses(id) {
+function toggleAgentPeutVoirCourses(id) {
   const ag = DB.agents.find(x=>x.id===id);
   if(!ag) return;
   ag.peutVoirCourses = !ag.peutVoirCourses;
-  await sbSaveAgent(ag);  // ATTENDRE que la sauvegarde soit finie avant de rafraîchir!
+  sbSaveAgent(ag);
   toast(ag.peutVoirCourses ? '🚕 ' + ag.name + ' peut désormais consulter l\'historique des courses' : '🚫 ' + ag.name + ' ne peut plus consulter l\'historique des courses');
   rGestion();
   updateNav();
@@ -12841,7 +12281,7 @@ function rSuppressionMasse() {
   window._supprType = type;
   const idsVisibles = new Set(items.map(x => x.id));
   supprSel = new Set([...supprSel].filter(id => idsVisibles.has(id)));
-  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🏍️ Taxi moto',taxis:'🏍️ Taxi moto',trajets:'🚙 Voyager',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
+  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🏍️ Taxi moto',taxis:'🏍️ Taxi moto',trajets:'🚙 Covoiturage',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
   return '<div class="card">' +
     '<div class="sect" style="margin-top:0">🧹 Suppression en masse — Admin</div>' +
     '<div class="grid2" style="margin-bottom:8px">' +
@@ -14426,84 +13866,37 @@ function rHistoriqueVehicule() {
 }
 
 function rHistorique() {
-  const zone = document.getElementById('hist-list');
-  if(!zone) return;
-  
-  // ENREGISTREMENTS - Tous les mouvements type 'enreg' avec détails complets
-  if(histTab === 'enreg') {
-    const mvts = (DB.mouvements || []).filter(m => m.type === 'enreg');
-    zone.innerHTML = mvts.length ? mvts.sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).map(m => {
-      const d = m.date ? new Date(m.date) : null;
-      const ds = d ? d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
-      return `<div class="card fu" style="margin-bottom:10px"><div style="display:flex;gap:10px"><div style="font-size:22px;flex-shrink:0">📋</div><div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(m.desc||'')}</div><div style="font-size:11px;color:var(--text2);line-height:1.6">📅 ${ds}<br>👤 ${esc(m.de||'Système')}<br>${m.vers && m.vers !== '—' ? '🏷️ ' + esc(m.vers) + '<br>' : ''}${m.montant ? '💰 ' + fmt(m.montant) + ' GNF' : ''}</div></div></div></div>`;
-    }).join('') : '<div class="empty">📜<br>Aucun enregistrement</div>';
-    return;
-  }
-  
-  // RECHARGES - Transferts de solde SANS commissions, avec détails
-  if(histTab === 'rech') {
-    const mvts = (DB.mouvements || []).filter(m => m.type === 'rech' && !m.desc.toLowerCase().includes('commission') && !m.desc.toLowerCase().includes('frais') && !m.desc.includes('🚕'));
-    zone.innerHTML = mvts.length ? mvts.sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).map(m => {
-      const d = m.date ? new Date(m.date) : null;
-      const ds = d ? d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
-      
-      // Chercher le bénéficiaire par son nom (m.vers)
-      let benefType = m.cibleType;
-      let benefId = m.cibleId;
-      
-      // Si cibleType/cibleId manquent, chercher par le nom dans m.vers
-      if(!benefType || !benefId) {
-        const nomBenef = m.vers;
-        if(nomBenef && nomBenef !== '—') {
-          // Chercher dans clients, agents, passagers
-          const cl = DB.clients.find(x => (x.prenom + ' ' + x.nom).includes(nomBenef));
-          const ag = DB.agents.find(x => x.name.includes(nomBenef));
-          const ps = DB.passagers.find(x => (x.prenom + ' ' + x.nom).includes(nomBenef));
-          
-          if(cl) { benefType = 'client'; benefId = cl.id; }
-          else if(ag) { benefType = 'agent'; benefId = ag.id; }
-          else if(ps) { benefType = 'passager'; benefId = ps.id; }
-        }
-      }
-      
-      // Bouton TOUJOURS visible - c'est la fonction annulerMouvement qui gérera les erreurs
-      const btnAnnulation = `<button class="btn" style="width:100%;margin-top:8px;padding:6px 12px;background:#22C55E;color:#000;font-weight:700;font-size:12px" onclick="annulerMouvement('` + m.id + `','` + (benefType||'') + `','` + (benefId||'') + `',` + m.montant + `)">✅ Annuler ce transfert</button>`;
-      
-      return `<div class="card fu" style="margin-bottom:10px"><div style="display:flex;gap:10px"><div style="font-size:22px;flex-shrink:0">💰</div><div style="flex:1"><div style="font-weight:900;font-size:14px;color:#EAB308;margin-bottom:4px">${fmt(m.montant||0)} GNF</div><div style="font-size:11px;color:var(--text2);line-height:1.6">${esc(m.desc||'')}<br>📅 ${ds}<br>👤 ${esc(m.de||'Système')} ➜ ${esc(m.vers||'—')}<br>🔐 ${esc(m.role||'')}</div>` + btnAnnulation + `</div></div></div>`;
-    }).join('') : '<div class="empty">📜<br>Aucune recharge</div>';
-    return;
-  }
-  
-  // TRAJETS - Covoiturage avec TOUS les détails (passager, chauffeur, sièges, date, heure)
-  if(histTab === 'trajet') {
-    const trajets = (DB.trajets || []).filter(t => t.statut !== 'annule');
-    zone.innerHTML = trajets.length ? trajets.sort((a,b) => new Date(b.dateDepart||b.created_at||0) - new Date(a.dateDepart||a.created_at||0)).map(t => {
-      const d = t.dateDepart ? new Date(t.dateDepart) : null;
-      const ds = d ? d.toLocaleDateString('fr-FR') : '';
-      const ts = d ? d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
-      const libStatut = {actif:'✅ Actif', en_cours:'🚗 En cours', effectue:'✅ Effectué', annule:'❌ Annulé'}[t.statut] || t.statut;
-      return `<div class="card fu" style="margin-bottom:10px"><div style="display:flex;gap:10px"><div style="font-size:22px;flex-shrink:0">🚗</div><div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(t.depart||'')} → ${esc(t.arrivee||'')}</div><div style="font-size:11px;color:var(--text2);line-height:1.6">👤 Chauffeur: ${esc(t.chauffeurNom||'?')}<br>💺 Sièges: ${t.nbSieges||'?'} · 👥 Réservés: ${(t.reservations||[]).filter(r => r.confirme).length || 0}<br>📅 ${ds} à ${ts}<br>💰 ${fmt(t.tarif||0)} GNF ${t.statut ? '· ' + libStatut : ''}</div></div></div></div>`;
-    }).join('') : '<div class="empty">📜<br>Aucun trajet covoiturage</div>';
-    return;
-  }
-  
-  // COURSES - Historique courses taxi moto
-  if(histTab === 'course') {
-    const libellesStatut = {en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée', effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée', refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée', annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)'};
-    const courses = DB.demandesCourse || [];
-    zone.innerHTML = courses.length ? courses.sort((a,b) => new Date(b.created_at||b.date) - new Date(a.created_at||a.date)).map(d => {
-      const dt = d.created_at || d.date ? new Date(d.created_at || d.date) : null;
-      const ds = dt ? dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '';
-      return `<div class="card fu" style="margin-bottom:10px"><div style="display:flex;gap:10px"><div style="font-size:22px;flex-shrink:0">🚕</div><div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(d.depart||'')} → ${esc(d.arrivee||'')}</div><div style="font-size:11px;color:var(--text2);line-height:1.6">👤 Passager: ${esc(d.passagerNom||'?')}<br>🏍️ Chauffeur: ${esc(d.taxiNom||'?')} · Plaque: ${esc(d.taxiPlaque||'?')}<br>💰 ${fmt(d.prixPropose||0)} GNF · 📅 ${ds}<br>📊 ${libellesStatut[d.statutAttribution]||d.statutAttribution}</div></div></div></div>`;
-    }).join('') : '<div class="empty">📜<br>Aucune course taxi moto</div>';
-    return;
-  }
-  
-  // DÉFAUT - Courses taxi
-  const libellesStatut = {en_attente:'⏳ En attente', prix_propose:'💰 Prix proposé', acceptee:'✅ Acceptée', effectuee:'🚕 En cours', terminee:'✅ Terminée', refusee:'❌ Refusée', refusee_passager:'❌ Prix refusé', expiree:'⏱️ Expirée', annulee:'❌ Annulée', annulee_chauffeur:'🚨 Annulée (chauffeur)', annulee_passager:'❌ Annulée (passager)'};
-  const courses = DB.demandesCourse || [];
-  
-  zone.innerHTML = courses.length ? courses.sort((a,b) => new Date(b.created_at||b.date) - new Date(a.created_at||a.date)).map(d => `<div class="card fu" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap"><span class="tag tag-orange">COURSE TAXI 🚕</span><span class="tag ${d.statutAttribution==='terminee'?'tag-green':d.statutAttribution==='annulee'?'tag-red':'tag-blue'}">${libellesStatut[d.statutAttribution]||d.statutAttribution}</span></div><div style="font-weight:700;margin-bottom:4px">${esc(d.depart||'?')} → ${esc(d.arrivee||'?')}</div><div style="font-size:11px;color:var(--text2);margin-bottom:3px">🧑 ${esc(d.passagerNom||'?')} · 📞 ${esc(d.passagerTel||'?')}</div><div style="font-size:11px;color:var(--text2);margin-bottom:3px">🏍️ ${esc(d.taxiNom||'?')} · 📋 ${esc(d.taxiPlaque||'?')}</div><div style="font-size:11px;color:var(--text2)">📅 ${fdt(d.created_at||d.date)}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">${d.prixPropose ? `<div style="font-size:14px;font-weight:900;color:#EAB308">${fmt(d.prixPropose)} GNF</div>` : ''}<button class="btn-ghost" style="font-size:10px;padding:5px 8px" onclick="alert('📋 Détails course:\\n\\nPassager: ${esc(d.passagerNom||'?')}\\nTaxi: ${esc(d.taxiNom||'?')}\\nStatut: ${libellesStatut[d.statutAttribution]||d.statutAttribution}\\n\\nPrix: ${fmt(d.prixPropose||0)} GNF\\nDate: ${fdt(d.created_at||d.date)}')">ℹ️ Détails</button></div></div></div>`).join('') : '<div class="empty">📜<br>Aucune course dans l\'historique</div>';
+  const typeColors = {enreg:'tag-green',rech:'tag-blue',trajet:'tag-orange'};
+  const typeLabels = {enreg:'ENREG.',rech:'RECHARGE',trajet:'TRAJET'};
+  const list = histTab==='all' ? DB.mouvements : DB.mouvements.filter(m=>m.type===histTab);
+
+  document.getElementById('hist-list').innerHTML = list.length ? list.map(m => {
+    // Peut annuler ? Admin = tout, Agent = ses propres recharges, SA = non
+    const canCancel = m.type==='rech' && !m.annule && (
+      isAdmin() ||
+      (isAgent() && !isAdmin() && m.agentId === DB.user.agId)
+    );
+    const isSA = DB.user && DB.user.role === 'sousagent';
+
+    return `<div class="card fu" style="margin-bottom:7px;${m.annule?'opacity:.55;border-style:dashed':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap">
+            <span class="tag ${typeColors[m.type]||'tag-blue'}">${typeLabels[m.type]||m.type}</span>
+            ${m.annule?'<span class="tag tag-red">ANNULÉE</span>':''}
+            <span style="font-size:13px;font-weight:600">${m.desc}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text2)">${m.de} → ${m.vers}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">📅 ${fdt(m.date)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          ${m.montant?`<div style="font-size:14px;font-weight:900;color:${m.annule?'#E8F0E8':'#EAB308'}">${fmt(m.montant)}</div>`:''}
+          ${canCancel ? `<button class="btn-red" style="font-size:11px;padding:5px 10px" onclick="annulerRecharge('${m.id}')">↩️ Annuler</button>` : ''}
+          ${isSA && m.type==='rech' && !m.annule ? `<div style="font-size:10px;color:var(--text2);text-align:right;max-width:110px">Contacter votre agent pour annuler</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty">📜<br>Aucun mouvement</div>';
 }
 
 function annulerRecharge(id) {
@@ -14772,7 +14165,7 @@ document.getElementById('sq').addEventListener('keydown', e => { if(e.key==='Ent
 document.getElementById('sq-taxi').addEventListener('keydown', e => { if(e.key==='Enter') doSearch('taxi'); });
 
 // ════ SURVEILLANCE TEMPS RÉEL (toutes les 10 s) ════
-// Un taxi moto en service et un chauffeur de voyager voient arriver leurs
+// Un taxi moto en service et un chauffeur de covoiturage voient arriver leurs
 // nouvelles courses/réservations sans rafraîchir : son 🔔 + vibration 📳 + bannière.
 let _survInterval = null;
 
@@ -14989,7 +14382,7 @@ async function _verifierNouveautesTempsReel() {
       }
     }
 
-    // ── 2. Nouvelles réservations sur MES trajets (voyager) ──
+    // ── 2. Nouvelles réservations sur MES trajets (covoiturage) ──
     const mesTrajets = DB.trajets.filter(t => t.clientId === cl.id && (t.statut === 'actif' || t.statut === 'en_cours'));
     if(mesTrajets.length) {
       const {data: trs} = await supabaseClient.from('trajets')
@@ -15085,7 +14478,7 @@ function nettoyerExpires() {
   DB.trajets  = trajetsValides();
   DB.annonces = annoncesValides();
   DB.demandesCourse = demandesCourseValides();
-  // NE PAS filtrer DB.corbeille: on garde TOUS les éléments, le filtrage 48h se fait à l'affichage
+  DB.corbeille = corbeilleValide();
   purgerCoursesEtTrajets();
 }
 
@@ -15308,134 +14701,6 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
 function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','');if(!r)return;logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('✅ Avertissement enregistré');}
 
 function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
-
-// Fonction de confirmation personnalisée
-window._confirmCallback = null;
-function confirmAction(message, onConfirm) {
-  window._confirmCallback = onConfirm;
-  const modal = document.createElement('div');
-  modal.id = 'm-confirm-custom';
-  modal.className = 'modal';
-  modal.style.display = 'flex';
-  modal.innerHTML = `
-    <div style="background:rgba(0,0,0,.8);border-radius:12px;padding:20px;max-width:300px;text-align:center">
-      <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:16px">${message}</div>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button class="btn-ghost" style="flex:1" onclick='closeConfirmAction()'>Annuler</button>
-        <button class="btn" style="flex:1" onclick='confirmActionYes()'>Confirmer</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-}
-function confirmActionYes() {
-  closeConfirmAction();
-  if(window._confirmCallback) window._confirmCallback();
-}
-function closeConfirmAction() {
-  const m = document.getElementById('m-confirm-custom');
-  if(m) m.remove();
-}
-
-// Avertir chauffeur
-function avertirChauffeur(chauffeurId, nom) {
-  const cl = DB.clients.find(x => x.id === chauffeurId);
-  if(!cl) { toast('❌ Chauffeur non trouvé', true); return; }
-  
-  confirmAction('⚠️ Avertir ' + nom + ' ?', () => {
-    cl.avertissements = (cl.avertissements || 0) + 1;
-    supabaseClient.from('clients').update({ avertissements: cl.avertissements }).eq('id', cl.id).then(() => {
-      logMvt('avertissement', '⚠️ Vous avez reçu un avertissement', 0, '', cl.tel);
-      toast('⚠️ ' + nom + ' a reçu un avertissement');
-      rGestion();
-      if(DB.user && DB.user.id === chauffeurId) rClient();
-    }).catch(e => console.error('❌ Erreur avertissement:', e));
-  });
-}
-
-function avertirChauffeurParNom(nom) {
-  const cl = DB.clients.find(x => nrm(x.prenom+' '+x.nom) === nrm(nom));
-  if(!cl) { toast('❌ Chauffeur non trouvé', true); return; }
-  
-  confirmAction('⚠️ Avertir ' + nom + ' ?', () => {
-    cl.avertissements = (cl.avertissements || 0) + 1;
-    supabaseClient.from('clients').update({ avertissements: cl.avertissements }).eq('id', cl.id);
-    logMvt('avertissement', '⚠️ Vous avez reçu un avertissement', 0, '', cl.tel);
-    toast('⚠️ ' + nom + ' a reçu un avertissement');
-    rGestion();
-  });
-}
-
-// Suspendre chauffeur
-function suspendreChauffeur(chauffeurId, nom) {
-  const cl = DB.clients.find(x => x.id === chauffeurId);
-  if(!cl) { toast('❌ Chauffeur non trouvé', true); return; }
-  
-  confirmAction('⛔ Suspendre le compte de ' + nom + ' ?', () => {
-    cl.suspendu = true;
-    supabaseClient.from('clients').update({ suspendu: true }).eq('id', cl.id).then(() => {
-      logMvt('suspension', '⛔ Votre compte a été suspendu. Vous ne pouvez plus publier de trajets.', 0, '', cl.tel);
-      toast('⛔ ' + nom + ' a été suspendu');
-      rGestion();
-      if(DB.user && DB.user.id === chauffeurId) rClient();
-    }).catch(e => console.error('❌ Erreur suspension:', e));
-  });
-}
-
-function suspendreChauffeurParNom(nom) {
-  const cl = DB.clients.find(x => nrm(x.prenom+' '+x.nom) === nrm(nom));
-  if(!cl) { toast('❌ Chauffeur non trouvé', true); return; }
-  
-  confirmAction('⛔ Suspendre le compte de ' + nom + ' ?', () => {
-    cl.suspendu = true;
-    supabaseClient.from('clients').update({ suspendu: true }).eq('id', cl.id);
-    logMvt('suspension', '⛔ Votre compte a été suspendu. Vous ne pouvez plus publier de trajets.', 0, '', cl.tel);
-    toast('⛔ ' + nom + ' a été suspendu');
-    rGestion();
-  });
-}
-
-// Apprécier chauffeur
-function apprecierChauffeur(chauffeurId, nom) {
-  const cl = DB.clients.find(x => x.id === chauffeurId);
-  if(!cl) { toast('❌ Chauffeur non trouvé', true); return; }
-  
-  cl.appreciations = (cl.appreciations || 0) + 1;
-  supabaseClient.from('clients').update({ appreciations: cl.appreciations }).eq('id', cl.id).then(() => {
-    logMvt('appreciation', '👍 Vous avez reçu une appréciation', 0, '', cl.tel);
-    toast('👍 ' + nom + ' a reçu une appréciation');
-    rGestion();
-    if(DB.user && DB.user.id === chauffeurId) rClient(); // Rafraîchir profil si c'est moi
-  }).catch(e => {
-    console.error('❌ Erreur appréciations:', e);
-    toast('❌ Erreur lors de l\'enregistrement', true);
-  });
-}
-
-// Avertir passager
-function avertirPassager(passagerId, nom) {
-  const p = DB.passagers.find(x => x.id === passagerId);
-  if(!p) { toast('❌ Passager non trouvé', true); return; }
-  
-  if(confirm('⚠️ Avertir ' + nom + ' ?')) {
-    p.avertissements = (p.avertissements || 0) + 1;
-    sbSavePassager(p);
-    toast('⚠️ Avertissement enregistré');
-    rGestion();
-  }
-}
-
-// Apprécier passager
-function apprecierPassager(passagerId) {
-  const p = DB.passagers.find(x => x.id === passagerId);
-  if(!p) { toast('❌ Passager non trouvé', true); return; }
-  
-  p.appreciations = (p.appreciations || 0) + 1;
-  sbSavePassager(p);
-  toast('👍 Appréciation enregistrée');
-  rGestion();
-}
-
 </script>
 </body>
 </html>
