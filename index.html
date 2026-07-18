@@ -14326,10 +14326,10 @@ function rHistorique() {
       let peutAnnuler = false, benefId = null, benefType = null;
       if(m.cibleType === 'client') {
         const c = DB.clients.find(x => x.id === m.cibleId);
-        if(c && c.solde === m.montant) { peutAnnuler = true; benefId = c.id; benefType = 'client'; }
+        if(c && c.solde >= m.montant) { peutAnnuler = true; benefId = c.id; benefType = 'client'; }
       } else if(m.cibleType === 'agent') {
         const a = DB.agents.find(x => x.id === m.cibleId);
-        if(a && a.solde === m.montant) { peutAnnuler = true; benefId = a.id; benefType = 'agent'; }
+        if(a && a.solde >= m.montant) { peutAnnuler = true; benefId = a.id; benefType = 'agent'; }
       }
       
       const btnAnnulation = peutAnnuler 
