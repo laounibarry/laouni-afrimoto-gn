@@ -8147,7 +8147,7 @@ async function validerRechargeAdmin() {
   if(!obj) return;
   obj.solde = (obj.solde||0)+montant;
   rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
-  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom,{cibleType:rechAdminCible.type==='client'?'client':'passager',cibleId:rechAdminCible.id});
+  logMvt('rech',`💵 Recharge espèces — ${rechAdminCible.nom} · +${fmt(montant)} GNF${note?' · '+note:''}`,montant,DB.user.name,rechAdminCible.nom,{cibleType:rechAdminCible.type==='client'?'client':'passager',cibleId:rechAdminCible.id,sourceType:DB.user.role==='admin'?'admin':DB.user.role==='agent'?'agent':'',sourceId:DB.user.agId||DB.user.saId||null});
   closeModal('m-recharge-admin');
   // 🔄 Recharger les mouvements depuis Supabase pour avoir cibleType/cibleId à jour
   try { const { data } = await supabaseClient.from('mouvements').select('*'); if(data && data.length > 0) DB.mouvements = data.map(mapMouvement); } catch(e) {}
@@ -12390,14 +12390,23 @@ function rGestion() {
 // ── Changement de mot de passe (admin seulement) ──
 // ════ ANNULATION DE TRANSACTIONS ════
 async function annulerMouvement(mouvId, benefType, benefId, montant) {
-  if(!confirm('Êtes-vous CERTAIN? Le solde sera restauré.')) return;
+  if(!confirm('Êtes-vous CERTAIN? Le solde sera restauré à l\'émetteur et retiré du bénéficiaire.')) return;
   const m = DB.mouvements.find(x => x.id === mouvId);
   if(!m) { toast('Mouvement non trouvé', true); return; }
   m.annule = true;
+  
+  // Retirer du bénéficiaire
   if(benefType === 'client') { const c = DB.clients.find(x => x.id === benefId); if(c) { c.solde -= montant; sbSaveClient(c); } }
   else if(benefType === 'agent') { const a = DB.agents.find(x => x.id === benefId); if(a) { a.solde -= montant; sbSaveAgent(a); } }
+  
+  // Remettre à l'émetteur (source)
+  if(m.sourceType === 'agent') { const a = DB.agents.find(x => x.id === m.sourceId); if(a) { a.solde += montant; sbSaveAgent(a); } }
+  else if(m.sourceType === 'sousagent') { const s = DB.sousAgents.find(x => x.id === m.sourceId); if(s) { s.solde += montant; sbSaveSousAgent(s); } }
+  else if(m.sourceType === 'client') { const c = DB.clients.find(x => x.id === m.sourceId); if(c) { c.solde += montant; sbSaveClient(c); } }
+  // Si sourceType est vide ou "Admin", pas besoin (l'admin n'a pas de solde)
+  
   try { await supabaseClient.from('mouvements').update({ annule: true }).eq('id', mouvId); } catch(e) {}
-  toast('✅ Transaction annulée, solde restauré de ' + fmt(montant));
+  toast('✅ Transaction annulée · Solde restauré de ' + fmt(montant));
   rHistorique();
 }
 
