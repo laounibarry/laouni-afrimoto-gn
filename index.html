@@ -13442,8 +13442,8 @@ function rGestion() {
     html = list.map(t=>{
       const client = DB.clients.find(c => c.id === t.clientId);
       const vehicle = DB.vehs.find(v => v.id === t.vehiculeId);
-      const confirmes = (t.reservations||[]).filter(r=>r.confirme);
-      const enAttente = (t.reservations||[]).filter(r=>!r.confirme);
+      const confirmes = (t.reservations||[]).filter(r=>r.confirme && !r.annule);
+      const enAttente = (t.reservations||[]).filter(r=>!r.confirme && !r.annule);
       
       // Calcul RÉEL des places
       const placesConfirmes = confirmes.reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces||1)), 0);
