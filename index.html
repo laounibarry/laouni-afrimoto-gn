@@ -11049,7 +11049,7 @@ function openReserverTrajet(trajetId) {
   
   // Calculer les places disponibles
   const totalPlaces = t.places || 0;
-  const reservees = (t.reservations || []).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
+  const reservees = (t.reservations || []).filter(r => !r.annule).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
   if(reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
   
   document.getElementById('rt-trajet-id').value = trajetId;
@@ -11107,6 +11107,8 @@ function renderPlacesSelection(trajetId) {
   const placesReservees = [];
   
   reservees.forEach(r => {
+    // ✅ FIX: EXCLURE les annulées!
+    if(r.annule) return;
     if(Array.isArray(r.places_positions)) {
       placesReservees.push(...r.places_positions);
     } else if(r.place_position) {
