@@ -3330,7 +3330,19 @@ function formatDistance(m) {
   return m < 1000 ? m + ' m' : (m/1000).toFixed(1) + ' km';
 }
 const fd = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
-const fdt = d => d ? new Date(d).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : '—';
+const fdt = d => {
+  if(!d) return '—';
+  // ✅ Si c'est un format datetime-local (YYYY-MM-DDTHH:mm), parser en HEURE LOCAL
+  if(typeof d === 'string' && d.includes('T') && d.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) {
+    const [datePart, timePart] = d.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    const date = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+    return date.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+  }
+  // Fallback pour autres formats
+  return new Date(d).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+};
 const isAdmin = () => DB.user && DB.user.role === 'admin';
 const isAgent = () => DB.user && (DB.user.role === 'agent' || DB.user.role === 'admin');
 const isSA = () => DB.user && DB.user.role === 'sousagent';
@@ -10949,13 +10961,21 @@ function rTrajets() {
   const villeN = nrm(filtreTrajetVille);
   // N'afficher les trajets QUE si une préfecture ou une ville de départ est sélectionnée
   const filtreActif = prefN || villeN || qDep;
-  const list = !filtreActif ? [] : trajetsValides().filter(t =>
-    t.statut==='actif' && t.placesDispos>0 &&
-    (!qDep || nrm(t.depart).includes(qDep)) &&
-    (!qArr || nrm(t.arrivee).includes(qArr)) &&
-    (!prefN || nrm(t.depart).includes(prefN) || nrm(t.arrivee).includes(prefN) || (t.pref && nrm(t.pref)===prefN)) &&
-    (!villeN || nrm(t.depart).includes(villeN) || nrm(t.arrivee).includes(villeN))
-  );
+  const list = !filtreActif ? [] : trajetsValides().filter(t => {
+    // Trajet AVEC réservations disparaît du PUBLIC à l'heure du départ
+    if(t.dateHeure) {
+      const trajet_date = parseLocalDateTime(t.dateHeure);
+      const trajet_ms = trajet_date ? trajet_date.getTime() : null;
+      const hasReservations = (t.reservations && t.reservations.some(r => r.confirme));
+      const now_ms = new Date().getTime();
+      if(trajet_ms && trajet_ms <= now_ms && hasReservations) return false;
+    }
+    return t.statut==='actif' && t.placesDispos>0 &&
+      (!qDep || nrm(t.depart).includes(qDep)) &&
+      (!qArr || nrm(t.arrivee).includes(qArr)) &&
+      (!prefN || nrm(t.depart).includes(prefN) || nrm(t.arrivee).includes(prefN) || (t.pref && nrm(t.pref)===prefN)) &&
+      (!villeN || nrm(t.depart).includes(villeN) || nrm(t.arrivee).includes(villeN));
+  });
   document.getElementById('trajets-list').innerHTML = list.length ? list.map(t=>{
     const av = avisChauffeur(t.clientId, t.conducteur);
     return `
@@ -17438,11 +17458,32 @@ function trajetsValides() {
     if(t.statut === 'effectué') return (now - new Date(t.arriveLe || t.date || now)) < ms45j;
     // Trajet en cours (départ verrouillé, tous les passagers confirmés) : toujours visible
     if(t.statut === 'en_cours') return true;
-    // Trajet actif : conserver si date pas encore dépassée
-    if(t.dateHeure && new Date(t.dateHeure) <= now) return false;
+    // Trajet actif : logique par réservations à l'heure de départ
+    // SANS réservations → disparaît complètement
+    // AVEC réservations → reste visible (CLIENT/ADMIN, PUBLIC le filtre)
+    if(t.dateHeure) {
+      const trajet_date = parseLocalDateTime(t.dateHeure);
+      const trajet_ms = trajet_date ? trajet_date.getTime() : null;
+      const hasReservations = (t.reservations && t.reservations.some(r => r.confirme));
+      const now_ms = now.getTime();
+      
+      if(trajet_ms && trajet_ms <= now_ms) {
+        if(!hasReservations) return false;
+      }
+    }
     return true;
   });
 }
+// ✅ Parser datetime-local string en Date HEURE LOCAL (pas UTC!)
+function parseLocalDateTime(dateString) {
+  if(!dateString) return null;
+  const [datePart, timePart] = dateString.split('T');
+  if(!datePart || !timePart) return null;
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  return new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+}
+
 function vehiculesValides() {
   // 🔧 FIX: Ne pas afficher les véhicules des clients supprimés
   return DB.vehs.filter(v => {
