@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.laouni_securite_ultime.twa",
+        "sha256_cert_fingerprints": ["F8:D5:AF:E4:B5:68:F0:5D:D6:5C:82:02:FE:E0:FC:4F:90:E9:25:E8:07:17:6F:8A:34:5A:14:13:67:A7:3F:44"]
+      }
+    }]
