@@ -3332,16 +3332,15 @@ function formatDistance(m) {
 const fd = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
 const fdt = d => {
   if(!d) return '—';
-  // ✅ Si c'est un format datetime-local (YYYY-MM-DDTHH:mm), parser en HEURE LOCAL
-  if(typeof d === 'string' && d.includes('T') && d.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) {
-    const [datePart, timePart] = d.split('T');
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hours, minutes] = timePart.split(':').map(Number);
-    const date = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
-    return date.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+  // ✅ Si format datetime-local: afficher DIRECTEMENT sans conversion
+  if(typeof d === 'string' && d.includes('T')) {
+    const parts = d.split('T');
+    const date = parts[0]; // "2026-07-25"
+    const time = parts[1] ? parts[1].substring(0, 5) : ''; // "01:01"
+    if(date && time) return `${date.split('-').reverse().join('/')} ${time}`; // "25/07/2026 01:01"
   }
-  // Fallback pour autres formats
-  return new Date(d).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+  // Fallback
+  return d.substring(0, 16);
 };
 const isAdmin = () => DB.user && DB.user.role === 'admin';
 const isAgent = () => DB.user && (DB.user.role === 'agent' || DB.user.role === 'admin');
@@ -10962,13 +10961,13 @@ function rTrajets() {
   // N'afficher les trajets QUE si une préfecture ou une ville de départ est sélectionnée
   const filtreActif = prefN || villeN || qDep;
   const list = !filtreActif ? [] : trajetsValides().filter(t => {
-    // Trajet AVEC réservations disparaît du PUBLIC à l'heure du départ
+    // ✅ Trajet AVEC réservations disparaît du PUBLIC à l'heure du départ
+    // Comparaison STRING directe (pas timestamp!)
     if(t.dateHeure) {
-      const trajet_date = parseLocalDateTime(t.dateHeure);
-      const trajet_ms = trajet_date ? trajet_date.getTime() : null;
+      const now_iso = new Date().toISOString().substring(0, 16);
       const hasReservations = (t.reservations && t.reservations.some(r => r.confirme));
-      const now_ms = new Date().getTime();
-      if(trajet_ms && trajet_ms <= now_ms && hasReservations) return false;
+      // Si heure de départ passée ET trajet a des réservations → disparaît du PUBLIC
+      if(t.dateHeure <= now_iso && hasReservations) return false;
     }
     return t.statut==='actif' && t.placesDispos>0 &&
       (!qDep || nrm(t.depart).includes(qDep)) &&
@@ -17458,32 +17457,24 @@ function trajetsValides() {
     if(t.statut === 'effectué') return (now - new Date(t.arriveLe || t.date || now)) < ms45j;
     // Trajet en cours (départ verrouillé, tous les passagers confirmés) : toujours visible
     if(t.statut === 'en_cours') return true;
-    // Trajet actif : logique par réservations à l'heure de départ
-    // SANS réservations → disparaît complètement
-    // AVEC réservations → reste visible (CLIENT/ADMIN, PUBLIC le filtre)
+    // Trajet actif : logique par réservations - compare STRINGS (pas timestamps!)
+    // ✅ SANS réservations → disparaît à l'heure exacte
+    // ✅ AVEC réservations → reste visible (CLIENT/ADMIN, PUBLIC le filtre)
     if(t.dateHeure) {
-      const trajet_date = parseLocalDateTime(t.dateHeure);
-      const trajet_ms = trajet_date ? trajet_date.getTime() : null;
+      // now en format ISO: "2026-07-25T03:05" (heure locale)
+      const now_iso = new Date().toISOString().substring(0, 16);
+      // Comparer les strings directement: "2026-07-25T01:01" <= "2026-07-25T03:05" ?
       const hasReservations = (t.reservations && t.reservations.some(r => r.confirme));
-      const now_ms = now.getTime();
       
-      if(trajet_ms && trajet_ms <= now_ms) {
+      if(t.dateHeure <= now_iso) {
+        // SANS réservations → disparaît complètement du système
         if(!hasReservations) return false;
+        // AVEC réservations → reste visible (CLIENT/ADMIN)
       }
     }
     return true;
   });
 }
-// ✅ Parser datetime-local string en Date HEURE LOCAL (pas UTC!)
-function parseLocalDateTime(dateString) {
-  if(!dateString) return null;
-  const [datePart, timePart] = dateString.split('T');
-  if(!datePart || !timePart) return null;
-  const [year, month, day] = datePart.split('-').map(Number);
-  const [hours, minutes] = timePart.split(':').map(Number);
-  return new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
-}
-
 function vehiculesValides() {
   // 🔧 FIX: Ne pas afficher les véhicules des clients supprimés
   return DB.vehs.filter(v => {
