@@ -60,16 +60,43 @@ self.addEventListener('push', function (e) {
 
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
-  var cible = (e.notification.data && e.notification.data.url) || '/';
+
+  // v9.354 : adresse COMPLETE. Avec une adresse relative (« / »), Android ne
+  // rattache pas toujours la notification a l'application installee et ouvre
+  // le navigateur a la place.
+  var brut = (e.notification.data && e.notification.data.url) || '/';
+  var cible;
+  try { cible = new URL(brut, self.location.origin).href; }
+  catch (err) { cible = self.location.origin + '/'; }
+
   e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (liste) {
-      for (var i = 0; i < liste.length; i++) {
-        if ('focus' in liste[i]) {
-          if (liste[i].navigate) { try { liste[i].navigate(cible); } catch (err) {} }
-          return liste[i].focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (liste) {
+        // 1) Une fenetre de l'application est deja ouverte : on la ramene devant
+        for (var i = 0; i < liste.length; i++) {
+          var c = liste[i];
+          if (c.url && c.url.indexOf(self.location.origin) === 0 && 'focus' in c) {
+            return c.focus().then(function (fen) {
+              // On ne recharge que si l'on n'est pas deja au bon endroit,
+              // pour ne pas perdre ce que l'utilisateur avait a l'ecran.
+              if (fen && fen.navigate && fen.url !== cible) {
+                return fen.navigate(cible).catch(function () { return fen; });
+              }
+              return fen;
+            }).catch(function () {
+              return self.clients.openWindow ? self.clients.openWindow(cible) : null;
+            });
+          }
         }
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(cible);
-    })
+        // 2) Application fermee : on l'ouvre
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(cible).catch(function () {
+            return self.clients.openWindow(self.location.origin + '/');
+          });
+        }
+      })
+      .catch(function () {
+        if (self.clients.openWindow) return self.clients.openWindow(self.location.origin + '/');
+      })
   );
 });
