@@ -35,3 +35,41 @@ self.addEventListener('fetch', function (e) {
     })
   );
 });
+
+
+/* ══════════════════════════════════════════════════════════
+   v9.336 — NOTIFICATIONS PUSH
+   Android reveille ce service worker meme application fermee.
+   ══════════════════════════════════════════════════════════ */
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = {}; }
+  var titre = d.titre || 'AfriMoto GN';
+  var options = {
+    body: d.message || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [300, 120, 300, 120, 300],
+    tag: d.tag || 'afrimoto',
+    renotify: true,
+    requireInteraction: true,
+    data: { url: d.url || '/' }
+  };
+  e.waitUntil(self.registration.showNotification(titre, options));
+});
+
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var cible = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (liste) {
+      for (var i = 0; i < liste.length; i++) {
+        if ('focus' in liste[i]) {
+          if (liste[i].navigate) { try { liste[i].navigate(cible); } catch (err) {} }
+          return liste[i].focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(cible);
+    })
+  );
+});
