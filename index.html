@@ -10550,12 +10550,11 @@ function toggleTaxiEnService(id) {
     toast('🟢 Vous êtes maintenant en service');
     capturerPositionTaxi(t.id);
     demarrerSuiviGpsTaxi(t.id); // v9.329 : suivi continu pendant le service
-    activerEcranAllume();       // v9.333 : ecran maintenu allume pendant le service
-    toast('\ud83d\udd06 L ecran restera allume tant que vous etes en service. Pensez au chargeur.');
+    activerEcranAllume();       // v9.333 : l'ecran reste allume tant qu'on est en service
   } else {
     // Position effacée à la désactivation : un taxi hors service ne doit pas apparaître "proche" de qui que ce soit
     arreterSuiviGpsTaxi(); // v9.329 : GPS coupe des la mise hors service
-    desactiverEcranAllume(); // v9.333 : on rend la main a Android (batterie)
+    desactiverEcranAllume(); // v9.333 : l'ecran peut de nouveau s'eteindre
     t.lat = null; t.lng = null; t.positionMaj = null;
     sbSaveTaxi(t); // AUDIT : idem pour le retour hors service
     toast('⚪ Vous êtes maintenant hors service');
@@ -10563,15 +10562,15 @@ function toggleTaxiEnService(id) {
 }
 // ── Capture la position GPS du taxi : appelée à l'activation du service, et tant que l'écran reste ouvert ──
 // ════════════════════════════════════════════════
-// v9.332 — DIAGNOSTIC GPS VISIBLE (panneau 🔧 + message a l'ecran)
-// La console F12 est bloquee sur le site : tout probleme de position
-// doit donc s'afficher directement au chauffeur.
+// v9.330 — DIAGNOSTIC GPS VISIBLE
+// La console F12 etant bloquee sur le site, tout probleme de position
+// doit s'afficher directement a l'ecran du chauffeur.
 // ════════════════════════════════════════════════
 let _gpsDerniereAlerte = 0, _gpsDejaConfirme = false;
 
 function _gpsMessageErreur(err) {
   if(!err) return '\u274c Position indisponible.';
-  if(err.code === 1) return '\ud83d\udeab Position REFUSEE. Touchez le cadenas a gauche de l\'adresse \u2192 Position \u2192 Autoriser, puis rechargez.';
+  if(err.code === 1) return '\ud83d\udeab Position REFUSEE. Touchez le cadenas a gauche de l\'adresse \u2192 Position \u2192 Autoriser, puis rechargez la page.';
   if(err.code === 2) return '\ud83d\udce1 Position indisponible : activez la localisation (GPS) du telephone.';
   if(err.code === 3) return '\u23f1\ufe0f Le GPS met trop de temps. Approchez-vous d\'une fenetre ou sortez a l\'air libre.';
   return '\u274c Position indisponible : ' + (err.message || 'erreur inconnue');
@@ -10579,29 +10578,27 @@ function _gpsMessageErreur(err) {
 
 function _gpsAlerte(msg) {
   const now = Date.now();
-  try { addDebugLog('GPS PROBLEME : ' + msg); } catch(e) {}
-  if(now - _gpsDerniereAlerte < 25000) return;
+  if(now - _gpsDerniereAlerte < 25000) return; // au plus un message toutes les 25 s
   _gpsDerniereAlerte = now;
   _gpsDejaConfirme = false;
+  try { addDebugLog('GPS PROBLEME : ' + msg); } catch(e) {}
   try { toast(msg, true); } catch(e) {}
 }
 
 function _gpsOk() {
-  try { addDebugLog('GPS OK : position enregistree dans Supabase'); } catch(e) {}
   if(_gpsDejaConfirme) return;
   _gpsDejaConfirme = true;
+  try { addDebugLog('GPS OK : position enregistree dans Supabase'); } catch(e) {}
   try { toast('\ud83d\udccd Position envoyee \u2014 vous etes visible sur la carte des passagers.'); } catch(e) {}
 }
 
 function capturerPositionTaxi(taxiId, hautePrecision) {
-  const precis = (hautePrecision !== false);
-  try { addDebugLog('GPS demande de position (' + (precis ? 'haute precision' : 'precision normale') + ')...'); } catch(e) {}
   if(!navigator.geolocation) { _gpsAlerte('\u274c Ce navigateur ne gere pas la geolocalisation.'); return; }
+  const precis = (hautePrecision !== false);
   navigator.geolocation.getCurrentPosition(
     pos => {
       const t = DB.taxis.find(x=>x.id===taxiId);
-      if(!t) { try { addDebugLog('GPS ANNULE : taxi introuvable en memoire'); } catch(e) {} return; }
-      if(!t.enService) { try { addDebugLog('GPS ANNULE : le taxi n est pas en service'); } catch(e) {} return; }
+      if(!t || !t.enService) return;
       t.lat = pos.coords.latitude;
       t.lng = pos.coords.longitude;
       t.positionMaj = new Date().toISOString();
@@ -10609,16 +10606,13 @@ function capturerPositionTaxi(taxiId, hautePrecision) {
       supabaseClient.from('taxis').update({
         position: {lat: t.lat, lng: t.lng, maj: t.positionMaj}
       }).eq('id', taxiId).then(({error}) => {
-        if(error) { _gpsAlerte('\u274c Base de donnees : ' + (error.message || 'refus')); return; }
+        if(error) { _gpsAlerte('\u274c Enregistrement refuse par la base : ' + (error.message || 'erreur')); return; }
         _gpsOk();
       });
     },
     err => {
       // Repli : la haute precision echoue souvent en interieur -> on retente en precision normale
-      if(precis && err && err.code === 3) {
-        try { addDebugLog('GPS trop lent en haute precision -> nouvelle tentative en precision normale'); } catch(e) {}
-        capturerPositionTaxi(taxiId, false); return;
-      }
+      if(precis && err && err.code === 3) { capturerPositionTaxi(taxiId, false); return; }
       _gpsAlerte(_gpsMessageErreur(err));
     },
     precis ? {enableHighAccuracy: true,  timeout: 12000, maximumAge: 5000}
@@ -10635,49 +10629,8 @@ function capturerPositionTaxi(taxiId, hautePrecision) {
 // ════════════════════════════════════════════════
 let _gpsWatchId = null, _gpsWatchTaxiId = null, _gpsDernierEnvoi = 0, _gpsDernierePos = null;
 
-// ════════════════════════════════════════════════
-// v9.333 — ECRAN MAINTENU ALLUME PENDANT LE SERVICE
-// Sans cela Android eteint l'ecran, gele les minuteries et coupe le son :
-// le chauffeur rate les demandes de course et le GPS s'arrete.
-// Le verrou est relache des la mise hors service (economie de batterie).
-// ════════════════════════════════════════════════
-let _wakeLock = null, _wakeLockVoulu = false;
-
-async function activerEcranAllume() {
-  _wakeLockVoulu = true;
-  if(!('wakeLock' in navigator)) {
-    try { addDebugLog('ECRAN : maintien non supporte par ce navigateur'); } catch(e) {}
-    return;
-  }
-  if(_wakeLock) return;
-  try {
-    _wakeLock = await navigator.wakeLock.request('screen');
-    try { addDebugLog('ECRAN : maintien ACTIF (l ecran ne s eteindra plus)'); } catch(e) {}
-    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
-  } catch(e) {
-    _wakeLock = null;
-    try { addDebugLog('ECRAN : maintien refuse (' + ((e && e.message) || 'erreur') + ')'); } catch(err) {}
-  }
-}
-
-async function desactiverEcranAllume() {
-  _wakeLockVoulu = false;
-  if(_wakeLock) {
-    try { await _wakeLock.release(); } catch(e) {}
-    _wakeLock = null;
-    try { addDebugLog('ECRAN : maintien relache'); } catch(e) {}
-  }
-}
-
-// Android relache le verrou des que l'app passe en arriere-plan :
-// on le reprend automatiquement au retour, tant que le taxi est en service.
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible' && _wakeLockVoulu && !_wakeLock) activerEcranAllume();
-});
-
 function demarrerSuiviGpsTaxi(taxiId) {
-  if(!navigator.geolocation || !navigator.geolocation.watchPosition) { _gpsAlerte('\u274c Suivi continu non disponible sur ce navigateur.'); return; }
-  try { addDebugLog('GPS demarrage du suivi continu pour le taxi ' + String(taxiId).slice(0,8)); } catch(e) {}
+  if(!navigator.geolocation || !navigator.geolocation.watchPosition) return;
   if(_gpsWatchId !== null && _gpsWatchTaxiId === taxiId) return; // deja actif sur ce taxi
   arreterSuiviGpsTaxi();
   _gpsWatchTaxiId = taxiId;
@@ -10697,11 +10650,11 @@ function demarrerSuiviGpsTaxi(taxiId) {
         supabaseClient.from('taxis').update({
           position: {lat: lat, lng: lng, maj: t.positionMaj}
         }).eq('id', t.id).then(({error}) => {
-          if(error) { _gpsAlerte('\u274c Base de donnees : ' + (error.message || 'refus')); return; }
+          if(error) { _gpsAlerte('\u274c Enregistrement refuse par la base : ' + (error.message || 'erreur')); return; }
           _gpsOk();
         });
       },
-      err => { _gpsAlerte(_gpsMessageErreur(err)); },
+      err => { _gpsAlerte(_gpsMessageErreur(err)); }, // v9.330 : on previent au lieu d'echouer en silence
       {enableHighAccuracy: true, maximumAge: 5000, timeout: 20000}
     );
   } catch(e) { _gpsWatchId = null; _gpsWatchTaxiId = null; }
@@ -10711,6 +10664,51 @@ function arreterSuiviGpsTaxi() {
   if(_gpsWatchId !== null) { try { navigator.geolocation.clearWatch(_gpsWatchId); } catch(e) {} }
   _gpsWatchId = null; _gpsWatchTaxiId = null; _gpsDernierEnvoi = 0; _gpsDernierePos = null;
 }
+
+// ════════════════════════════════
+// v9.333 — ECRAN MAINTENU ALLUME PENDANT LE SERVICE (Wake Lock)
+// Tant que le taxi est EN SERVICE, l'ecran ne s'eteint pas : le GPS continue
+// d'envoyer la position, la surveillance des demandes tourne, les sonneries
+// fonctionnent. Tout est relache des la mise HORS SERVICE.
+// ════════════════════════════════
+let _ecranVerrou = null, _ecranVoulu = false, _ecranDejaSignale = false;
+
+function _ecranLog(msg) { try { addDebugLog('ECRAN : ' + msg); } catch(e) {} }
+
+async function activerEcranAllume() {
+  _ecranVoulu = true;
+  if(!('wakeLock' in navigator)) {
+    if(!_ecranDejaSignale) { _ecranDejaSignale = true; _ecranLog('non gere par ce navigateur (l\'ecran peut s\'eteindre)'); }
+    return;
+  }
+  if(_ecranVerrou) return; // deja actif
+  try {
+    _ecranVerrou = await navigator.wakeLock.request('screen');
+    _ecranLog('maintien actif');
+    _ecranVerrou.addEventListener('release', () => {
+      _ecranVerrou = null;
+      _ecranLog('relache par le systeme');
+    });
+  } catch(e) {
+    _ecranVerrou = null;
+    _ecranLog('refuse : ' + ((e && e.message) || 'erreur inconnue'));
+  }
+}
+
+async function desactiverEcranAllume() {
+  _ecranVoulu = false;
+  if(!_ecranVerrou) return;
+  try { await _ecranVerrou.release(); } catch(e) {}
+  _ecranVerrou = null;
+  _ecranLog('relache (hors service)');
+}
+
+// Android coupe le verrou des qu'on quitte l'app : on le reprend au retour.
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && _ecranVoulu && !_ecranVerrou) {
+    activerEcranAllume();
+  }
+});
 
 // ════════════════════════════════════════════════
 // v9.329 — CARTE DE SUIVI COTE PASSAGER
@@ -17867,11 +17865,10 @@ setInterval(() => {
   if(!DB.user || DB.user.role !== 'client') return;
   const cl = DB.clients.find(c => c.id === DB.user.id);
   if(!cl) return;
-  const _enService = DB.taxis.filter(t => t.tel === cl.tel && t.enService);
-  if(_enService.length && !_wakeLockVoulu) activerEcranAllume(); // v9.333 : reprise de session
-  _enService.forEach(t => {
+  DB.taxis.filter(t => t.tel === cl.tel && t.enService).forEach(t => {
     demarrerSuiviGpsTaxi(t.id);                          // v9.329 : relance apres reprise de session (sans effet si deja actif)
     if(_gpsWatchId === null) capturerPositionTaxi(t.id);  // repli si watchPosition indisponible
+    activerEcranAllume();                                // v9.333 : deja en service au chargement
   });
 }, 30 * 1000); // toutes les 30 secondes
 // Surveille toutes les 3 secondes si une nouvelle demande de course automatique arrive pour ce chauffeur.
