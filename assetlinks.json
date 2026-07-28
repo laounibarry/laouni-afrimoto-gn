@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "com.laouni_securite_ultime.www.twa",
+        "package_name": "com.laouni_securite_ultime.twa",
         "sha256_cert_fingerprints": ["4C:C2:9B:67:BE:72:D5:AF:8E:F3:32:2D:AE:E2:AB:F9:17:66:71:9E:1D:E0:A1:E5:40:BA:2A:1F:21:5E:68:B2"]
       }
     }]
