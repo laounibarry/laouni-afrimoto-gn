@@ -1,1 +1,1 @@
-v9.411 - Fin du defilement horizontal (barre du haut qui passe a la ligne)
+v9.412 - Les bandeaux ne cachent plus EN SERVICE sur la carte
