@@ -1,1 +1,1 @@
-v9.419 - La carte du chauffeur se synchronise toute seule (course acceptee/qui sonne sans tirer pour actualiser)
+v9.420 - Course confirmee amenee sur la carte du chauffeur + chauffeur accepte le prix du passager = demarrage immediat sans re-accord
