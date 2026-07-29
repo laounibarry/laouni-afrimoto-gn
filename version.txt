@@ -1,1 +1,1 @@
-v9.418 - Bouton Retour au service fixe sur la fiche du vehicule (plus de bouton flottant qui bugue)
+v9.419 - La carte du chauffeur se synchronise toute seule (course acceptee/qui sonne sans tirer pour actualiser)
