@@ -1,1 +1,1 @@
-v9.412 - Les bandeaux ne cachent plus EN SERVICE sur la carte
+v9.413 - Correctifs : bandeaux qui disparaissent + Retour au service masque hors ligne
