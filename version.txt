@@ -1,1 +1,1 @@
-v9.410 - Sons distincts : positif en ligne, negatif hors ligne
+v9.411 - Fin du defilement horizontal (barre du haut qui passe a la ligne)
