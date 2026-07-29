@@ -1,1 +1,1 @@
-v9.415 - Course acceptee affichee sur la carte (Waze/Maps + code PIN) facon Bolt
+v9.416 - La carte ne souvre plus toute seule au rechargement (bouton Retour au service conserve)
