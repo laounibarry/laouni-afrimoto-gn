@@ -1,1 +1,1 @@
-v9.433 - Passage en ligne debloque (selecteur de vehicule permissif) + frais d annonce dans l onglet Zones
+v9.434 - ANTI-CLIGNOTEMENT (1 rechargement max/3min) + liste complete des vehicules + bouton d etat vert/gris
