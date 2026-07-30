@@ -1,1 +1,1 @@
-v9.451 - Disponibilites en direct (~2 s) : vehicules proches par option Economie/Standard/Confort et taxis motos autour
+v9.452 - Moteur de la carte chauffeur REECRIT : etat, revenus, glissiere et course TOUJOURS a jour (battement 2 s permanent)
