@@ -1,1 +1,1 @@
-v9.431 - La liste des vehicules (motos et voitures) s affiche TOUJOURS avant d aller en ligne
+v9.432 - Frais d annonce reglables par l admin (Gestion, carte des tarifs) â€” 0 = publication gratuite
