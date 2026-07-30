@@ -1,1 +1,1 @@
-v9.448 - Categories VTC (Economie / Standard / Confort) avec prix ajuste â€” uniquement pour les voitures
+v9.449 - Message honnete quand la session est fermee par un autre appareil (cause reelle du bouton carte muet)
