@@ -1,1 +1,1 @@
-v9.421 - Carte chauffeur facon Bolt : volet course repliable en bas, sous-menu range, moteur de synchro actif meme apres rechargement
+v9.422 - Ecran passager facon Bolt : carte plein ecran, depart suggere depuis la position GPS, Ou allez-vous en bas
