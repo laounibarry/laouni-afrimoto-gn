@@ -1,1 +1,1 @@
-v9.442 - Glissiere unique en/hors service sur la carte + position passager quasi instantanee + prix affiche des que possible
+v9.443 - Adresse EXACTE du depart (rue, quartier, ville) transmise au chauffeur + crayon Modifier ouvre la carte pour confirmer
