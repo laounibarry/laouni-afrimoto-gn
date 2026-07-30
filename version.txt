@@ -1,1 +1,1 @@
-v9.422 - Ecran passager facon Bolt : carte plein ecran, depart suggere depuis la position GPS, Ou allez-vous en bas
+v9.423 - Accueil chauffeur facon Bolt (carte a la connexion) + la course arrive sur la carte quel que soit le vehicule (correctif racine)
