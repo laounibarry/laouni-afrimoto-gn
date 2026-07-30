@@ -1,1 +1,1 @@
-v9.446 - CORRECTIF RACINE : plus AUCUNE sauvegarde ne peut ecraser l etat en/hors service sur le serveur + version visible sur la carte
+v9.447 - Depart (adresse exacte) juste au-dessus de Ou allez-vous + GPS passager actualise en continu (~2 s)
