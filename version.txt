@@ -1,1 +1,1 @@
-v9.420 - Course confirmee amenee sur la carte du chauffeur + chauffeur accepte le prix du passager = demarrage immediat sans re-accord
+v9.421 - Carte chauffeur facon Bolt : volet course repliable en bas, sous-menu range, moteur de synchro actif meme apres rechargement
