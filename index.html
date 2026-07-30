@@ -21904,7 +21904,7 @@ body.mode-service .nav-inner{display:none!important}
     document.getElementById('svc-return').classList.remove('on');
     // v9.423 : facon Bolt — la carte est aussi l'accueil HORS service ("Aller en ligne")
     var _enSvcE = !!(t && t.enService);
-    var _txtE=document.querySelector('.svc-slide-txt'); if(_txtE) _txtE.textContent = _enSvcE ? 'Glissez pour vous arrêter →' : 'Glissez pour reprendre le service →';
+    var _txtE=document.querySelector('.svc-slide-txt'); if(_txtE) _txtE.textContent = _enSvcE ? 'Glissez pour vous arrêter →' : 'Appuyez pour reprendre le service'; // v9.426
     var _etE=document.getElementById('svc-etat'); if(_etE) _etE.innerHTML = _enSvcE ? '🟢 En service' : '⚪ Hors service';
     var _slE=document.getElementById('svc-slide'); if(_slE) _slE.classList[_enSvcE?'remove':'add']('hors');
     setTimeout(function(){
@@ -22071,7 +22071,26 @@ body.mode-service .nav-inner{display:none!important}
     svcTimer=setInterval(_svcTick, 4000);
   };
   window.sortirServiceDepuisEcran=function(){
-    if(svcTaxiId && typeof toggleTaxiEnService==='function') toggleTaxiEnService(svcTaxiId);
+    // v9.426 : si l'identifiant du vehicule a ete perdu, on reprend le premier
+    // taxi du compte plutot que de ne rien faire du tout.
+    if(!svcTaxiId){
+      try{
+        var _cl=(DB.clients||[]).find(function(c){return c.id===(DB.user&&DB.user.id)});
+        var _t0=_cl?(DB.taxis||[]).find(function(x){return x.tel===_cl.tel}):null;
+        if(_t0) svcTaxiId=_t0.id;
+      }catch(e){}
+    }
+    if(!svcTaxiId){ toast('\u26a0\ufe0f Aucun v\u00e9hicule trouv\u00e9 sur ce compte.',true); return; }
+    try{ addDebugLog('SERVICE : bascule demandee pour '+svcTaxiId); }catch(e){}
+    if(typeof toggleTaxiEnService==='function') toggleTaxiEnService(svcTaxiId);
+  };
+
+  // v9.426 : le taxi de cet ecran est-il en service ?
+  window._svcEstEnService=function(){
+    try{
+      var t=(DB.taxis||[]).find(function(x){return x.id===svcTaxiId});
+      return !!(t && t.enService);
+    }catch(e){ return false; }
   };
   // Menu : demande de confirmation avant d'ouvrir
   window.demanderMenuService=function(){ var c=document.getElementById('svc-confirm'); if(c) c.classList.add('on'); };
@@ -22091,9 +22110,21 @@ body.mode-service .nav-inner{display:none!important}
     knob.addEventListener('touchstart',start,{passive:true});
     knob.addEventListener('touchmove',move,{passive:false});
     knob.addEventListener('touchend',end);
+    knob.addEventListener('touchcancel',end);
     knob.addEventListener('mousedown',start);
     document.addEventListener('mousemove',move);
     document.addEventListener('mouseup',end);
+
+    // v9.426 : REPRENDRE le service par un simple appui.
+    // Le glissement garde tout son sens pour s'arreter — un arret par erreur
+    // ferait perdre des courses. Mais se remettre en ligne ne presente aucun
+    // risque : imposer un geste precis ne protegeait personne.
+    slide.addEventListener('click', function(e){
+      if(dragging) return;
+      if(window._svcEstEnService && _svcEstEnService()) return; // en service : le glissement seul
+      try{ addDebugLog('SERVICE : reprise par appui'); }catch(e2){}
+      sortirServiceDepuisEcran();
+    });
   })();
 })();
 </script>
