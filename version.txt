@@ -1,1 +1,1 @@
-v9.439 - Frais d annonce bien visibles : leur propre carte en TETE de Gestion > Zones, avec leur bouton Enregistrer
+v9.440 - Bouton d etat AUTO-CORRIGE (vert des que vous etes en ligne) + fenetre vehicules epuree + acces direct a la liste verte
