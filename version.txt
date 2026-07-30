@@ -1,1 +1,1 @@
-v9.434 - ANTI-CLIGNOTEMENT (1 rechargement max/3min) + liste complete des vehicules + bouton d etat vert/gris
+v9.435 - ANTI-CLIGNOTEMENT + bulle native uniquement EN service + liste complete des vehicules + bouton d etat vert/gris
