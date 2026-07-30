@@ -1,1 +1,1 @@
-v9.443 - Adresse EXACTE du depart (rue, quartier, ville) transmise au chauffeur + crayon Modifier ouvre la carte pour confirmer
+v9.444 - L etat en/hors service se synchronise entre appareils (recharge du serveur toutes les 8 s sur la carte)
