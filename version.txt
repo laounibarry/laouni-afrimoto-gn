@@ -1,1 +1,1 @@
-v9.437 - Tableau de bord passager entierement refait (memes fonctionnalites, nouvelle interface)
+v9.439 - Frais d annonce bien visibles : leur propre carte en TETE de Gestion > Zones, avec leur bouton Enregistrer
