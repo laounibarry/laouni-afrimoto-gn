@@ -1,1 +1,1 @@
-v9.423 - Accueil chauffeur facon Bolt (carte a la connexion) + la course arrive sur la carte quel que soit le vehicule (correctif racine)
+v9.424 - Espace passager facon Bolt : profil et solde sur une ligne, Ou allez-vous, destinations recentes
