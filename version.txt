@@ -1,1 +1,1 @@
-v9.441 - Commande passager : prix au km + position visibles et modifiables + filtre 33 villes et 5 communes + tuile carte blindee
+v9.442 - Glissiere unique en/hors service sur la carte + position passager quasi instantanee + prix affiche des que possible
