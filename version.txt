@@ -1,1 +1,1 @@
-v9.429 - Carte passager facon Bolt (trajet dessine, prix estime, chauffeur en direct) + choix du vehicule avant d aller en ligne
+v9.430 - Le bouton En service repond au doigt : un appui + confirmation pour s arreter (plus de glissement obligatoire)
