@@ -1,1 +1,1 @@
-v9.444 - L etat en/hors service se synchronise entre appareils (recharge du serveur toutes les 8 s sur la carte)
+v9.445 - L etat EN/HORS SERVICE du compte s affiche DES l ouverture de la carte (plus aucun delai ni incoherence)
