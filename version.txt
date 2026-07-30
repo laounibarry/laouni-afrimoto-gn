@@ -1,1 +1,1 @@
-v9.449 - Message honnete quand la session est fermee par un autre appareil (cause reelle du bouton carte muet)
+v9.450 - Commander sur la carte retire de l espace passager (la commande se fait par le formulaire Ou allez-vous)
