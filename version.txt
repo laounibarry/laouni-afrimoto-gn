@@ -1,1 +1,1 @@
-v9.447 - Depart (adresse exacte) juste au-dessus de Ou allez-vous + GPS passager actualise en continu (~2 s)
+v9.448 - Categories VTC (Economie / Standard / Confort) avec prix ajuste â€” uniquement pour les voitures
