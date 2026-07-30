@@ -1,1 +1,1 @@
-v9.432 - Frais d annonce reglables par l admin (Gestion, carte des tarifs) â€” 0 = publication gratuite
+v9.433 - Passage en ligne debloque (selecteur de vehicule permissif) + frais d annonce dans l onglet Zones
