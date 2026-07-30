@@ -1,1 +1,1 @@
-v9.445 - L etat EN/HORS SERVICE du compte s affiche DES l ouverture de la carte (plus aucun delai ni incoherence)
+v9.446 - CORRECTIF RACINE : plus AUCUNE sauvegarde ne peut ecraser l etat en/hors service sur le serveur + version visible sur la carte
