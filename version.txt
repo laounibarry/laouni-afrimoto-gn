@@ -1,1 +1,1 @@
-v9.428 - Gros bouton ALLER EN LIGNE fiable au doigt (chauffeur) + volet passager compact
+v9.429 - Carte passager facon Bolt (trajet dessine, prix estime, chauffeur en direct) + choix du vehicule avant d aller en ligne
