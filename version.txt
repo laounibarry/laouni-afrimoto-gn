@@ -1,1 +1,1 @@
-v9.450 - Commander sur la carte retire de l espace passager (la commande se fait par le formulaire Ou allez-vous)
+v9.451 - Disponibilites en direct (~2 s) : vehicules proches par option Economie/Standard/Confort et taxis motos autour
