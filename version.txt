@@ -1,1 +1,1 @@
-v9.490 - Refus du chauffeur, refus de prix ou absence de reponse : on passe AUTOMATIQUEMENT au chauffeur suivant (plus aucun clic). Corrige aussi l index qui n avancait jamais : on recontactait le meme chauffeur
+v9.491 - ECRAN DE COURSE NATIF cote chauffeur : dans l application, la carte et le panneau sont desormais dessines par Android (plus aucune page web) - le site transmet la course et recoit les actions
