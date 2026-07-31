@@ -1,1 +1,1 @@
-v9.455 - Arret bloque pendant une course = message clair + panneau de diagnostic (3 appuis sur l etiquette de version)
+v9.456 - Session fermee : ecran clair avec bouton Se reconnecter (fini la carte a moitie morte)
