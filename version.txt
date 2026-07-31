@@ -1,1 +1,1 @@
-v9.456 - Session fermee : ecran clair avec bouton Se reconnecter (fini la carte a moitie morte)
+v9.457 - TEMPS REEL (Realtime) + la derniere connexion gagne (fin des sessions fantomes) + liste verte toujours visible
