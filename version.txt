@@ -1,1 +1,1 @@
-v9.485 - CAUSE RACINE APP : la WebView imposait une fenetre large + dezoom (useWideViewPort), les ecrans plein ecran se dimensionnaient sur une surface virtuelle. Hauteur reellement visible mesuree en direct + verrou anti-debordement sur le menu
+v9.486 - Passager : course annulee par le chauffeur - la recherche d un autre taxi repart TOUTE SEULE (plus aucun clic) et la detection n est plus limitee a 5 min apres la creation (30 min), ce qui la rendait muette sur une annulation tardive
