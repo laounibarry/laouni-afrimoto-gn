@@ -1,1 +1,1 @@
-v9.469 - Chauffeur : volet de la course - le glissement est SUPPRIME, il reste desormais TOUJOURS visible et deplie en entier, sans aucun geste, avec auto-guerison a chaque battement
+v9.470 - Passager : la fiche du chauffeur (nom + bouton appeler) flotte maintenant SUR la carte, comme cote chauffeur â€” avant elle etait poussee EN DESSOUS, hors ecran
