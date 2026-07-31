@@ -1,1 +1,1 @@
-v9.476 - Passager : desactive le tirer-pour-rafraichir natif Android en ouvrant la carte de suivi (comme cote chauffeur) - piste specifique a l app, invisible en test navigateur
+v9.477 - Passager : bouton Annuler ma course RESTAURE (perdu par erreur en fermant l ancienne fenetre) - Chauffeur+Passager : erreurs desormais loguees et visibles (7 appuis sur le logo)
