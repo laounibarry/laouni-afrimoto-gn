@@ -1,1 +1,1 @@
-v9.457 - TEMPS REEL (Realtime) + la derniere connexion gagne (fin des sessions fantomes) + liste verte toujours visible
+v9.458 - ANTI-SCINTILLEMENT : l ecran n est reecrit que quand quelque chose change vraiment (fini le clignotement des 2 s)
