@@ -1,1 +1,1 @@
-v9.480 - Passager : bandeau permanent sur le tableau de bord pour rouvrir la carte de suivi apres l avoir fermee - avant, aucun moyen d y retourner une fois fermee
+v9.481 - Passager : la carte de suivi se ferme desormais automatiquement des qu une course annulee est detectee, au lieu de continuer a afficher le PIN/appel/annuler comme si elle etait active
