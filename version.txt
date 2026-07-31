@@ -1,1 +1,1 @@
-v9.479 - Passager : le code PIN (qui avait disparu, cache par la fiche devenue plus haute avec les adresses) est deplace DANS la fiche elle-meme, bien visible
+v9.480 - Passager : bandeau permanent sur le tableau de bord pour rouvrir la carte de suivi apres l avoir fermee - avant, aucun moyen d y retourner une fois fermee
