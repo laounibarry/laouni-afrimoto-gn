@@ -1,1 +1,1 @@
-v9.477 - Passager : bouton Annuler ma course RESTAURE (perdu par erreur en fermant l ancienne fenetre) - Chauffeur+Passager : erreurs desormais loguees et visibles (7 appuis sur le logo)
+v9.478 - Passager : adresses depart/arrivee AJOUTEES a la fiche de suivi (elles n y avaient jamais ete) + CSS plein ecran durci (top/right/bottom/left explicites) pour le telephone
