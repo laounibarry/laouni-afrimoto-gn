@@ -1,1 +1,1 @@
-v9.489 - Etiquette sur les cartes : version du SITE + version de l APPLICATION + hauteur mesuree par elle. Permet enfin de verifier si la bonne application est installee
+v9.490 - Refus du chauffeur, refus de prix ou absence de reponse : on passe AUTOMATIQUEMENT au chauffeur suivant (plus aucun clic). Corrige aussi l index qui n avancait jamais : on recontactait le meme chauffeur
