@@ -1,1 +1,1 @@
-v9.467 - URGENT : volet de course - clic fantome apres appui tactile qui annulait le glissement corrige, + bouton Terminer/Demarrer toujours visible dans l entete meme volet ferme
+v9.468 - Chauffeur : icones Waze/Maps toujours visibles dans l entete (plus besoin d ouvrir le volet) â€” Passager : carte de suivi maintenant en PLEIN ECRAN, comme cote chauffeur
