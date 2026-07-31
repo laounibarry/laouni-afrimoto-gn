@@ -1,1 +1,1 @@
-v9.487 - Temps et km restants sur les DEUX ecrans et les DEUX etapes, rafraichis chaque seconde. Et la relance automatique apres annulation du chauffeur fonctionne enfin : elle echouait en silence sur les champs depart/destination vides
+v9.488 - La recherche de chauffeur ne s arrete plus jamais d elle-meme : tant qu aucun n a accepte, elle refait des tours automatiquement (liste reconstruite, memes criteres de proximite/notes/perimetre). Seule l annulation par le passager y met fin
