@@ -1,1 +1,1 @@
-v9.454 - Carte actualisee toutes les 2 s (courses jamais ratees) + ecran toujours allume tant qu un vehicule est en service
+v9.455 - Arret bloque pendant une course = message clair + panneau de diagnostic (3 appuis sur l etiquette de version)
