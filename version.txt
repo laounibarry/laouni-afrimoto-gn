@@ -1,1 +1,1 @@
-v9.459 - Cadenas et message de session SUPPRIMES + la liste des courses ne clignote plus (redessin uniquement au changement)
+v9.460 - Plus JAMAIS de fenetre de connexion imposee ni de renvoi force vers la page publique â€” connexion et deconnexion libres
