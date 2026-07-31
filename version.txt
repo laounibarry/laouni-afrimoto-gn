@@ -1,1 +1,1 @@
-v9.484 - Passager : le bandeau Voir sur la carte devient autonome (verifie toutes les 3 s) et apparait des la fermeture de la carte ; la fenetre de confirmation ne se ferme plus que si la carte s est vraiment ouverte - fini le passager sans carte ni bandeau
+v9.485 - CAUSE RACINE APP : la WebView imposait une fenetre large + dezoom (useWideViewPort), les ecrans plein ecran se dimensionnaient sur une surface virtuelle. Hauteur reellement visible mesuree en direct + verrou anti-debordement sur le menu
