@@ -1,1 +1,1 @@
-v9.474 - Passager : la fenetre de confirmation de course se ferme desormais AVANT que la carte plein ecran s ouvre automatiquement - elle restait affichee par-dessus et empechait de voir le suivi
+v9.476 - Passager : desactive le tirer-pour-rafraichir natif Android en ouvrant la carte de suivi (comme cote chauffeur) - piste specifique a l app, invisible en test navigateur
