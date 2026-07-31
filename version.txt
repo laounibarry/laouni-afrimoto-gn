@@ -1,1 +1,1 @@
-v9.460 - Plus JAMAIS de fenetre de connexion imposee ni de renvoi force vers la page publique â€” connexion et deconnexion libres
+v9.461 - CHASSE AU CLIGNOTEMENT partout (public, trajets, passager, suivi de course) + la barre de la carte agit toujours
