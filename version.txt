@@ -1,1 +1,1 @@
-v9.465 - Chauffeur : le volet de la course sur la carte se glisse maintenant au doigt (haut/bas) comme un vrai bottom sheet, au lieu de rester bloque tout en bas
+v9.466 - CORRECTION MAJEURE : le Realtime Supabase (bug window.supabaseClient) ne fonctionnait jamais depuis sa creation ; maintenant actif partout, y compris pour le suivi du passager
