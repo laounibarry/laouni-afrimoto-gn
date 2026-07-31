@@ -1,1 +1,1 @@
-v9.462 - Toutes les courses listees (plus de limite de 5), la course ACTIVE vit uniquement sur la carte, et glisser pour s arreter ne demande plus jamais de choisir un vehicule
+v9.463 - Course acceptee : correction du bug window.DB qui empechait son affichage sur la carte (chauffeur et passager) + banniere permanente sur le tableau de bord jusqu a la fin de la course
