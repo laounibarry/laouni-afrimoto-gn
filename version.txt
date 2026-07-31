@@ -1,1 +1,1 @@
-v9.482 - MOBILE : cause trouvee - 100vh inclut la barre d adresse du telephone, le bas des ecrans tombait derriere elle (correct sur PC, coupe sur mobile). Passe en 100dvh + mise en page en colonne flexible, cotes passager ET chauffeur
+v9.483 - Chauffeur (carte) : bouton Annuler ajoute, doublons Terminer/Demarrer et icones Waze-Maps retires de l entete, chronometre reduit a une pastille ronde (temps seul) placee en haut a gauche
