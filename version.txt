@@ -1,1 +1,1 @@
-v9.452 - Moteur de la carte chauffeur REECRIT : etat, revenus, glissiere et course TOUJOURS a jour (battement 2 s permanent)
+v9.453 - Arret du service repare : plus de fenetre fantome apres le glissement, et les fenetres incoherentes se ferment seules
