@@ -1,1 +1,1 @@
-v9.472 - Passager : le zoom automatique de la carte de suivi (qui se resserre quand le chauffeur approche) est rendu instantane et fiable, il ne dependait plus a tort d une animation qui pouvait ne jamais aboutir
+v9.473 - CORRECTION RACINE (chauffeur + passager) : forceRepaint() cassait le plein ecran des deux cartes via un transform sur body jamais nettoye a temps ; remplace par opacity, sans effet de bord, teste dans le pire cas
