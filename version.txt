@@ -1,1 +1,1 @@
-v9.486 - Passager : course annulee par le chauffeur - la recherche d un autre taxi repart TOUTE SEULE (plus aucun clic) et la detection n est plus limitee a 5 min apres la creation (30 min), ce qui la rendait muette sur une annulation tardive
+v9.487 - Temps et km restants sur les DEUX ecrans et les DEUX etapes, rafraichis chaque seconde. Et la relance automatique apres annulation du chauffeur fonctionne enfin : elle echouait en silence sur les champs depart/destination vides
