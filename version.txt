@@ -1,1 +1,1 @@
-v9.478 - Passager : adresses depart/arrivee AJOUTEES a la fiche de suivi (elles n y avaient jamais ete) + CSS plein ecran durci (top/right/bottom/left explicites) pour le telephone
+v9.479 - Passager : le code PIN (qui avait disparu, cache par la fiche devenue plus haute avec les adresses) est deplace DANS la fiche elle-meme, bien visible
