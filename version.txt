@@ -1,1 +1,1 @@
-v9.481 - Passager : la carte de suivi se ferme desormais automatiquement des qu une course annulee est detectee, au lieu de continuer a afficher le PIN/appel/annuler comme si elle etait active
+v9.482 - MOBILE : cause trouvee - 100vh inclut la barre d adresse du telephone, le bas des ecrans tombait derriere elle (correct sur PC, coupe sur mobile). Passe en 100dvh + mise en page en colonne flexible, cotes passager ET chauffeur
