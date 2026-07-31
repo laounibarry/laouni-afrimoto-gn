@@ -1,1 +1,1 @@
-v9.463 - Course acceptee : correction du bug window.DB qui empechait son affichage sur la carte (chauffeur et passager) + banniere permanente sur le tableau de bord jusqu a la fin de la course
+v9.464 - Passager : la carte plein ecran s ouvre automatiquement des qu une course est acceptee, avec suivi du chauffeur, km et temps estime avant arrivee (comme Bolt)
