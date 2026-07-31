@@ -1,1 +1,1 @@
-v9.458 - ANTI-SCINTILLEMENT : l ecran n est reecrit que quand quelque chose change vraiment (fini le clignotement des 2 s)
+v9.459 - Cadenas et message de session SUPPRIMES + la liste des courses ne clignote plus (redessin uniquement au changement)
