@@ -1,1 +1,1 @@
-v9.461 - CHASSE AU CLIGNOTEMENT partout (public, trajets, passager, suivi de course) + la barre de la carte agit toujours
+v9.462 - Toutes les courses listees (plus de limite de 5), la course ACTIVE vit uniquement sur la carte, et glisser pour s arreter ne demande plus jamais de choisir un vehicule
