@@ -1,1 +1,1 @@
-v9.468 - Chauffeur : icones Waze/Maps toujours visibles dans l entete (plus besoin d ouvrir le volet) â€” Passager : carte de suivi maintenant en PLEIN ECRAN, comme cote chauffeur
+v9.469 - Chauffeur : volet de la course - le glissement est SUPPRIME, il reste desormais TOUJOURS visible et deplie en entier, sans aucun geste, avec auto-guerison a chaque battement
