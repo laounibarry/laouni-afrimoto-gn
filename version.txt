@@ -1,1 +1,1 @@
-v9.471 - Passager : ecran de suivi RECONSTRUIT a l identique de l ecran chauffeur (meme structure plein ecran dediee, plus de modale generique partagee) - nom/gilet/matricule/appel flottent bien sur la carte
+v9.472 - Passager : le zoom automatique de la carte de suivi (qui se resserre quand le chauffeur approche) est rendu instantane et fiable, il ne dependait plus a tort d une animation qui pouvait ne jamais aboutir
