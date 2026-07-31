@@ -1,1 +1,1 @@
-v9.470 - Passager : la fiche du chauffeur (nom + bouton appeler) flotte maintenant SUR la carte, comme cote chauffeur â€” avant elle etait poussee EN DESSOUS, hors ecran
+v9.471 - Passager : ecran de suivi RECONSTRUIT a l identique de l ecran chauffeur (meme structure plein ecran dediee, plus de modale generique partagee) - nom/gilet/matricule/appel flottent bien sur la carte
