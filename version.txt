@@ -1,1 +1,1 @@
-v9.496 - Retour a l accueil chauffeur WEB : la liste des motos et l oeil des revenus sont retrouves. Les ecrans natifs conserves sont la course et le suivi passager
+v9.497 - Dans l application, la course appartient au SEUL ecran natif : l ancien volet web et son chronometre ne s affichent plus (ils alternaient toutes les quelques secondes)
