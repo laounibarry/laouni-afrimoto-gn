@@ -5646,7 +5646,19 @@ async function doLogin() {
           return;
         }
       }
-      const _ok = _sv ? (_sv.ok === true) : await verifyPw(pw, cl.pass);
+      // FILET DE SECURITE DE LA MIGRATION.
+      // Le repli sur la verification locale ne se declenchait que si le serveur ETAIT
+      // INJOIGNABLE. Or il peut tres bien repondre — et refuser a tort, si son calcul
+      // d'empreinte differe d'un caractere de celui du site. Dans ce cas, plus PERSONNE
+      // ne pourrait se connecter, et le repli n'aurait rien rattrape.
+      // Tant que les empreintes sont encore en memoire, on laisse donc entrer celui que
+      // la verification locale accepte, et on le signale au diagnostic. Ce filet
+      // disparaitra au palier 3, quand les empreintes ne seront plus telechargees.
+      let _ok = _sv ? (_sv.ok === true) : await verifyPw(pw, cl.pass);
+      if(_sv && !_ok && _sv.raison === 'identifiants' && await verifyPw(pw, cl.pass)) {
+        _ok = true;
+        try { addDebugLog('CONNEXION : le serveur a refuse alors que la verification locale accepte — les deux calculs d empreinte different, a corriger avant le palier 3'); } catch(e) {}
+      }
       if(_ok) user = {role:'client', name:cl.prenom+' '+cl.nom, id:cl.id};
     } else if(_sv && _sv.ok === true) {
       // Le serveur reconnait ce compte alors qu'il n'est pas dans la memoire locale.
