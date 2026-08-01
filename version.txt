@@ -1,1 +1,1 @@
-v9.497 - Dans l application, la course appartient au SEUL ecran natif : l ancien volet web et son chronometre ne s affichent plus (ils alternaient toutes les quelques secondes)
+v9.498 - L identifiant du vehicule est transmis a l ecran de course natif, qui suit desormais LA COURSE et non le vehicule (il se refermait toutes les 10 secondes)
