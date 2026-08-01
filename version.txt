@@ -1,1 +1,1 @@
-v9.495 - Ecrans natifs : Terminer et Annuler fonctionnent enfin (la confirmation etait posee dans la page cachee sous l ecran natif)
+v9.496 - Retour a l accueil chauffeur WEB : la liste des motos et l oeil des revenus sont retrouves. Les ecrans natifs conserves sont la course et le suivi passager
