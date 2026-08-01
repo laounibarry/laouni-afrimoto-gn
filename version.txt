@@ -1,1 +1,1 @@
-v9.492 - Ecran de course natif : ajout de la passerelle natifLancerCourse (passager a bord -> trajet lance), en complement de la validation du code
+v9.493 - Suivi PASSAGER natif dans l application : ouvrirSuiviTaxi bascule vers l ecran Android, la carte web reste utilisee hors application
