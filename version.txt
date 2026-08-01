@@ -1,1 +1,1 @@
-v9.498 - L identifiant du vehicule est transmis a l ecran de course natif, qui suit desormais LA COURSE et non le vehicule (il se refermait toutes les 10 secondes)
+v9.499 - Espace client onglet Vendre : les boutons Vendre ma moto / Vendre ma voiture etaient grises tant que le solde n atteignait pas 10 000 GNF, meme quand la publication est gratuite. Le seuil suit desormais le tarif fixe par l admin, les cartes de transfert disent voiture pour une voiture, et la regle d appartenance du vehicule est la meme a l affichage, a l ouverture et a la publication
