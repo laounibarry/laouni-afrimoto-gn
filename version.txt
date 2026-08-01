@@ -1,1 +1,1 @@
-v9.493 - Suivi PASSAGER natif dans l application : ouvrirSuiviTaxi bascule vers l ecran Android, la carte web reste utilisee hors application
+v9.494 - Accueil chauffeur NATIF dans l application (carte plein ecran, recette du jour, bouton Aller en ligne / Hors ligne) - la bascule reste decidee par le site
