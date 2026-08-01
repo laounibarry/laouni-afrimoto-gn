@@ -1,1 +1,1 @@
-v9.494 - Accueil chauffeur NATIF dans l application (carte plein ecran, recette du jour, bouton Aller en ligne / Hors ligne) - la bascule reste decidee par le site
+v9.495 - Ecrans natifs : Terminer et Annuler fonctionnent enfin (la confirmation etait posee dans la page cachee sous l ecran natif)
