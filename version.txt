@@ -1,1 +1,1 @@
-v9.491 - ECRAN DE COURSE NATIF cote chauffeur : dans l application, la carte et le panneau sont desormais dessines par Android (plus aucune page web) - le site transmet la course et recoit les actions
+v9.492 - Ecran de course natif : ajout de la passerelle natifLancerCourse (passager a bord -> trajet lance), en complement de la validation du code
