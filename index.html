@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.536';
+window.AFRIMOTO_VERSION = 'v9.537';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -5537,7 +5537,9 @@ async function verifierSessionUnique() {
       await prendreSessionUnique(DB.user);
       return;
     }
-    if(data[0].appareil_id === _appareilId()) return; // tout va bien
+    // Tout va bien : on oublie les constats precedents, sinon deux ecarts sans rapport,
+    // separes de plusieurs heures, finiraient par provoquer une deconnexion injustifiee.
+    if(data[0].appareil_id === _appareilId()) { window._appareilEtranger = 0; return; }
     // v9.457 : si CET appareil vient de se connecter explicitement (moins de 3 min), c'est LUI
     // qui gagne — il REPREND la session au lieu d'etre ejecte par une trace perimee.
     if(window._derniereConnexionExplicite && Date.now() - window._derniereConnexionExplicite < 180000) {
@@ -5545,11 +5547,32 @@ async function verifierSessionUnique() {
       await prendreSessionUnique(DB.user);
       return;
     }
+    // \u2550\u2550 v9.537 : DEUX CONSTATS, ET PLUS DE RECHARGEMENT \u2550\u2550
+    // Un seul constat suffisait a ejecter, puis la page se rechargeait \u2014 et au rechargement
+    // la session etait reprise, ce qui ejectait l'autre appareil, qui reprenait a son tour...
+    // D'ou l'ecran qui \u00ab saute vers l'espace public puis revient \u00bb, en boucle. Une course en
+    // cours n'y survit pas.
+    // Il faut desormais DEUX constats d'affilee (un ecart passager ne compte plus), et on ne
+    // recharge plus : on laisse simplement l'ecran d'accueil, sans relancer le cycle.
+    window._appareilEtranger = (window._appareilEtranger || 0) + 1;
+    if(window._appareilEtranger < 2) {
+      try { addDebugLog('APPAREIL : trace etrangere (1er constat) \u2014 on attend confirmation'); } catch(e) {}
+      return;
+    }
+    // Jamais pendant une course : deconnecter un chauffeur ou un passager en pleine course
+    // laisserait l'autre partie seule, sans explication.
+    try {
+      if(typeof _monTaxiEnCourse === 'function' && _monTaxiEnCourse()) {
+        addDebugLog('APPAREIL : trace etrangere ignoree \u2014 course en cours');
+        return;
+      }
+    } catch(e) {}
+    window._appareilEtranger = 0;
     try { addDebugLog('APPAREIL : session reprise par ' + (data[0].appareil || 'un autre appareil')); } catch(e) {}
     if(typeof clearSession === 'function') clearSession();
     DB.user = null;
-    toast('\u26a0\ufe0f Votre compte vient d\'\u00eatre ouvert sur un autre appareil. Vous avez \u00e9t\u00e9 d\u00e9connect\u00e9 ici.', true);
-    setTimeout(() => location.reload(), 2600);
+    toast('\u26a0\ufe0f Votre compte vient d\'\u00eatre ouvert sur un autre appareil. Reconnectez-vous pour continuer ici.', true);
+    try { updateNav(); goPage('home'); rHome(); } catch(e) {}
   } catch(e) { /* silencieux : jamais de deconnexion sur une erreur technique */ }
 }
 
@@ -8597,6 +8620,10 @@ function toggleSonReservation() {
 }
 
 function alarmeCourseStop() {
+  // v9.537 : la sonnerie a DEUX sources. La page coupait la sienne (vibration, son web) mais
+  // pas la notification Android envoyee par le serveur — celle qui sonne meme application
+  // fermee. Le telephone continuait donc de sonner apres l'acceptation ou le refus.
+  try { if (window.AfriMotoNative && AfriMotoNative.stopAlerte) AfriMotoNative.stopAlerte(); } catch(e) {}
   if(_alarmeCourseInterval) { clearInterval(_alarmeCourseInterval); _alarmeCourseInterval = null; }
   try { if(navigator.vibrate) navigator.vibrate(0); } catch(e) {}
 }
