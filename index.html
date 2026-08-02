@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.542';
+window.AFRIMOTO_VERSION = 'v9.543';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1269,8 +1269,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       agId:r.agent_id||r.agId||r.agentId||null,
       permis:r.permis||'',
       vis:r.vis || {owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false},
-      photo:r.photo_url||r.photo||'', gilet:r.gilet||false,
-      photoP:r.photo_proprietaire_url||r.photoP||'',
+      photo:_photoValable(r.photo_url||r.photo), gilet:r.gilet||false, // v9.543
+      photoP:_photoValable(r.photo_proprietaire_url||r.photoP), // v9.543
       photoFacture:r.photo_facture_url||r.photoFacture||'',
       photoCG:r.photo_cg_url||r.photoCG||'',
       photoPiece:r.photo_piece_url||r.photoPiece||'',
@@ -1302,10 +1302,31 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       historique:r.historique_proprietaires||r.historique||[],
       created_at:r.created_at };
   }
+  // v9.543 — UNE ADRESSE DE PAGE WEB N'EST PAS UNE PHOTO.
+  //
+  // La fiche d'un chauffeur contenait « https://www.laouni-securite-ultime.com/ » dans le
+  // champ photo : l'adresse du site, collee la par erreur. Le navigateur allait donc
+  // chercher la page d'accueil entiere — 1,5 Mo — pour l'afficher comme une image, et
+  // n'affichait rien. Sur chaque ecran montrant ce chauffeur, a chaque fois.
+  //
+  // L'application n'enregistre jamais qu'une image en texte ou une adresse de son propre
+  // stockage. Tout le reste est une erreur de saisie, et on l'ignore plutot que d'aller la
+  // telecharger. Le controle est ici, a l'endroit unique ou les fiches sont traduites :
+  // aucun ecran n'a besoin d'y penser.
+  function _photoValable(v) {
+    const s = String(v || '').trim();
+    if(!s) return '';
+    if(s.indexOf('data:image') === 0) return s;
+    if(s.indexOf('/storage/v1/object/') !== -1) return s;
+    if(s.indexOf('doc:') === 0) return s; // document prive, resolu plus tard
+    try { addDebugLog('PHOTO ignoree (ce n\'est pas une image) : ' + s.slice(0, 60)); } catch(e) {}
+    return '';
+  }
+
   function mapTaxi(r) {
     const _pos = r.position || null;
     return { id:r.id, num:r.num||'', plaque:r.plaque||'', nom:r.nom_chauffeur||r.nom||'',
-      tel:r.telephone||r.tel||'', photo:r.photo_url||r.photo||'', gilet:r.gilet||false,
+      tel:r.telephone||r.tel||'', photo:_photoValable(r.photo_url||r.photo), gilet:r.gilet||false,
       statut:r.statut||'actif', position:_pos,
       enService:(r.en_service!==undefined&&r.en_service!==null)?r.en_service:(r.enService||false),
       lat:(_pos&&_pos.lat!=null)?_pos.lat:(r.lat!=null?r.lat:null),
