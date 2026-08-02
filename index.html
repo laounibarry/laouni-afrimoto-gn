@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.538';
+window.AFRIMOTO_VERSION = 'v9.539';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -7634,8 +7634,9 @@ function confirmerDemandeCourse() {
   }
   _dernierDepartSaisi = _dcDep; _derniereArriveeSaisie = _dcArr; // mémorisé pour ne pas se perdre après un refus de prix
   if(!_commissionAuTaxi()) { // v9.366 : le passager ne paie que si l'admin l'a decide ainsi
-    ps.solde = (ps.solde||0) - commission;
-    sbSavePassager(ps); // AUDIT : le débit de commission n'était jamais persisté
+    // v9.539 : la commission du passager arrive au compte de la societe.
+    mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Commission course')
+      .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
     logMvt('rech', '🚕 Commission course taxi — ' + ps.prenom + ' ' + ps.nom + ' → ' + t.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {cibleType:'passager',cibleId:ps.id});
   }
   const _nvDemande = {
@@ -7759,8 +7760,8 @@ function demarrerRechercheAutomatique(commissionDejaPayee) {
 
   // Frais prélevés UNE SEULE FOIS (jamais si on reprend une recherche déjà payée précédemment)
   if(!dejaPayee && !_commissionAuTaxi()) { // v9.366
-    ps.solde = (ps.solde||0) - commission;
-    sbSavePassager(ps);
+    mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Frais de recherche')
+      .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
     logMvt('rech', '🚕 Frais de recherche course taxi — ' + ps.prenom + ' ' + ps.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {cibleType:'passager',cibleId:ps.id});
   }
 
@@ -8364,8 +8365,10 @@ async function debiterTaxiCommission(demande) {
   if(m <= 0) return;
   const cl = _clientDuTaxi(demande.taxiId);
   if(!cl) { try { addDebugLog('COMMISSION : propri\u00e9taire du taxi introuvable'); } catch(e) {} return; }
-  cl.solde = (cl.solde || 0) - m;
-  await sbSaveClient(cl);
+  // v9.539 : la commission ARRIVE quelque part. Elle etait retiree au chauffeur et
+  // n'etait creditee a personne — invisible dans les comptes de la societe.
+  const _fait = await mouvementSolde('client', cl.id, 'societe', 'societe', m, 'Commission course');
+  if(_fait !== true) { cl.solde = (cl.solde || 0) - m; await sbSaveClient(cl); }
   const nom = ((cl.prenom || '') + ' ' + (cl.nom || '')).trim();
   logMvt('rech', '\ud83c\udfcd\ufe0f Commission course taxi \u2014 ' + (demande.taxiNom || nom), m,
     nom, 'Soci\u00e9t\u00e9 (commission)', { cibleType: 'client', cibleId: cl.id });
@@ -8377,8 +8380,9 @@ async function rembourserTaxiCommission(demande, motif) {
   if(m <= 0) return;
   const cl = _clientDuTaxi(demande.taxiId);
   if(!cl) { try { addDebugLog('REMBOURSEMENT : propri\u00e9taire du taxi introuvable'); } catch(e) {} return; }
-  cl.solde = (cl.solde || 0) + m;
-  await sbSaveClient(cl);
+  // Le remboursement VIENT du compte de la societe, qui avait encaisse la commission.
+  const _fait2 = await mouvementSolde('societe', 'societe', 'client', cl.id, m, 'Remboursement commission');
+  if(_fait2 !== true) { cl.solde = (cl.solde || 0) + m; await sbSaveClient(cl); }
   const nom = ((cl.prenom || '') + ' ' + (cl.nom || '')).trim();
   logMvt('rech', '\u21a9\ufe0f Remboursement commission course \u2014 ' + motif, m,
     'Soci\u00e9t\u00e9', nom, { cibleType: 'client', cibleId: cl.id });
@@ -15976,8 +15980,9 @@ async function _publierTrajetDefinitif() {
   if(DB.user && DB.user.role==='client' && fraisInfo.montant > 0) {
     const cl = DB.clients.find(x=>x.id===DB.user.id);
     if(cl) {
-      cl.solde -= fraisInfo.montant;
-      await sbSaveClient(cl);
+      // v9.539 : les frais arrivent au compte de la societe au lieu de disparaitre.
+      const _f1 = await mouvementSolde('client', cl.id, 'societe', 'societe', fraisInfo.montant, 'Publication trajet');
+      if(_f1 !== true) { cl.solde -= fraisInfo.montant; await sbSaveClient(cl); }
       logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,fraisInfo.montant,cl.prenom+' '+cl.nom,'Système',{cibleType:'client',cibleId:cl.id});
     }
   }
@@ -17951,8 +17956,8 @@ function saveAnnonce() {
     const frais = _fraisAnnonce(); // v9.432 : montant fixe par l'admin ; 0 = gratuit
     if(cl && frais > 0) {
       if(cl.solde < frais) { err.textContent='⚠️ Solde insuffisant (frais requis : '+fmt(frais)+').'; err.style.display='block'; return; }
-      cl.solde -= frais;
-      sbSaveClient(cl);
+      mouvementSolde('client', cl.id, 'societe', 'societe', frais, 'Publication annonce')
+        .then(function(f){ if(f !== true) { cl.solde -= frais; sbSaveClient(cl); } });
       logMvt('rech','Publication annonce vente — '+cl.prenom+' '+cl.nom,frais,cl.prenom+' '+cl.nom,'Système',{cibleType:'client',cibleId:cl.id});
     }
   }
@@ -20056,8 +20061,8 @@ function majClient(kind, id) {
   if(_ech && new Date() < _ech) { toast('🔒 La mise à jour sera disponible le ' + _ech.toLocaleDateString('fr-FR') + ' — inutile de payer avant.', true); return; }
   const idVeh = estTaxi ? ('taxi ' + (x.plaque||'')) : ((x.mat || x.vin || '') + (x.brand ? ' — ' + x.brand + ' ' + (x.model||'') : ''));
   askConfirm('Mettre à jour l\'enregistrement de ' + idVeh + ' pour ' + fmt(prix) + ' (débité de votre solde) ?', () => {
-    cl.solde = (cl.solde||0) - prix;
-    sbSaveClient(cl);
+    mouvementSolde('client', cl.id, 'societe', 'societe', prix, 'Mise a jour enregistrement')
+      .then(function(f){ if(f !== true) { cl.solde = (cl.solde||0) - prix; sbSaveClient(cl); } });
     appliquerMaj(x, estTaxi, prix, ((cl.prenom||'')+' '+(cl.nom||'')).trim());
     updateNav();
     if(DB.user && DB.user.role === 'owner') { try { rOwner(); } catch(e) {} }
@@ -21971,6 +21976,58 @@ function logMvt(type, desc, montant=0, de='', vers='', meta={}) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 // 💳 TRANSFERT = C'EST JUSTE UN MOUVEMENT !
+// ══════════════════════════════════════════════════════════════════════════
+// v9.539 — TOUT MOUVEMENT D'ARGENT A DEUX COTES
+//
+// Jusqu'ici, une commission etait RETIREE au chauffeur sans arriver nulle part, des frais
+// etaient RETIRES au client sans destinataire, un remboursement etait AJOUTE sans venir de
+// nulle part. L'argent apparaissait et disparaissait : on pouvait afficher un chiffre
+// d'affaires, mais ni le prouver, ni le rapprocher, ni detecter une erreur.
+//
+// La societe a desormais un compte. Chaque commission et chaque frais y arrivent, chaque
+// remboursement en repart, et les deux ecritures se font ENSEMBLE sur le serveur.
+//
+// Renvoie true si le serveur a fait le mouvement. false : l'appelant garde son ancien
+// comportement, pour qu'une fonction pas encore installee ne bloque personne.
+// ══════════════════════════════════════════════════════════════════════════
+async function mouvementSolde(srcType, srcId, cibleType, cibleId, montant, motif) {
+  try {
+    if (!(Number(montant) > 0)) return false;
+    const { data, error } = await supabaseClient.rpc('transferer_solde', {
+      p_source_type: srcType, p_source_id: String(srcId || ''),
+      p_cible_type: cibleType, p_cible_id: String(cibleId || ''),
+      p_montant: Number(montant), p_motif: motif || ''
+    });
+    if (error) {
+      try { addDebugLog('MOUVEMENT indisponible : ' + error.message + ' — repli local'); } catch(e) {}
+      return false;
+    }
+    if (data && data.ok === true) {
+      // On reporte les nouveaux soldes dans la memoire locale, sinon l'ecran afficherait
+      // encore les anciens jusqu'au prochain chargement.
+      const poser = (t, id, v) => {
+        if (v == null) return;
+        const liste = t === 'client' ? DB.clients : t === 'passager' ? DB.passagers
+                    : t === 'agent' ? DB.agents : t === 'sousagent' ? DB.sousAgents
+                    : t === 'taxi' ? DB.taxis : null;
+        if (!liste) return;
+        const o = liste.find(x => x.id === id); if (o) o.solde = v;
+      };
+      poser(srcType, srcId, data.solde_source);
+      poser(cibleType, cibleId, data.solde_cible);
+      return true;
+    }
+    if (data && data.raison === 'solde_insuffisant') {
+      try { toast('⛔ Solde insuffisant pour cette opération.', true); } catch(e) {}
+      return 'insuffisant';
+    }
+    return false;
+  } catch (e) {
+    try { addDebugLog('MOUVEMENT erreur : ' + ((e && e.message) || e)); } catch(er) {}
+    return false;
+  }
+}
+
 async function enregistrerTransfert(typeTransfert, expediteur, beneficiaire, montant, raison, details={}) {
   // Créer UN MOUVEMENT pour l'expéditeur (débit)
   logMvt('transfert_out', 
