@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.539';
+window.AFRIMOTO_VERSION = 'v9.540';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2201,6 +2201,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('avis')" id="gt-avis" style="font-size:12px;padding:7px 11px">⭐ Avis</button>
     <button class="btn-ghost" onclick="setGestTab('passagers')" id="gt-passagers" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto / VTC</button>
     <button class="btn-ghost" onclick="setGestTab('bilan')" id="gt-bilan" style="font-size:12px;padding:7px 11px">📊 Bilan</button>
+    <button class="btn-ghost" onclick="setGestTab('tresorerie')" id="gt-tresorerie" style="font-size:12px;padding:7px 11px">🏦 Trésorerie</button>
     <button class="btn-ghost" onclick="setGestTab('transferts')" id="gt-transferts" style="font-size:12px;padding:7px 11px">&#128181; Transferts</button>
     <button class="btn-ghost" onclick="setGestTab('courses')" id="gt-courses" style="font-size:12px;padding:7px 11px">📜 Historique courses</button>
     <button class="btn-ghost" onclick="setGestTab('historique-complet')" id="gt-historique-complet" style="font-size:12px;padding:7px 11px">💳 Transferts</button>
@@ -18492,13 +18493,93 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression'].forEach(x=>{
+  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
   rGestion();
 }
 function setVehFiltre(t){ window.vehFiltreType = t; if(typeof rGestion==='function') rGestion(); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// TRESORERIE — les totaux viennent du serveur, jamais du telephone.
+//
+// Pourquoi : le serveur ne renvoie jamais plus de mille lignes de mouvements. Additionner
+// celles qu'on a deja en memoire donne donc un total incomplet — et de plus en plus faux a
+// mesure que l'activite grandit. La fonction « tresorerie » fait la somme dans la base.
+// ════════════════════════════════════════════════════════════════════════════
+window._tresoJours = window._tresoJours || 30;
+
+function choisirPeriodeTresorerie(j){ window._tresoJours = j; if(typeof rGestion==='function') rGestion(); }
+
+async function chargerTresorerie(){
+  const zone = document.getElementById('treso-corps');
+  if(!zone) return;
+  let d = null;
+  try {
+    const r = await supabaseClient.rpc('tresorerie', { p_jours: window._tresoJours || 30 });
+    if(!r.error) d = r.data;
+  } catch(e) { }
+
+  if(!d || d.ok !== true){
+    // On n'invente pas un chiffre de remplacement : un montant faux est pire qu'un
+    // montant absent quand il sert a rendre des comptes.
+    zone.innerHTML =
+      '<div class="empty">Les totaux n\'ont pas pu être calculés.<br>' +
+      '<span style="font-size:11px">Exécutez <b>tresorerie.sql</b> dans Supabase, puis rouvrez cet onglet.</span></div>';
+    return;
+  }
+
+  const net = (Number(d.entrees)||0) - (Number(d.sorties)||0);
+  const detenu = Object.values(d.soldes_detenus || {}).reduce((t,v)=>t+(Number(v)||0), 0);
+  const NATURES = { rech:'Commissions de course', trajet:'Publication de trajets',
+                    enreg:'Frais d\'enregistrement', annonce:'Annonces', admin:'Écritures admin' };
+
+  const carte = (titre, valeur, couleur, note) =>
+    '<div style="flex:1;min-width:180px;background:rgba(255,255,255,.04);border:1px solid ' + couleur +
+    '33;border-radius:14px;padding:14px">' +
+      '<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">' + titre + '</div>' +
+      '<div style="font-size:22px;font-weight:900;color:' + couleur + ';margin:6px 0 2px">' + fmt(valeur) + '</div>' +
+      (note ? '<div style="font-size:11px;color:var(--text2)">' + note + '</div>' : '') +
+    '</div>';
+
+  zone.innerHTML =
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      carte('Entrées', d.entrees, '#22C55E', d.lignes + ' écriture' + (d.lignes>1?'s':'')) +
+      carte('Sorties', d.sorties, '#EF4444', 'remboursements') +
+      carte('Net sur la période', net, '#EAB308', d.jours >= 3650 ? 'depuis le début' : d.jours + ' jours') +
+    '</div>' +
+
+    '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+      carte('Caisse de la société', d.solde_societe, '#60A5FA', 'solde disponible') +
+      carte('Soldes des utilisateurs', detenu, '#A78BFA', 'dû aux comptes, pas un revenu') +
+    '</div>' +
+
+    ((d.detail||[]).length ?
+      '<div style="margin-top:16px;font-size:13px;font-weight:800;margin-bottom:6px">D\'où vient l\'argent</div>' +
+      '<div class="card" style="padding:4px 0">' +
+      d.detail.map(x =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div><div style="font-size:13px;font-weight:700">' + (NATURES[x.nature] || x.nature) + '</div>' +
+          '<div style="font-size:11px;color:var(--text2)">' + x.nombre + ' écriture' + (x.nombre>1?'s':'') + '</div></div>' +
+          '<div style="font-size:14px;font-weight:900;color:#22C55E">' + fmt(x.total) + '</div>' +
+        '</div>').join('') +
+      '</div>' : '') +
+
+    '<div style="margin-top:14px;font-size:12px;color:var(--text2);line-height:1.8">' +
+      '<b>Depuis le premier jour :</b> ' + fmt(d.entrees_total) + ' encaissés, ' +
+      fmt(d.sorties_total) + ' remboursés — net ' +
+      '<b style="color:var(--text)">' + fmt((Number(d.entrees_total)||0)-(Number(d.sorties_total)||0)) + '</b>.' +
+    '</div>' +
+
+    '<div style="margin-top:10px;font-size:11px;color:var(--text2);line-height:1.7">' +
+      '👤 ' + (d.comptes.clients||0) + ' clients · ' + (d.comptes.passagers||0) + ' passagers · ' +
+      (d.comptes.taxis||0) + ' taxis/VTC · ' + (d.comptes.vehicules||0) + ' véhicules · ' +
+      (d.comptes.mouvements||0) + ' écritures.<br>' +
+      'Les totaux ci-dessus sont calculés par le serveur sur la totalité des écritures ' +
+      '— contrairement à l\'onglet Bilan, limité aux mille dernières reçues par cet appareil.' +
+    '</div>';
+}
 
 function renderGestionRechercheUnifiee(q) {
   // Pour maintenant, garder la logique EXACTE existante
@@ -19159,7 +19240,34 @@ function rGestion() {
       '<div style="font-size:11px;color:var(--text2);margin-top:14px;line-height:1.6">' +
         'Seules les courses marqu\u00e9es \u00ab termin\u00e9e \u00bb sont compt\u00e9es, et les montants annul\u00e9s sont exclus. ' +
         'Les courses termin\u00e9es avant le 26 juillet 2026 n\'ont pas de date enregistr\u00e9e : elles n\'apparaissent pas.' +
+      '</div>' +
+      // Dit franchement : ces totaux portent sur les mouvements presents sur CET appareil,
+      // et le serveur n'en envoie jamais plus de mille. Pour un chiffre complet, la Tresorerie.
+      '<div style="margin-top:10px;padding:10px 12px;background:rgba(234,179,8,.09);border:1px solid rgba(234,179,8,.3);border-radius:12px;font-size:11px;color:var(--text2);line-height:1.6">' +
+        '\u26a0\ufe0f Ces totaux sont calcul\u00e9s sur les \u00e9critures pr\u00e9sentes sur cet appareil, et le serveur n\'en envoie ' +
+        'jamais plus de mille \u00e0 la fois. Pour un montant complet et v\u00e9rifiable, ouvrez l\'onglet ' +
+        '<b onclick="setGestTab(\'tresorerie\')" style="color:#EAB308;cursor:pointer;text-decoration:underline">\ud83c\udfe6 Tr\u00e9sorerie</b>, ' +
+        'o\u00f9 la somme est faite par le serveur sur la totalit\u00e9 des lignes.' +
       '</div>';
+
+  // ─── TRESORERIE ───
+  // Le « Bilan » ci-dessus additionne les mouvements deja telecharges. Le serveur n'en
+  // envoie jamais plus de mille, et il y en a deja plus du double : ses totaux portent donc
+  // sur une partie seulement de l'activite. Cet ecran-ci demande la somme AU SERVEUR, qui
+  // lit toutes les lignes. C'est le chiffre qu'on peut presenter sans risquer d'etre dementi.
+  } else if(gestTab === 'tresorerie') {
+    html =
+      '<div style="font-size:15px;font-weight:900;margin-bottom:4px">🏦 Trésorerie</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Totaux calculés par le serveur sur la <b>totalité</b> des écritures.</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' +
+        [[7,'7 jours'],[30,'30 jours'],[90,'3 mois'],[365,'1 an'],[3650,'Tout']].map(function(p){
+          var actif = (window._tresoJours || 30) === p[0];
+          return '<button class="' + (actif ? 'btn' : 'btn-ghost') + '" style="font-size:12px;padding:6px 12px" ' +
+                 'onclick="choisirPeriodeTresorerie(' + p[0] + ')">' + p[1] + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div id="treso-corps"><div class="empty">Calcul en cours…</div></div>';
+    setTimeout(chargerTresorerie, 0);
 
   } else if(gestTab==='avis') {
     // Regroupe les avis par chauffeur (clientId si compte réel, sinon par nom)
