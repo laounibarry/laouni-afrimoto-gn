@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.541';
+window.AFRIMOTO_VERSION = 'v9.542';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -20065,20 +20065,58 @@ async function annulerMouvement(mouvId, benefType, benefId, montant) {
   if(!confirm('Êtes-vous CERTAIN? Le solde sera restauré à l\'émetteur et retiré du bénéficiaire.')) return;
   const m = DB.mouvements.find(x => x.id === mouvId);
   if(!m) { toast('Mouvement non trouvé', true); return; }
+
+  // ══ v9.542 — POURQUOI CE BOUTON EST REECRIT ══
+  //
+  // C'est le seul endroit du code qui retire un montant libre a un compte. Il faisait trois
+  // choses, et les trois etaient defaillantes :
+  //
+  //   1. « c.solde -= montant » sans verifier que le beneficiaire avait encore la somme.
+  //      Un compte pouvait donc passer en negatif. C'est ainsi qu'un chauffeur s'est
+  //      retrouve a moins 4 000 000 GNF.
+  //   2. Le marquage « annule » partait vers une colonne qui n'existait pas : il etait
+  //      silencieusement abandonne. Apres rechargement, le mouvement redevenait actif et
+  //      pouvait etre annule une SECONDE fois, retirant le montant a nouveau.
+  //   3. Le remboursement a l'emetteur lisait « sourceType », qui n'etait jamais enregistre
+  //      non plus. L'argent n'etait donc rendu a personne : il etait detruit.
+  //
+  // Le point 1 est desormais impossible : la base refuse tout solde negatif, et le retrait
+  // passe par « transferer_solde », qui refuse plutot que de creuser. Les points 2 et 3
+  // exigeaient les colonnes manquantes — voir journal-mouvements.sql.
+  if(m.annule) { toast('⚠️ Cette transaction est déjà annulée.', true); return; }
+
+  // ── Le retrait au beneficiaire ──
+  const _cible = benefType === 'client' ? 'client' : (benefType === 'agent' ? 'agent' : null);
+  if(!_cible) { toast('❌ Bénéficiaire inconnu, annulation impossible.', true); return; }
+  const _retire = await mouvementSolde(_cible, benefId, 'societe', 'societe', montant, 'Annulation de transaction');
+  if(_retire !== true) {
+    // Le plus souvent : le beneficiaire a deja depense l'argent. On ne creuse pas son compte.
+    toast('⛔ Annulation impossible : le bénéficiaire n\'a plus cette somme sur son compte. ' +
+          'Rechargez-le d\'abord, ou passez par un mouvement correctif.', true);
+    return;
+  }
+
+  // ── Le remboursement a l'emetteur, s'il est connu ──
+  const _srcType = m.sourceType || '';
+  if(_srcType && _srcType !== 'admin' && m.sourceId) {
+    const _rendu = await mouvementSolde('societe', 'societe', _srcType, m.sourceId, montant, 'Retour sur annulation');
+    if(_rendu !== true) { try { addDebugLog('ANNULATION : retour à l\'émetteur refusé'); } catch(e) {} }
+  }
+  // Si l'emetteur est l'administration ou n'est pas enregistre, la somme reste sur le compte
+  // de la societe. Elle n'est plus detruite : elle est quelque part, et elle se voit.
+
   m.annule = true;
-  
-  // Retirer du bénéficiaire
-  if(benefType === 'client') { const c = DB.clients.find(x => x.id === benefId); if(c) { c.solde -= montant; sbSaveClient(c); } }
-  else if(benefType === 'agent') { const a = DB.agents.find(x => x.id === benefId); if(a) { a.solde -= montant; sbSaveAgent(a); } }
-  
-  // Remettre à l'émetteur (source)
-  if(m.sourceType === 'agent') { const a = DB.agents.find(x => x.id === m.sourceId); if(a) { a.solde += montant; sbSaveAgent(a); } }
-  else if(m.sourceType === 'sousagent') { const s = DB.sousAgents.find(x => x.id === m.sourceId); if(s) { s.solde += montant; sbSaveSousAgent(s); } }
-  else if(m.sourceType === 'client') { const c = DB.clients.find(x => x.id === m.sourceId); if(c) { c.solde += montant; sbSaveClient(c); } }
-  // Si sourceType est vide ou "Admin", pas besoin (l'admin n'a pas de solde)
-  
-  try { await supabaseClient.from('mouvements').update({ annule: true }).eq('id', mouvId); } catch(e) {}
-  toast('✅ Transaction annulée · Solde restauré de ' + fmt(montant));
+  const { error: _errAnn } = await supabaseClient.from('mouvements').update({ annule: true }).eq('id', mouvId);
+  if(_errAnn) {
+    // On ne laisse plus cette panne passer en silence : sans ce marquage, la meme transaction
+    // pourrait etre annulee plusieurs fois de suite.
+    m.annule = false;
+    toast('⚠️ Le retrait a été fait, mais l\'annulation n\'a pas pu être enregistrée. ' +
+          'Exécutez journal-mouvements.sql, sinon elle pourra être rejouée.', true);
+    try { addDebugLog('ANNULATION non enregistrée : ' + _errAnn.message); } catch(e) {}
+  } else {
+    toast('✅ Transaction annulée · ' + fmt(montant) + ' retirés au bénéficiaire');
+  }
   rHistorique();
 }
 
