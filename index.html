@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.537';
+window.AFRIMOTO_VERSION = 'v9.538';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -12113,8 +12113,44 @@ async function validerRechargeAdmin() {
   if(!rechAdminCible) return;
   const obj = rechAdminCible.type==='client' ? DB.clients.find(c=>c.id===rechAdminCible.id) : DB.passagers.find(p=>p.id===rechAdminCible.id);
   if(!obj) return;
-  obj.solde = (obj.solde||0)+montant;
-  rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
+  // ══ v9.538 : LE DEBIT ET LE CREDIT SE FONT ENSEMBLE, SUR LE SERVEUR ══
+  // Avant, on ajoutait simplement au beneficiaire — sans jamais retirer a l'agent. De
+  // l'argent etait donc cree a chaque recharge, et rien ne permettait de rapprocher les
+  // comptes. La base fait desormais les deux ecritures en une seule operation : soit les
+  // deux passent, soit aucune. L'agent est refuse s'il n'a pas la somme.
+  // L'administrateur, lui, n'est pas debite : c'est lui qui met l'argent en circulation.
+  const _srcType = (DB.user && DB.user.role === 'admin') ? 'admin'
+                 : (DB.user && DB.user.role === 'sousagent') ? 'sousagent' : 'agent';
+  const _srcId = (DB.user && (DB.user.saId || DB.user.agId)) || '';
+  let _faitParLeServeur = false;
+  try {
+    const { data: _t, error: _e } = await supabaseClient.rpc('transferer_solde', {
+      p_source_type: _srcType, p_source_id: _srcId,
+      p_cible_type: rechAdminCible.type === 'client' ? 'client' : 'passager',
+      p_cible_id: rechAdminCible.id,
+      p_montant: montant, p_motif: note || 'Recharge especes'
+    });
+    if(!_e && _t && _t.ok === true) {
+      obj.solde = _t.solde_cible;
+      if(_t.solde_source != null) {
+        const _src = DB.agents.find(a => a.id === _srcId) || DB.sousAgents.find(a => a.id === _srcId);
+        if(_src) _src.solde = _t.solde_source;
+      }
+      _faitParLeServeur = true;
+    } else if(!_e && _t && _t.raison === 'solde_insuffisant') {
+      err.textContent = '⚠️ Votre solde ne couvre pas cette recharge.';
+      err.style.display = 'block';
+      return;
+    } else if(_e) {
+      try { addDebugLog('TRANSFERT serveur indisponible : ' + _e.message + ' — repli local'); } catch(x) {}
+    }
+  } catch(x) { try { addDebugLog('TRANSFERT erreur : ' + ((x && x.message) || x)); } catch(y) {} }
+
+  if(!_faitParLeServeur) {
+    // Repli : ancien comportement, tant que la fonction n'est pas installee.
+    obj.solde = (obj.solde||0)+montant;
+    rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
+  }
   
   // 💳 Enregistrer le transfert EN MÉMOIRE
   const adminObj = { id: DB.user.id, role: 'admin', nom: DB.user.name || 'Admin' };
