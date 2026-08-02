@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.540';
+window.AFRIMOTO_VERSION = 'v9.541';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -923,7 +923,18 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       ] = await Promise.all([
         supabaseClient.from('agents').select('*'),
         supabaseClient.from('sous_agents').select('*'),
-        supabaseClient.from('clients').select('*'),
+        // v9.541 : LA TABLE DES CLIENTS N'EST PLUS TELECHARGEE PAR TOUT LE MONDE.
+        // Un « client » est un proprietaire ou un chauffeur. La liste servait a trois choses
+        // hors du personnel : lire SA PROPRE fiche, prelever la commission du chauffeur, et
+        // verifier son solde avant une course. Les deux dernieres se font desormais sur le
+        // serveur (voir alleger-registre.sql), il ne reste donc que la sienne.
+        // Le ministere vise un million d'enregistrements : cette liste ne peut pas partir
+        // sur chaque telephone, et au-dela de mille lignes elle serait de toute facon
+        // tronquee sans que personne ne le sache.
+        _perso ? supabaseClient.from('clients').select('*').limit(PLAFOND_LIGNES)
+               : (_roleEnregistre() === 'client' && _idEnregistre()
+                   ? supabaseClient.from('clients').select('*').eq('id', _idEnregistre()).limit(1)
+                   : Promise.resolve({ data: [] })),
         // v9.525 : LA TABLE DES PASSAGERS N'EST PLUS TELECHARGEE PAR TOUT LE MONDE.
         // Elle ne servait qu'a trois choses : se connecter, verifier qu'un identifiant
         // n'etait pas deja pris, et lire SA PROPRE fiche. Les deux premieres sont passees
@@ -933,7 +944,20 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
                : (_roleEnregistre() === 'passager' && _idEnregistre()
                    ? supabaseClient.from('passagers').select('*').eq('id', _idEnregistre()).limit(1)
                    : Promise.resolve({ data: [] })),
-        supabaseClient.from('vehicules').select('*'),
+        // v9.541 : LE REGISTRE DES VEHICULES N'EST PLUS TELECHARGE PAR TOUT LE MONDE.
+        // C'est LA table que le ministere veut remplir : un million de lignes la premiere
+        // semaine. Personne ne peut la recevoir en entier sur un telephone, et le serveur
+        // s'arreterait de toute facon a mille lignes — l'application croirait tout avoir.
+        //
+        // La verification d'un vehicule ne s'en trouve pas affaiblie : elle passe deja par
+        // la recherche cote serveur (chercher_registre), qui range la fiche trouvee dans la
+        // liste locale au moment ou on en a besoin. Un proprietaire garde ses propres
+        // vehicules, pour pouvoir les gerer et les mettre en vente.
+        _perso ? supabaseClient.from('vehicules').select('*').limit(PLAFOND_LIGNES)
+               : (_roleEnregistre() === 'client' && _idEnregistre()
+                   ? supabaseClient.from('vehicules').select('*')
+                       .eq('client_id', _idEnregistre()).limit(PLAFOND_LIGNES)
+                   : Promise.resolve({ data: [] })),
         supabaseClient.from('taxis').select('*'),
         supabaseClient.from('trajets').select('*'),
         supabaseClient.from('annonces').select('*'),
@@ -1035,6 +1059,51 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // Le personnel doit le voir tout de suite : c'est lui qui peut agir.
         if(_perso) setTimeout(() => { try { toast(_msg, true); } catch(e) {} }, 2500);
       }
+
+      // v9.541 — RECHARGER SES PROPRES DONNEES APRES UNE CONNEXION.
+      //
+      // Le chargement ci-dessus se fait a l'ouverture de l'application, donc AVANT que l'on
+      // sache qui se connecte. Depuis que les tables ne partent plus en entier, un chauffeur
+      // qui se connecte ensuite se retrouvait avec sa fiche et ses vehicules absents : son
+      // solde, ses revenus et ses motos apparaissaient vides. Il fallait fermer et rouvrir.
+      //
+      // Cette fonction va chercher UNIQUEMENT ce qui appartient a la personne qui vient
+      // d'entrer. Elle est appelee juste apres la connexion.
+      window.rechargerMesDonnees = async function(role, id) {
+        if(!id) return;
+        try {
+          if(role === 'client') {
+            const [{ data: c }, { data: v }] = await Promise.all([
+              supabaseClient.from('clients').select('*').eq('id', id).limit(1),
+              supabaseClient.from('vehicules').select('*').eq('client_id', id).limit(PLAFOND_LIGNES),
+            ]);
+            if(c && c.length) {
+              const m = mapClient(c[0]);
+              const i = DB.clients.findIndex(x => x.id === m.id);
+              if(i >= 0) DB.clients[i] = m; else DB.clients.push(m);
+            }
+            if(v) v.map(mapVehicule).forEach(m => {
+              const i = DB.vehs.findIndex(x => x.id === m.id);
+              if(i >= 0) DB.vehs[i] = m; else DB.vehs.push(m);
+            });
+          } else if(role === 'passager') {
+            const { data: p } = await supabaseClient.from('passagers').select('*').eq('id', id).limit(1);
+            if(p && p.length) {
+              const m = mapPassager(p[0]);
+              const i = DB.passagers.findIndex(x => x.id === m.id);
+              if(i >= 0) DB.passagers[i] = m; else DB.passagers.push(m);
+            }
+          } else if(role === 'owner') {
+            // Le proprietaire se connecte par son vehicule : c'est « id » qui porte la fiche.
+            const { data: v } = await supabaseClient.from('vehicules').select('*').eq('id', id).limit(1);
+            if(v && v.length) {
+              const m = mapVehicule(v[0]);
+              const i = DB.vehs.findIndex(x => x.id === m.id);
+              if(i >= 0) DB.vehs[i] = m; else DB.vehs.push(m);
+            }
+          }
+        } catch(e) { try { addDebugLog('RECHARGEMENT compte : ' + ((e && e.message) || e)); } catch(er) {} }
+      };
 
       // Tri côté client (le tri serveur échouait silencieusement quand created_at manquait)
       const _triDate = (arr, champ) => (arr||[]).sort((a,b) => new Date(b[champ]||0) - new Date(a[champ]||0));
@@ -1248,6 +1317,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       fraisEnreg:r.frais_enregistrement||r.fraisEnreg||0, code:r.code||'',
       ville:r.ville||'', zone:r.zone||'', motoId:r.moto_id||r.motoId||null,
       typeVehicule:r.type_vehicule||null, // v9.387
+      couleur:r.couleur||'', // v9.541 — recopiee du vehicule, evite de telecharger le registre
       places:(r.places!=null)?r.places:null, confort:r.confort||null, options:r.options||null, // v9.388/398
       categories:r.categories||null, // v9.532 : categories VTC acceptees, separees par des virgules
       valide:(r.valide!==undefined&&r.valide!==null)?r.valide:true,
@@ -5952,6 +6022,9 @@ async function doLogin() {
   loginAttempts = 0;
   DB.user = user;
   saveSession(user);
+  // v9.541 : les tables ne partent plus en entier. Il faut donc aller chercher la fiche et
+  // les vehicules de CETTE personne, sinon son espace s'ouvrirait vide.
+  try { if(window.rechargerMesDonnees) await window.rechargerMesDonnees(user.role, user.id || user.vid); } catch(e) {}
   window._derniereConnexionExplicite = Date.now(); // v9.457 : la DERNIERE connexion gagne
   prendreSessionUnique(user); // v9.348 : cet appareil devient le seul connecte
   synchroniserAbonnementPush(); // v9.350 : les canaux suivent le compte qui vient d'ouvrir
@@ -6235,6 +6308,11 @@ function setClientTab(t) {
 // la bonne voiture parmi celles qui attendent.
 function _couleurTaxi(t) {
   try {
+    // v9.541 : la couleur est desormais recopiee sur la fiche du taxi, et tenue a jour par
+    // la base quand elle change sur la fiche du vehicule. C'etait la seule information du
+    // registre dont le passager avait besoin pendant une course : il n'a donc plus aucune
+    // raison de telecharger le registre des vehicules pour reconnaitre la voiture.
+    if(t && t.couleur && String(t.couleur).trim()) return String(t.couleur).trim();
     const v = DB.vehs.find(x => x.id === (t && t.motoId));
     return (v && v.color) ? String(v.color).trim() : '';
   } catch(e) { return ''; }
@@ -8135,7 +8213,7 @@ function afficherChoixApresEchec(demande, motif) {
 }
 
 // Décision du passager sur le prix proposé par le taxi
-function repondrePrixPassager(accepte) {
+async function repondrePrixPassager(accepte) {
   alarmeCourseStop();
   alarmePrixProposeStop();
   const rch = rechercheAutoEnCours;
@@ -8167,7 +8245,10 @@ function repondrePrixPassager(accepte) {
     if(_commissionAuTaxi()) { // v9.366 : l'affaire est conclue, le chauffeur paie
       // v9.367 : dernier controle. Si le solde a fondu entre-temps, la course
       // ne peut pas se faire : mieux vaut le dire tout de suite aux deux parties.
-      const _sda = _soldeTaxiSuffisant(demande.taxiId);
+      // v9.541 : ce controle-ci s'execute chez le PASSAGER. C'est le seul des trois, les
+      // deux autres tournant sur le telephone du chauffeur, qui a sa propre fiche.
+      // On demande donc au serveur, qui repond sans jamais devoiler le solde du chauffeur.
+      const _sda = await _soldeTaxiSuffisantServeur(demande.taxiId);
       if(!_sda.ok) {
         toast('\u26d4 Le chauffeur n\'a plus assez de solde pour la commission. Course impossible \u2014 choisissez un autre taxi.', true);
         demande.statutAttribution = 'annulee_chauffeur';
@@ -8353,6 +8434,31 @@ function _soldeTaxiSuffisant(taxiId) {
   return { ok: sd >= c, solde: sd, manque: Math.max(0, c - sd) };
 }
 
+// v9.541 — LE MEME CONTROLE, MAIS SANS LA TABLE DES CLIENTS.
+//
+// Le controle ci-dessus cherche le compte du chauffeur dans « DB.clients ». Or ce controle
+// s'execute AUSSI sur le telephone du PASSAGER, avant d'engager une course. C'est la seule
+// raison pour laquelle un passager telechargeait la liste de tous les comptes du pays.
+//
+// Le serveur sait retrouver le lien taxi -> compte tout seul. Il repond « suffisant ou non »
+// sans jamais dire au passager combien le chauffeur possede.
+//
+// Si le serveur ne repond pas, on retombe sur l'ancienne methode : mieux vaut un controle
+// approximatif que pas de controle du tout.
+async function _soldeTaxiSuffisantServeur(taxiId) {
+  const c = _commissionPourTaxi(DB.taxis.find(x => x.id === taxiId)) || 0;
+  if(!_commissionAuTaxi() || c <= 0) return { ok: true, solde: null, manque: 0 };
+  try {
+    const { data, error } = await supabaseClient.rpc('verifier_solde_taxi',
+      { p_taxi_id: taxiId, p_montant: c });
+    if(!error && data && data.ok === true) {
+      return { ok: data.suffisant === true, solde: null,
+               manque: Number(data.manque) || 0, sansCompte: data.sans_compte === true };
+    }
+  } catch(e) { }
+  return _soldeTaxiSuffisant(taxiId);
+}
+
 function _clientDuTaxi(taxiId) {
   try {
     const t = DB.taxis.find(x => x.id === taxiId);
@@ -8364,15 +8470,31 @@ function _clientDuTaxi(taxiId) {
 async function debiterTaxiCommission(demande) {
   const m = Number(demande && demande.commission) || 0;
   if(m <= 0) return;
-  const cl = _clientDuTaxi(demande.taxiId);
-  if(!cl) { try { addDebugLog('COMMISSION : propri\u00e9taire du taxi introuvable'); } catch(e) {} return; }
+  // v9.541 : LE PRELEVEMENT NE DEPEND PLUS DE LA TABLE DES CLIENTS.
+  // Ce prelevement s'execute sur le telephone du PASSAGER : c'est lui qui conclut l'affaire.
+  // Il cherchait le compte du chauffeur dans \u00ab DB.clients \u00bb. Si cette table n'etait pas
+  // telechargee, la commission n'etait pas prelevee, et personne ne s'en apercevait.
+  // Le serveur retrouve desormais le lien taxi -> compte, debite le chauffeur et credite la
+  // societe en une seule operation : les deux se font ensemble, ou aucune ne se fait.
+  const cl = _clientDuTaxi(demande.taxiId); // present sur le telephone du chauffeur seulement
+  let _faitServeur = false;
+  try {
+    const { data, error } = await supabaseClient.rpc('debiter_commission_taxi',
+      { p_taxi_id: demande.taxiId, p_montant: m, p_motif: 'Commission course' });
+    if(!error && data && data.ok === true) _faitServeur = true;
+    else if(data && data.raison) { try { addDebugLog('COMMISSION refus\u00e9e : ' + data.raison); } catch(e) {} }
+  } catch(e) { try { addDebugLog('COMMISSION serveur indisponible'); } catch(er) {} }
+  if(!_faitServeur && !cl) { try { addDebugLog('COMMISSION : propri\u00e9taire du taxi introuvable'); } catch(e) {} return; }
   // v9.539 : la commission ARRIVE quelque part. Elle etait retiree au chauffeur et
   // n'etait creditee a personne — invisible dans les comptes de la societe.
-  const _fait = await mouvementSolde('client', cl.id, 'societe', 'societe', m, 'Commission course');
-  if(_fait !== true) { cl.solde = (cl.solde || 0) - m; await sbSaveClient(cl); }
-  const nom = ((cl.prenom || '') + ' ' + (cl.nom || '')).trim();
+  if(!_faitServeur) {
+    // Repli : l'ancienne methode, qui exige d'avoir la fiche du chauffeur sous la main.
+    const _fait = await mouvementSolde('client', cl.id, 'societe', 'societe', m, 'Commission course');
+    if(_fait !== true) { cl.solde = (cl.solde || 0) - m; await sbSaveClient(cl); }
+  }
+  const nom = cl ? ((cl.prenom || '') + ' ' + (cl.nom || '')).trim() : (demande.taxiNom || '');
   logMvt('rech', '\ud83c\udfcd\ufe0f Commission course taxi \u2014 ' + (demande.taxiNom || nom), m,
-    nom, 'Soci\u00e9t\u00e9 (commission)', { cibleType: 'client', cibleId: cl.id });
+    nom, 'Soci\u00e9t\u00e9 (commission)', { cibleType: 'client', cibleId: cl ? cl.id : null });
   try { addDebugLog('COMMISSION : ' + m + ' pr\u00e9lev\u00e9s au chauffeur'); } catch(e) {}
 }
 
@@ -11276,13 +11398,42 @@ async function rafraichirVehiculesEtTaxis(terme) {
       try { addDebugLog('REGISTRE serveur erreur : ' + ((e && e.message) || e)); } catch(er) {}
     }
   }
-  // Repli : ancienne methode, tout le registre.
+  // v9.541 — LE REPLI NE TELECHARGE PLUS TOUT LE REGISTRE.
+  //
+  // Avant, quand la recherche serveur ne trouvait rien, on rapatriait la table entiere pour
+  // chercher soi-meme. Avec 33 vehicules c'etait discret. Avec un million, cela ne marcherait
+  // pas du tout : le serveur s'arrete a mille lignes, donc on repondrait « vehicule inconnu »
+  // apres avoir regarde 0,1 % du registre. Sur une verification anti-vol, c'est le pire
+  // resultat possible : rassurer a tort.
+  //
+  // On interroge donc le serveur sur les memes champs, mais en ciblant. Ce qu'il renvoie est
+  // range dans la liste locale, exactement comme la recherche principale.
   try {
-    const [{data: vehs}, {data: taxis}] = await Promise.all([
-      supabaseClient.from('vehicules').select('*'),
-      supabaseClient.from('taxis').select('*'),
-    ]);
-    if(vehs) DB.vehs = vehs.map(mapVehicule);
+    const brut = String(terme || '').trim();
+    if(brut) {
+      const sur = brut.replace(/[,()*]/g, ' ').trim(); // ces caracteres ont un sens pour le serveur
+      const estUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(brut);
+      const qv = estUuid
+        ? supabaseClient.from('vehicules').select('*').eq('id', brut).limit(1)
+        : supabaseClient.from('vehicules').select('*')
+            .or(['mat.ilike.*' + sur + '*', 'vin.ilike.*' + sur + '*',
+                 'code.ilike.*' + sur + '*', 'num.ilike.*' + sur + '*'].join(','))
+            .limit(50);
+      const qt = estUuid
+        ? supabaseClient.from('taxis').select('*').eq('id', brut).limit(1)
+        : supabaseClient.from('taxis').select('*')
+            .or(['plaque.ilike.*' + sur + '*', 'gilet.ilike.*' + sur + '*',
+                 'code.ilike.*' + sur + '*'].join(','))
+            .limit(50);
+      const [{data: vehs}, {data: taxis}] = await Promise.all([qv, qt]);
+      (vehs  || []).forEach(l => _ranger(DB.vehs,  l, mapVehicule));
+      (taxis || []).forEach(l => _ranger(DB.taxis, l, mapTaxi));
+      return;
+    }
+    // Sans terme de recherche, c'est un simple rafraichissement. La table des taxis reste
+    // petite par nature (un par chauffeur en service), on peut la reprendre entierement ;
+    // le registre des vehicules, non.
+    const { data: taxis } = await supabaseClient.from('taxis').select('*').limit(PLAFOND_LIGNES);
     if(taxis) DB.taxis = taxis.map(mapTaxi);
   } catch(e) { console.warn('rafraichirVehiculesEtTaxis:', e && e.message); }
 }
@@ -23330,9 +23481,12 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   if(!DB.passagers.some(p => demoPsIds.includes(p.id)))
     DB.passagers.push(...DEMO_PASSAGERS.map(mapPassager));
 
-  const demoVehIds = DEMO_VEHS.map(v => v.id);
-  if(!DB.vehs.some(v => demoVehIds.includes(v.id)))
-    // DB.vehs.push(...DEMO_VEHS.map(mapVehicule)); // Démos désactivées
+  // Les vehicules de demonstration sont desactives. Le « if » qui les ajoutait avait vu son
+  // contenu mis en commentaire, mais il etait reste : il gouvernait donc l'instruction
+  // SUIVANTE, et le hachage du mot de passe administrateur ne s'executait que si aucun
+  // vehicule de demonstration n'etait present. Cela ne se voyait pas — la condition etait
+  // toujours vraie — mais le mot de passe admin dependait de l'etat du registre, ce qui
+  // n'a aucun sens. Le « if » est supprime.
 
   DB.adminPass = await hashPw(DB.adminPass);
   // Hasher les mots de passe démo
