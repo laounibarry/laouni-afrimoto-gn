@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.565';
+window.AFRIMOTO_VERSION = 'v9.566';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -5899,6 +5899,82 @@ function demanderMotDePasse(titre, sousTitre) {
       if(e.key === 'Escape') finir(null);
     };
     setTimeout(() => { try { champ.focus(); } catch(e) {} }, 60);
+  });
+}
+
+// ── Demander un texte, sans passer par le navigateur ─────────────────────────
+// v9.566 : « prompt » ne s'affiche pas dans certaines WebView Android — votre propre code
+// le notait déjà à deux endroits. Sur l'application, les boutons qui s'en servaient ne
+// faisaient donc rien du tout : pas de message, pas d'erreur, rien. Celle-ci est une vraie
+// fenêtre de la page, elle s'affiche partout.
+function demanderTexte(titre, sousTitre, valeurDepart, multi) {
+  return new Promise(resolve => {
+    const fond = document.createElement('div');
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;' +
+      'display:flex;align-items:center;justify-content:center;padding:18px';
+    const boite = document.createElement('div');
+    boite.style.cssText = 'background:#1a1410;border:1px solid #7a3f10;border-radius:14px;' +
+      'padding:22px;max-width:460px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.6)';
+    const champHtml = multi
+      ? '<textarea rows="3" style="width:100%;padding:12px;border-radius:9px;border:1px solid #7a3f10;' +
+        'background:#0f0b08;color:#fff;font-size:15px;box-sizing:border-box;resize:vertical"></textarea>'
+      : '<input type="text" style="width:100%;padding:12px;border-radius:9px;border:1px solid #7a3f10;' +
+        'background:#0f0b08;color:#fff;font-size:15px;box-sizing:border-box">';
+    boite.innerHTML =
+      '<div style="font-weight:700;color:#ff9d3c;font-size:16px;margin-bottom:6px">' + esc(titre) + '</div>' +
+      (sousTitre ? '<div style="color:#c9b8a8;font-size:13px;line-height:1.45;margin-bottom:14px">' +
+        esc(sousTitre) + '</div>' : '<div style="height:8px"></div>') +
+      champHtml +
+      '<div style="display:flex;gap:10px;margin-top:16px">' +
+        '<button data-non style="flex:1;padding:11px;border-radius:9px;border:1px solid #555;' +
+          'background:transparent;color:#ccc;font-size:14px;cursor:pointer">Annuler</button>' +
+        '<button data-oui style="flex:1;padding:11px;border-radius:9px;border:0;' +
+          'background:#e2610b;color:#fff;font-weight:700;font-size:14px;cursor:pointer">Valider</button>' +
+      '</div>';
+    fond.appendChild(boite);
+    document.body.appendChild(fond);
+    const champ = boite.querySelector(multi ? 'textarea' : 'input');
+    if(valeurDepart) champ.value = valeurDepart;
+    const finir = v => { try { fond.remove(); } catch(e) {} resolve(v); };
+    boite.querySelector('[data-oui]').onclick = () => finir((champ.value || '').trim() || null);
+    boite.querySelector('[data-non]').onclick = () => finir(null);
+    fond.onclick = e => { if(e.target === fond) finir(null); };
+    champ.onkeydown = e => {
+      if(e.key === 'Enter' && !multi) finir((champ.value || '').trim() || null);
+      if(e.key === 'Escape') finir(null);
+    };
+    setTimeout(() => { try { champ.focus(); } catch(e) {} }, 60);
+  });
+}
+
+// Même chose pour les questions oui/non. « confirm » est bloqué dans les mêmes WebView
+// que « prompt » — un bouton de suspension qui ne demande rien et ne fait rien est pire
+// qu'un bouton absent.
+function demanderConfirmation(titre, sousTitre, motBouton) {
+  return new Promise(resolve => {
+    const fond = document.createElement('div');
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;' +
+      'display:flex;align-items:center;justify-content:center;padding:18px';
+    const boite = document.createElement('div');
+    boite.style.cssText = 'background:#1a1410;border:1px solid #7a3f10;border-radius:14px;' +
+      'padding:22px;max-width:420px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.6)';
+    boite.innerHTML =
+      '<div style="font-weight:700;color:#ff9d3c;font-size:16px;margin-bottom:8px">' + esc(titre) + '</div>' +
+      (sousTitre ? '<div style="color:#c9b8a8;font-size:13px;line-height:1.5">' + esc(sousTitre) + '</div>' : '') +
+      '<div style="display:flex;gap:10px;margin-top:18px">' +
+        '<button data-non style="flex:1;padding:11px;border-radius:9px;border:1px solid #555;' +
+          'background:transparent;color:#ccc;font-size:14px;cursor:pointer">Annuler</button>' +
+        '<button data-oui style="flex:1;padding:11px;border-radius:9px;border:0;' +
+          'background:#e2610b;color:#fff;font-weight:700;font-size:14px;cursor:pointer">' +
+          esc(motBouton || 'Confirmer') + '</button>' +
+      '</div>';
+    fond.appendChild(boite);
+    document.body.appendChild(fond);
+    const finir = v => { try { fond.remove(); } catch(e) {} resolve(v); };
+    boite.querySelector('[data-oui]').onclick = () => finir(true);
+    boite.querySelector('[data-non]').onclick = () => finir(false);
+    fond.onclick = e => { if(e.target === fond) finir(false); };
+    setTimeout(() => { try { boite.querySelector('[data-oui]').focus(); } catch(e) {} }, 60);
   });
 }
 
@@ -14865,7 +14941,9 @@ async function rLitiges() {
 async function conserverDossier(type, id) {
   // Le motif est exige par la base, pas seulement ici : un dossier gele sans raison ecrite
   // ne se defend pas devant un juge.
-  const motif = prompt('Pourquoi conserver ce dossier au-delà du délai ?\n(procédure en cours, plainte déposée, réquisition…)', '');
+  const motif = await demanderTexte('🔒 Conserver ce dossier',
+    'Pourquoi le conserver au-delà du délai ? (procédure en cours, plainte déposée, réquisition…)',
+    '', true);
   if(!motif || motif.trim().length < 3) { if(motif !== null) toast('⚠️ Un motif est obligatoire.', true); return; }
   try {
     const { data, error } = await supabaseClient.rpc('conserver_dossier', {
@@ -14888,7 +14966,8 @@ async function conserverDossier(type, id) {
 
 async function leverConservation(type, id) {
   if(!isAdmin()) { toast('⛔ Réservé à l\'administration.', true); return; }
-  const motif = prompt('Pourquoi lever la conservation ?\n(affaire classée, jugement rendu…)', '');
+  const motif = await demanderTexte('🔓 Lever la conservation',
+    'Pourquoi la lever ? (affaire classée, jugement rendu…)', '', true);
   if(motif === null) return;
   try {
     const { data } = await supabaseClient.rpc('lever_conservation', {
@@ -21390,7 +21469,8 @@ function rGestion() {
 // ── Changement de mot de passe (admin seulement) ──
 // ════ ANNULATION DE TRANSACTIONS ════
 async function annulerMouvement(mouvId, benefType, benefId, montant) {
-  if(!confirm('Êtes-vous CERTAIN? Le solde sera restauré à l\'émetteur et retiré du bénéficiaire.')) return;
+  if(!await demanderConfirmation('Annuler ce mouvement ?',
+       'Le solde sera restauré à l\'émetteur et retiré du bénéficiaire.', 'Annuler le mouvement')) return;
   const m = DB.mouvements.find(x => x.id === mouvId);
   if(!m) { toast('Mouvement non trouvé', true); return; }
 
@@ -23034,7 +23114,7 @@ function adminAvertirTaxi(taxiId, taxiNom) {
   renderRechercheCompteDetail();
 }
 
-function adminToggleSuspendTaxi(taxiId, taxiNom) {
+async function adminToggleSuspendTaxi(taxiId, taxiNom) {
   const taxi = DB.taxis.find(t => t.id === taxiId);
   if(!taxi) { toast('❌ Taxi introuvable', true); return; }
   
@@ -23042,7 +23122,9 @@ function adminToggleSuspendTaxi(taxiId, taxiNom) {
   const actionMsg = estBloque ? 'débloqué' : 'suspendu';
   const actionConfirm = estBloque ? 'Débloquer' : 'Suspendre';
   
-  if(!confirm(actionConfirm + ' le chauffeur ' + taxiNom + ' ?')) return;
+  if(!await demanderConfirmation(actionConfirm + ' le chauffeur ' + taxiNom + ' ?',
+       estBloque ? 'Il pourra de nouveau prendre des courses.'
+                 : 'Il ne pourra plus prendre de course.', actionConfirm)) return;
   
   // Toggle le flag
   taxi.taxi_bloque = !estBloque;
@@ -25059,9 +25141,29 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   updateNav();
 })();
 
-function adminAvertirChauffeur(id,nom){const r=prompt('Motif avertissement:','');if(!r)return;logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('✅ Avertissement enregistré');}
+async function adminAvertirChauffeur(id,nom){
+  const r = await demanderTexte('⚠️ Avertir ' + nom, 'Motif de l\'avertissement :', '', true);
+  if(!r) return;
+  logMvt('avertissement','⚠️ Avertissement: '+nom,0,'',nom,{cibleType:'client',cibleId:id});
+  toast('✅ Avertissement enregistré');
+}
 
-function adminSusprendreChauffeur(id,nom){const r=prompt('Motif suspension:','');if(!r)return;if(!confirm('SUSPENDRE '+nom+' ?'))return;const c=DB.clients.find(x=>x.id===id);if(!c)return;c.chauffeurBloque=true;supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});toast('🚫 Chauffeur suspendu');rRecherche();}).catch(e=>toast('❌ Erreur',true));}
+async function adminSusprendreChauffeur(id,nom){
+  const r = await demanderTexte('🚫 Suspendre ' + nom, 'Motif de la suspension :', '', true);
+  if(!r) return;
+  // askConfirm remplace confirm() : même raison que prompt(), certaines WebView Android
+  // n'affichent pas les fenêtres du navigateur.
+  askConfirm('SUSPENDRE ' + nom + ' ?\n\nIl ne pourra plus prendre de course.', () => {
+    const c = DB.clients.find(x => x.id === id);
+    if(!c) return;
+    c.chauffeurBloque = true;
+    supabaseClient.from('clients').update({chauffeur_bloque:true}).eq('id',id).then(()=>{
+      logMvt('suspension','🚫 Suspension: '+nom,0,'',nom,{cibleType:'client',cibleId:id});
+      toast('🚫 Chauffeur suspendu');
+      rRecherche();
+    }).catch(e=>toast('❌ Erreur',true));
+  });
+}
 
 // Fonction de confirmation personnalisée
 window._confirmCallback = null;
@@ -25390,11 +25492,11 @@ function apprecierChauffeur(chauffeurId, nom) {
 }
 
 // Avertir passager
-function avertirPassager(passagerId, nom) {
+async function avertirPassager(passagerId, nom) {
   const p = DB.passagers.find(x => x.id === passagerId);
   if(!p) { toast('❌ Passager non trouvé', true); return; }
-  
-  if(confirm('⚠️ Avertir ' + nom + ' ?')) {
+
+  if(await demanderConfirmation('⚠️ Avertir ' + nom + ' ?', 'Un avertissement sera ajouté à son compte.', 'Avertir')) {
     p.avertissements = (p.avertissements || 0) + 1;
     sbSavePassager(p);
     toast('⚠️ Avertissement enregistré');
