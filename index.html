@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.562';
+window.AFRIMOTO_VERSION = 'v9.563';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1896,17 +1896,25 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   async function sbDeleteItem(table, id) {
     const typeProtege = TABLES_PROTEGEES[table];
     if(typeProtege) {
-      try {
+      const tenter = async (jeton) => {
         const { data, error } = await supabaseClient.rpc('supprimer_element', {
-          p_type: typeProtege, p_id: id, p_jeton: window._jetonPersonnel || ''
+          p_type: typeProtege, p_id: id, p_jeton: jeton || ''
         });
-        if(error) { console.warn('❌ suppression serveur:', table, id, error.message); return false; }
-        if(!data || data.ok !== true) {
-          console.warn('❌ suppression refusée:', table, id, data && data.raison);
+        if(error) throw new Error(error.message);
+        return data || {};
+      };
+      try {
+        let r = await tenter(jetonPersonnel());
+        // Session expirée : on redemande le mot de passe sur place et on réessaie UNE fois.
+        if(r.ok !== true && r.raison === 'session_invalide') {
+          const neuf = await redemanderJeton();
+          if(neuf) r = await tenter(neuf);
+        }
+        if(r.ok !== true) {
+          console.warn('❌ suppression refusée:', table, id, r.raison);
           // Le refus doit se voir. Une suppression qui échoue en silence laisse croire
           // que le travail est fait alors que la ligne est toujours là.
-          if(data && data.raison === 'session_invalide')
-            try { toast('⛔ Session expirée — reconnectez-vous pour supprimer'); } catch(e) {}
+          try { toast('⛔ Suppression refusée par le serveur.', true); } catch(e) {}
           return false;
         }
         return true;
@@ -5844,13 +5852,72 @@ async function verifierSessionUnique() {
 function saveSession(user) {
   try { localStorage.setItem('afrimoto_session', JSON.stringify(user)); } catch(e) { /* stockage indisponible, sans conséquence grave */ }
 }
+
+// ── Le jeton du personnel ────────────────────────────────────────────────────
+// Il prouve au serveur que celui qui demande une suppression a bien donné un mot de passe
+// du personnel. Il vaut douze heures, puis il faut le redemander.
+function enregistrerJeton(jeton, expireLe, role, identifiant) {
+  window._jetonPersonnel = jeton;
+  try {
+    localStorage.setItem('afrimoto_jeton', JSON.stringify({
+      j: jeton,
+      exp: expireLe ? new Date(expireLe).getTime() : (Date.now() + 12*3600*1000),
+      role: role || '', id: identifiant || ''
+    }));
+  } catch(e) { /* stockage indisponible : le jeton reste en mémoire pour cette page */ }
+}
+function effacerJeton() {
+  window._jetonPersonnel = null;
+  try { localStorage.removeItem('afrimoto_jeton'); } catch(e) {}
+}
+// Renvoie le jeton s'il est encore valable, sinon rien. Un jeton périmé est effacé plutôt
+// que renvoyé : le serveur le refuserait, autant l'apprendre ici.
+function jetonPersonnel() {
+  if(window._jetonPersonnel) return window._jetonPersonnel;
+  try {
+    const o = JSON.parse(localStorage.getItem('afrimoto_jeton') || 'null');
+    if(o && o.j && o.exp > Date.now() + 30000) { window._jetonPersonnel = o.j; return o.j; }
+    if(o) localStorage.removeItem('afrimoto_jeton');
+  } catch(e) {}
+  return null;
+}
+// Douze heures passent vite. Plutôt que de renvoyer l'administrateur à l'écran de
+// connexion au milieu de son travail, on lui redemande son mot de passe sur place.
+async function redemanderJeton() {
+  let role = '', ident = '';
+  try {
+    const o = JSON.parse(localStorage.getItem('afrimoto_jeton') || 'null');
+    if(o) { role = o.role; ident = o.id; }
+  } catch(e) {}
+  if(!role) role = (DB.user && DB.user.role) || '';
+  if(!role || !['admin','agent','sousagent'].includes(role)) return null;
+  // Sur une suppression groupée, la question ne doit être posée qu'une fois. Si elle est
+  // refusée, on ne la repose pas pour chacun des éléments suivants.
+  if(window._refusJetonJusqua && Date.now() < window._refusJetonJusqua) return null;
+  const pw = prompt('Votre session de sécurité a expiré.\nSaisissez votre mot de passe pour continuer :');
+  if(!pw) { window._refusJetonJusqua = Date.now() + 60000; return null; }
+  if(!ident) ident = (role === 'admin') ? (DB.adminId || '') :
+                     ((DB.user && (DB.user.num || DB.user.code)) || '');
+  try {
+    const { data } = await supabaseClient.rpc('ouvrir_session_personnel', {
+      p_role: role, p_identifiant: ident, p_mot_de_passe: pw
+    });
+    if(data && data.ok === true && data.jeton) {
+      enregistrerJeton(data.jeton, data.expire_le, role, ident);
+      return data.jeton;
+    }
+    toast('⛔ Mot de passe refusé.', true);
+  } catch(e) { toast('⛔ Serveur injoignable.', true); }
+  return null;
+}
+
 function clearSession() {
   try { localStorage.removeItem('afrimoto_session'); } catch(e) {}
   // v9.560 : le jeton du personnel meurt avec la session. On le dit aussi au serveur, pour
   // qu'il ne reste pas valable douze heures apres un depart.
   try {
-    const j = window._jetonPersonnel;
-    window._jetonPersonnel = null;
+    const j = window._jetonPersonnel || jetonPersonnel();
+    effacerJeton();
     if(j) supabaseClient.rpc('fermer_session_personnel', { p_jeton: j });
   } catch(e) {}
 }
@@ -6233,26 +6300,29 @@ async function doLogin() {
   // SERVEUR, qui delivre en echange un jeton valable douze heures. Les operations
   // dangereuses l'exigeront. Un inconnu, lui, ne l'a pas.
   //
-  // Le jeton ne survit pas a la fermeture de l'onglet : il n'est pas ecrit sur le disque.
-  // C'est volontaire — un jeton retrouve dans le stockage du navigateur vaudrait un mot
-  // de passe.
+  // v9.563 : le jeton est conserve dans le navigateur, avec sa date d'expiration.
+  // Je l'avais d'abord garde en memoire seule, par prudence ; il disparaissait donc au
+  // moindre rafraichissement de page et n'a jamais servi. Le raisonnement etait faux :
+  // ce que ce jeton protege, ce sont les inconnus qui n'ont que la clef publique du site.
+  // Ceux-la n'ont pas l'appareil de l'administrateur. Quelqu'un qui a l'appareil a deja
+  // la session admin dans ce meme stockage : le jeton ne lui apprend rien de plus.
   if(curRole === 'admin' || curRole === 'agent' || curRole === 'sousagent') {
     try {
       const { data: _s } = await supabaseClient.rpc('ouvrir_session_personnel', {
         p_role: curRole, p_identifiant: id, p_mot_de_passe: pw
       });
       if(_s && _s.ok === true && _s.jeton) {
-        window._jetonPersonnel = _s.jeton;
+        enregistrerJeton(_s.jeton, _s.expire_le, curRole, id);
         try { addDebugLog('SESSION personnel ouverte (' + curRole + ')'); } catch(e) {}
       } else {
-        window._jetonPersonnel = null;
+        effacerJeton();
         // v9.561 : la raison s'affiche a l'ecran. Un echec silencieux nous a deja coute un
         // aller-retour : le jeton n'etait pas delivre et rien ne le disait.
         try { addDebugLog('SESSION personnel refusee : ' + ((_s && _s.raison) || 'sans reponse')); } catch(e) {}
         try { toast('⚠️ Session serveur refusée : ' + ((_s && _s.raison) || 'sans réponse'), true); } catch(e) {}
       }
     } catch(e) {
-      window._jetonPersonnel = null;
+      effacerJeton();
       try { addDebugLog('SESSION personnel indisponible'); } catch(er) {}
       try { toast('⚠️ Session serveur injoignable.', true); } catch(er) {}
     }
