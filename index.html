@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.561';
+window.AFRIMOTO_VERSION = 'v9.562';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1888,7 +1888,30 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   }
   const sbLogMvt = sbIgnoreErr(_sbLogMvt, 'sbLogMvt');
 
+  // Tables dont la suppression passe obligatoirement par le serveur, avec un jeton du
+  // personnel. Une suppression y est définitive et concerne un dossier opposable en
+  // justice : elle ne doit pas dépendre d'une simple clef publique lisible dans le site.
+  const TABLES_PROTEGEES = { trajets:'trajet', demandes_course:'course' };
+
   async function sbDeleteItem(table, id) {
+    const typeProtege = TABLES_PROTEGEES[table];
+    if(typeProtege) {
+      try {
+        const { data, error } = await supabaseClient.rpc('supprimer_element', {
+          p_type: typeProtege, p_id: id, p_jeton: window._jetonPersonnel || ''
+        });
+        if(error) { console.warn('❌ suppression serveur:', table, id, error.message); return false; }
+        if(!data || data.ok !== true) {
+          console.warn('❌ suppression refusée:', table, id, data && data.raison);
+          // Le refus doit se voir. Une suppression qui échoue en silence laisse croire
+          // que le travail est fait alors que la ligne est toujours là.
+          if(data && data.raison === 'session_invalide')
+            try { toast('⛔ Session expirée — reconnectez-vous pour supprimer'); } catch(e) {}
+          return false;
+        }
+        return true;
+      } catch(e) { console.warn('❌ suppression serveur:', e && e.message); return false; }
+    }
     try {
       const {error} = await supabaseClient.from(table).delete().eq('id', id);
       if(error) {
@@ -10609,7 +10632,26 @@ function _terminerCourseConfirmee(demandeId) {
 }
 
 // ── Purge automatique des courses/trajets ──
+// Le ménage du serveur est fait PAR le serveur (fonction « purger_donnees_anciennes »).
+// Auparavant chaque navigateur — y compris celui de chaque passager — supprimait les vieux
+// trajets un par un. Rien ne justifiait que le téléphone d'un passager fasse le ménage de
+// la base, et cela empêchait de fermer la suppression aux inconnus.
+// On l'appelle au plus une fois toutes les six heures par appareil : c'est du ménage, pas
+// une urgence, et cela évite des milliers d'appels inutiles.
+async function purgeServeurSiNecessaire() {
+  try {
+    const cle = 'afri_derniere_purge';
+    const dernier = parseInt(localStorage.getItem(cle) || '0', 10) || 0;
+    if(Date.now() - dernier < 6*3600*1000) return;
+    localStorage.setItem(cle, String(Date.now()));
+    const { data } = await supabaseClient.rpc('purger_donnees_anciennes');
+    if(data && data.ok) try { addDebugLog('PURGE serveur : ' +
+      (data.trajets_expires||0) + ' expirés, ' + (data.trajets_anciens||0) + ' anciens'); } catch(e) {}
+  } catch(e) { /* le ménage n'est jamais bloquant */ }
+}
+
 function purgerCoursesEtTrajets() {
+  purgeServeurSiNecessaire();
   const now = new Date();
   const ms72h  = 72 * 60 * 60 * 1000;
   const ms45j  = 45 * 24 * 60 * 60 * 1000;
@@ -10620,10 +10662,8 @@ function purgerCoursesEtTrajets() {
     const dh = t.dateHeure ? new Date(t.dateHeure) : null;
     const expire = dh && !isNaN(dh) && now > dh;
     const sansResa = !t.reservations || t.reservations.length === 0;
-    if(t.statut === 'actif' && expire && sansResa) {
-      sbDeleteItem('trajets', t.id);
-      return false;
-    }
+    // On les retire de l'affichage tout de suite ; le serveur les efface de son côté.
+    if(t.statut === 'actif' && expire && sansResa) return false;
     return true;
   });
 
@@ -10632,7 +10672,7 @@ function purgerCoursesEtTrajets() {
     if(t.statut !== 'effectué' && t.statut !== 'annulé') return true;
     const ref = t.arriveLe || t.dateHeure || null;
     if(!ref) return true;
-    if(now - new Date(ref) > ms45j) { sbDeleteItem('trajets', t.id); return false; }
+    if(now - new Date(ref) > ms45j) return false;
     return true;
   });
 
