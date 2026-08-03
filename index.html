@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.547';
+window.AFRIMOTO_VERSION = 'v9.548';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1089,7 +1089,19 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       DB.avisChauffeurs = (avisChauffeurs||[]).map(mapAvis);
       DB.avisCourses = (avisCourses||[]).map(x=>({...x}));
       DB.chauffeursBloquesParNom = (chauffeursBloquesParNom||[]).map(x=>x.nom||x.name||x);
-      DB.journalAccesSensibles = (journalAccesSensibles||[]).map(x=>({...x}));
+      // v9.548 : le journal etait recopie brut, sans traduction des noms de colonnes.
+      // L'ecran cherchait « consultePar » et « date » ; la base ecrit « consulte_par » et
+      // « created_at ». Le nom du demandeur etait donc bien enregistre — il l'a toujours
+      // ete — mais l'ecran affichait un tiret a sa place. Sur un journal de tracabilite,
+      // c'est le pire endroit ou laisser passer ca : il donnait l'impression que personne
+      // n'etait identifie, alors que tout etait la.
+      DB.journalAccesSensibles = (journalAccesSensibles||[]).map(x=>({
+        ...x,
+        consultePar : x.consulte_par  || x.consultePar  || '',
+        date        : x.created_at    || x.date         || null,
+        typeDocument: x.type_document || x.typeDocument || '',
+        cibleId     : x.cible_id      || x.cibleId      || null
+      }));
 
       // v9.510 : la troncature ne doit plus etre silencieuse. Si une table revient pleine
       // au plafond du serveur, c'est qu'il en manque — et l'application afficherait alors
@@ -21401,10 +21413,25 @@ function supprimerStatutChauffeur(clientId) {
 function voirPhotoGrande(src, contexte) {
   document.getElementById('photo-grande-img').src = src;
   if(contexte) {
+    // ══ v9.548 — LA TRACE PART VRAIMENT AU SERVEUR ══
+    //
+    // L'ecran annonce que chaque consultation est « conservee indefiniment pour la
+    // tracabilite ». C'etait faux : la ligne n'etait ajoutee qu'a la liste en memoire du
+    // telephone, et disparaissait a la fermeture de l'application. La table restait vide.
+    //
+    // Un journal de tracabilite qui ne conserve rien est pire que pas de journal du tout :
+    // il fait croire qu'on peut repondre a « qui a regarde la piece d'identite de cette
+    // personne ? », alors que non.
+    const qui = DB.user ? (DB.user.name || DB.user.role) : 'Inconnu';
+    const ligne = { contexte: contexte, consulte_par: qui,
+                    type_document: 'photo', role: DB.user ? DB.user.role : 'public' };
     DB.journalAccesSensibles.unshift({
-      id: gid(), contexte, consultePar: DB.user ? (DB.user.name || DB.user.role) : 'Inconnu',
+      id: gid(), contexte: contexte, consultePar: qui, date: new Date().toISOString(),
       created_at: new Date().toISOString()
     });
+    supabaseClient.from('journal_acces_sensibles').insert(ligne).then(function(r){
+      if(r && r.error) { try { addDebugLog('JOURNAL non enregistré : ' + r.error.message); } catch(e) {} }
+    }).catch(function(){});
   }
   openModal('m-photo-grande');
 }
