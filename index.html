@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.557';
+window.AFRIMOTO_VERSION = 'v9.558';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -4498,6 +4498,11 @@ function goPage(id, skipHistory) {
     annonces:rAnnonces,alertes:rAlertes,agences:rAgences,registre:()=>rRegistre(),
     gestion:()=>rGestion(),'recherche-agent':renderRechercheAgent,recharge:()=>rRecharge(),
     sousagents:rSA,historique:()=>rHistorique(),tarifs:rTarifs,litiges:()=>rLitiges()};
+  // v9.558 : on quitte la Gestion, on lache l'abonnement d'ecran. Sans cela il resterait
+  // ouvert pour rien — c'est precisement ce qu'on cherche a eviter.
+  if(id !== 'gestion' && window._canalEcran && window._canalEcran.nom) {
+    try { _detacherEcran(); } catch(e) {}
+  }
   if(renders[id]) renders[id]();
   // Nav bottom public
   ['home','vehs','trajets','annonces'].forEach(p => {
@@ -19646,6 +19651,69 @@ function setGestTab(t) {
 function setVehFiltre(t){ window.vehFiltreType = t; if(typeof rGestion==='function') rGestion(); }
 
 // ════════════════════════════════════════════════════════════════════════════
+// v9.558 — UN ABONNEMENT QUI VIT AVEC L'ECRAN
+//
+// Le temps reel du site est aujourd'hui branche EN PERMANENCE sur douze tables, et pour le
+// personnel SANS AUCUN FILTRE : chaque changement de chaque ligne lui est pousse, qu'il
+// regarde l'ecran ou non.
+//
+// A 33 vehicules c'est invisible. Faisons le calcul a l'echelle visee : un chauffeur en
+// service envoie sa position toutes les quinze secondes, soit 1 333 messages par seconde
+// pour 20 000 chauffeurs. Multiplie par 50 membres du personnel connectes, cela ferait
+// 66 650 messages par seconde — contre environ 500 inclus dans l'offre. C'est la meme
+// erreur que le registre telecharge en entier : ca marche a 33 lignes, ca meurt a 20 000.
+//
+// Le principe pose ici : ON S'ABONNE EN ENTRANT DANS UN ECRAN, ON SE DETACHE EN SORTANT.
+// Un seul canal a la fois, remplace quand on change d'ecran. C'est le schema que je
+// reutiliserai pour les autres onglets, un par un.
+// ════════════════════════════════════════════════════════════════════════════
+window._canalEcran = window._canalEcran || { nom: null, canal: null };
+
+function _detacherEcran() {
+  try { if(window._canalEcran.canal) supabaseClient.removeChannel(window._canalEcran.canal); } catch(e) {}
+  window._canalEcran.canal = null;
+  window._canalEcran.nom = null;
+}
+
+function _abonnerEcran(nom, options, surChangement) {
+  if(window._canalEcran.nom === nom) return;   // deja branche sur cet ecran
+  _detacherEcran();
+  try {
+    window._canalEcran.canal = supabaseClient
+      .channel('ecran-' + nom + '-' + Date.now())
+      .on('postgres_changes', options, surChangement)
+      .subscribe();
+    window._canalEcran.nom = nom;
+  } catch(e) { }
+}
+
+// ── LE JOURNAL D'ACCES, EN DIRECT ──────────────────────────────────────────
+// Il fallait actualiser la page pour savoir qui venait de consulter un dossier de litige.
+// Sur un journal de tracabilite, c'est genant : on veut voir l'acces au moment ou il a lieu.
+//
+// Le volume est negligeable — quelques lignes par jour — et l'envoi ne concerne que le
+// personnel. C'est le cas ou le temps reel ne coute presque rien.
+function _brancherJournalAcces() {
+  _abonnerEcran('journal', { event: 'INSERT', schema: 'public', table: 'journal_acces_sensibles' },
+    function(p) {
+      const x = p && p.new; if(!x) return;
+      DB.journalAccesSensibles.unshift({
+        ...x,
+        consultePar : x.consulte_par  || '',
+        date        : x.created_at    || null,
+        typeDocument: x.type_document || '',
+        cibleId     : x.cible_id      || null
+      });
+      // On ne redessine que si l'onglet est encore a l'ecran : l'utilisateur a pu en changer
+      // entre l'abonnement et l'arrivee du message.
+      if(gestTab === 'journal') {
+        try { rGestion(); } catch(e) {}
+        try { toast('📋 ' + (x.consulte_par || 'Quelqu\'un') + ' vient de consulter un dossier'); } catch(e) {}
+      }
+    });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // v9.546 — CHERCHER AU-DELA DES 90 JOURS GARDES EN MEMOIRE.
 //
 // L'application ne telecharge plus que les trois derniers mois d'ecritures. C'est une
@@ -19843,6 +19911,11 @@ function selectGestionCompte(type, id) {
 
 function rGestion() {
   try {
+  // v9.558 : l'abonnement suit l'onglet affiche. Se brancher ici plutot que dans le bouton
+  // couvre tous les chemins — retour en arriere, ouverture directe, rechargement.
+  // _abonnerEcran ne fait rien si le canal est deja celui-ci.
+  if(gestTab === 'journal') _brancherJournalAcces();
+  else if(window._canalEcran && window._canalEcran.nom === 'journal') _detacherEcran();
   const q = nrm((document.getElementById('gest-q')||{}).value||'');
   let html = '';
 
