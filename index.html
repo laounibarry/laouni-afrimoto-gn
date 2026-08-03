@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.546';
+window.AFRIMOTO_VERSION = 'v9.547';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -14332,8 +14332,11 @@ async function ouvrirDossierLitige(type, id) {
 
   const corps =
     '<div class="entete">' +
-      '<div class="marque">🛡️ AfriMoto GN</div>' +
-      '<div class="sous">Registre sécurisé des véhicules à moteur — République de Guinée</div>' +
+      // v9.547 : le nom complet, celui du titre du site et du manifeste — « Laouni AfriMoto GN ».
+      // Sur une piece remise a un tribunal, l'entete doit porter la denomination exacte,
+      // pas une abreviation : c'est elle qui rattache le document a une entite identifiable.
+      '<div class="marque">🛡️ LAOUNI AFRIMOTO GN</div>' +
+      '<div class="sous">Registre sécurisé de trajets et véhicules à moteur — République de Guinée</div>' +
       '<h1>Dossier de litige — ' + (estCourse ? 'course de taxi' : 'voyage') + '</h1>' +
       '<div class="ref">Référence : ' + esc(c.reference || id) + '</div>' +
     '</div>' +
@@ -14424,7 +14427,7 @@ async function ouvrirDossierLitige(type, id) {
     '<div class="pied">' +
       '<p><b>Document délivré le ' + _dtLitige(d.delivre_le) + '</b>' +
         ' à la demande de ' + esc(DB.user ? (DB.user.name || DB.user.role) : '—') + '.</p>' +
-      '<p>Les informations ci-dessus sont extraites telles quelles du registre AfriMoto GN. ' +
+      '<p>Les informations ci-dessus sont extraites telles quelles du registre Laouni AfriMoto GN. ' +
         'Les heures sont celles enregistrées automatiquement par le système au moment des faits. ' +
         'Le code de confirmation est le nombre à quatre chiffres que le passager a communiqué ' +
         'oralement au conducteur : il atteste de leur rencontre.</p>' +
@@ -14434,7 +14437,7 @@ async function ouvrirDossierLitige(type, id) {
         : '<p>Ce dossier reste délivrable pendant ' + (d.delai_restant_jours != null ? d.delai_restant_jours : '—') +
           ' jours encore. Passé ce délai, il ne pourra plus être produit, sauf s\'il a été conservé.</p>') +
       '<p class="petit">La délivrance de ce document est enregistrée au journal des accès sensibles ' +
-        'd\'AfriMoto GN, avec l\'identité du demandeur et l\'horodatage.</p>' +
+        'de Laouni AfriMoto GN, avec l\'identité du demandeur et l\'horodatage.</p>' +
     '</div>';
 
   const style =
@@ -15439,11 +15442,11 @@ async function activerVerrouEmpreinte() {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: 'AfriMoto GN', id: location.hostname },
+        rp: { name: 'Laouni AfriMoto GN', id: location.hostname },
         user: {
           id: crypto.getRandomValues(new Uint8Array(16)),
           name: (DB.user && (DB.user.name || DB.user.id)) || 'utilisateur',
-          displayName: 'AfriMoto GN'
+          displayName: 'Laouni AfriMoto GN'
         },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
@@ -24322,7 +24325,7 @@ async function _envoyerEmailAvertissement(client, motif) {
     '',
     'Bonjour ' + client.prenom + ' ' + client.nom + ',',
     '',
-    'Vous avez reçu un avertissement de la part de l\'administration AfriMoto GN.',
+    'Vous avez reçu un avertissement de la part de l\'administration Laouni AfriMoto GN.',
     '',
     '📌 MOTIF DE L\'AVERTISSEMENT',
     '──────────────────────────────',
