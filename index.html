@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.554';
+window.AFRIMOTO_VERSION = 'v9.555';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -14849,7 +14849,34 @@ async function ouvrirDossierLitige(type, id) {
       ? '<p class="absent">Ce passager n\'avait pas de compte : seuls le nom et le téléphone ' +
         'donnés au moment de la commande sont connus. Aucune pièce d\'identité n\'a été vérifiée.</p>' : '') +
 
-    _photosLitige('5. Pièces jointes', [
+    // ══ v9.555 — LA CONVERSATION, DANS LE DOSSIER ══
+    //
+    // C'est souvent la piece qui tranche : « je vous ai attendu vingt minutes » se verifie
+    // en lisant l'heure de chaque message. On la met AVANT les pieces jointes, parce qu'un
+    // juge lit le deroule avant de regarder les photos.
+    //
+    // Chaque ligne porte l'heure a la seconde et le nom de celui qui parle. Aucun tri, aucun
+    // resume : l'ordre est celui du serveur, et rien n'est retire.
+    ((d.messages && d.messages.length)
+      ? '<h2>5. Ce que les deux parties se sont écrit</h2>' +
+        '<table>' + d.messages.map(function(m){
+          const h = m.quand ? new Date(m.quand) : null;
+          const hh = (h && !isNaN(h)) ? (h.toLocaleDateString('fr-FR') + ' ' +
+            String(h.getHours()).padStart(2,'0') + ':' +
+            String(h.getMinutes()).padStart(2,'0') + ':' +
+            String(h.getSeconds()).padStart(2,'0')) : '—';
+          return '<tr><th style="white-space:nowrap">' + esc(hh) + ' · <b>' + esc(m.de) + '</b></th>' +
+                 '<td style="font-weight:normal">' + esc(m.texte) + '</td></tr>';
+        }).join('') + '</table>' +
+        '<p class="petit">Messages échangés dans l\'application pendant la course, ' +
+        'horodatés automatiquement par le système. ' + d.messages.length + ' message' +
+        (d.messages.length > 1 ? 's' : '') + '.</p>'
+      : (estCourse
+          ? '<h2>5. Ce que les deux parties se sont écrit</h2>' +
+            '<p class="absent">Aucun message n\'a été échangé pendant cette course.</p>'
+          : '')) +
+
+    _photosLitige('6. Pièces jointes', [
       ['Photo du chauffeur', pSelfie],
       ['Photo du véhicule', pVeh],
       ['Photo du propriétaire', pProp],
@@ -14860,7 +14887,7 @@ async function ouvrirDossierLitige(type, id) {
       ['Pièce d\'identité du passager', pPieceP]
     ]) +
 
-    _blocLitige('6. Agent ayant enregistré le véhicule', [
+    _blocLitige('7. Agent ayant enregistré le véhicule', [
       ['Agence', ag.nom], ['Code agent', ag.code],
       ['Préfecture', ag.prefecture], ['Ville', ag.ville], ['Téléphone', ag.telephone]
     ]) +
