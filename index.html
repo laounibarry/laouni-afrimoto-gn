@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.556';
+window.AFRIMOTO_VERSION = 'v9.557';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -14779,7 +14779,12 @@ async function ouvrirDossierLitige(type, id) {
       '<div class="marque">🛡️ LAOUNI AFRIMOTO GN</div>' +
       '<div class="sous">Registre sécurisé de trajets et véhicules à moteur — République de Guinée</div>' +
       '<h1>Dossier de litige — ' + (estCourse ? 'course de taxi' : 'voyage') + '</h1>' +
+      // v9.557 : on indique comment se servir de cette reference. Elle etait imprimee sans
+      // que rien ne dise ou la chercher — et la recherche ne l'acceptait meme pas.
       '<div class="ref">Référence : ' + esc(c.reference || id) + '</div>' +
+      '<div class="ref" style="color:#777">Pour retrouver ce dossier : espace Litiges, ' +
+        'barre de recherche — les ' + esc(String(c.reference || id).slice(0, 8)) +
+        ' du début suffisent.</div>' +
     '</div>' +
 
     (estCourse
