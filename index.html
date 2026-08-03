@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.548';
+window.AFRIMOTO_VERSION = 'v9.549';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1404,6 +1404,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       ville:r.ville||'', zone:r.zone||'', motoId:r.moto_id||r.motoId||null,
       typeVehicule:r.type_vehicule||null, // v9.387
       couleur:r.couleur||'', // v9.541 — recopiee du vehicule, evite de telecharger le registre
+      // v9.549 : marque, modele et photo recopies eux aussi. C'est ce qui permet au passager
+      // de reconnaitre LA bonne voiture parmi celles qui attendent, sans que son telephone
+      // ait a interroger le registre au moment ou il cherche des yeux.
+      marque:r.marque||'', modele:r.modele||'',
+      photoVehicule:_photoValable(r.photo_vehicule),
       places:(r.places!=null)?r.places:null, confort:r.confort||null, options:r.options||null, // v9.388/398
       categories:r.categories||null, // v9.532 : categories VTC acceptees, separees par des virgules
       valide:(r.valide!==undefined&&r.valide!==null)?r.valide:true,
@@ -2853,6 +2858,27 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <div id="m-photo-grande" class="modal" onclick="closeModal('m-photo-grande')">
   <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:20px">
     <img id="photo-grande-img" style="max-width:100%;max-height:85vh;border-radius:10px;border:2px solid rgba(249,115,22,.4)"/>
+  </div>
+</div>
+
+<!-- CHAT DE COURSE — entre le passager et le chauffeur, pendant la course seulement -->
+<div id="m-chat-course" class="modal-bot">
+  <div class="mbox fu" style="max-height:88vh;display:flex;flex-direction:column;padding-bottom:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>
+        <div style="font-weight:900;font-size:15px">💬 <span id="chat-titre">Message</span></div>
+        <div style="font-size:11px;color:var(--text2)" id="chat-sous">Pendant la course seulement</div>
+      </div>
+      <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="fermerChatCourse()">✕</button>
+    </div>
+    <div id="chat-messages" style="flex:1;overflow-y:auto;min-height:180px;max-height:38vh;
+         background:rgba(0,0,0,.18);border-radius:12px;padding:10px;margin-bottom:9px"></div>
+    <div id="chat-phrases" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>
+    <div style="display:flex;gap:7px;padding-bottom:12px">
+      <input type="text" id="chat-saisie" maxlength="500" placeholder="Écrire un message…"
+             style="flex:1;margin:0" onkeydown="if(event.key==='Enter')envoyerMessageCourse()"/>
+      <button class="btn" style="padding:11px 16px" onclick="envoyerMessageCourse()">➤</button>
+    </div>
   </div>
 </div>
 
@@ -6702,6 +6728,136 @@ function lancerScanDepuisCourse() {
   ouvrirScannerGlobal();
 }
 // Bloc "profil complet du chauffeur" : photo, nom, matricule, gilet — pour vérification à l'arrivée
+// ════════════════════════════════════════════════════════════════════════════
+// v9.549 — LE CHAT DE COURSE
+//
+// Un chauffeur de moto-taxi ne peut pas taper un message : il conduit, il a un casque, il
+// est parfois sous la pluie. Et une partie des chauffeurs lit et ecrit difficilement — c'est
+// une realite du metier qu'on ne peut pas ignorer en dessinant cet ecran.
+//
+// D'ou les phrases pretes, en un seul appui, avec une icone devant chacune. Le clavier reste
+// disponible pour qui veut preciser un repere, mais il n'est jamais obligatoire.
+//
+// Les messages passent par le canal temps reel deja ouvert pour la course : ils n'ouvrent
+// pas une connexion de plus, et pesent environ deux cents octets piece.
+// ════════════════════════════════════════════════════════════════════════════
+const PHRASES_CHAUFFEUR = [
+  ['🕐', "J'arrive dans 2 minutes"],
+  ['📍', 'Je suis sur place'],
+  ['🚦', 'Je suis bloqué dans la circulation'],
+  ['❓', "Je ne trouve pas l'adresse"],
+  ['📞', 'Appelez-moi']
+];
+const PHRASES_PASSAGER = [
+  ['🚶', 'Je descends'],
+  ['🕐', 'Attendez 2 minutes'],
+  ['📍', 'Je suis devant la boutique'],
+  ['👋', 'Je vous vois'],
+  ['📞', 'Appelez-moi']
+];
+
+window._chatCourseId = null;
+window._chatMoi = null;
+window._chatCanal = null;
+
+function ouvrirChatCourse(courseId, moi, nomAutre) {
+  window._chatCourseId = courseId;
+  window._chatMoi = (moi === 'chauffeur') ? 'chauffeur' : 'passager';
+  const t = document.getElementById('chat-titre');
+  if(t) t.textContent = nomAutre || (window._chatMoi === 'chauffeur' ? 'Votre passager' : 'Votre chauffeur');
+
+  // Les phrases proposees dependent de qui parle : un chauffeur ne dit pas « je descends ».
+  const phrases = (window._chatMoi === 'chauffeur') ? PHRASES_CHAUFFEUR : PHRASES_PASSAGER;
+  const z = document.getElementById('chat-phrases');
+  if(z) z.innerHTML = phrases.map(p =>
+    '<button class="btn-ghost" style="font-size:12px;padding:7px 11px" ' +
+    'onclick="envoyerMessageCourse(' + JSON.stringify(p[1]).replace(/"/g, '&quot;') + ')">' +
+    p[0] + ' ' + esc(p[1]) + '</button>').join('');
+
+  openModal('m-chat-course');
+  chargerMessagesCourse();
+  _ecouterMessagesCourse(courseId);
+}
+
+function fermerChatCourse() {
+  try { if(window._chatCanal) supabaseClient.removeChannel(window._chatCanal); } catch(e) {}
+  window._chatCanal = null;
+  window._chatCourseId = null;
+  closeModal('m-chat-course');
+}
+
+function _ecouterMessagesCourse(courseId) {
+  try { if(window._chatCanal) supabaseClient.removeChannel(window._chatCanal); } catch(e) {}
+  try {
+    window._chatCanal = supabaseClient.channel('chat-' + courseId)
+      .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages_course', filter: 'course_id=eq.' + courseId },
+          function(){ chargerMessagesCourse(); })
+      .subscribe();
+  } catch(e) { }
+}
+
+async function chargerMessagesCourse() {
+  const zone = document.getElementById('chat-messages');
+  const id = window._chatCourseId;
+  if(!zone || !id) return;
+  let liste = [];
+  try {
+    const { data, error } = await supabaseClient.from('messages_course')
+      .select('*').eq('course_id', id).order('cree_le', { ascending: true }).limit(200);
+    if(!error && data) liste = data;
+  } catch(e) { }
+
+  if(!liste.length) {
+    zone.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:12px;padding:22px 8px">' +
+      'Aucun message.<br>Appuyez sur une phrase ci-dessous pour écrire sans clavier.</div>';
+    return;
+  }
+  const moi = window._chatMoi;
+  zone.innerHTML = liste.map(m => {
+    const aMoi = (m.expediteur === moi);
+    const h = m.cree_le ? new Date(m.cree_le) : null;
+    const hh = h ? (String(h.getHours()).padStart(2,'0') + ':' + String(h.getMinutes()).padStart(2,'0')) : '';
+    return '<div style="display:flex;justify-content:' + (aMoi ? 'flex-end' : 'flex-start') + ';margin-bottom:7px">' +
+      '<div style="max-width:78%;padding:8px 11px;border-radius:13px;font-size:13px;line-height:1.4;' +
+        (aMoi ? 'background:#f97316;color:#fff;border-bottom-right-radius:4px'
+              : 'background:rgba(255,255,255,.1);border-bottom-left-radius:4px') + '">' +
+        esc(m.texte) +
+        '<div style="font-size:10px;opacity:.7;margin-top:2px;text-align:right">' + hh + '</div>' +
+      '</div></div>';
+  }).join('');
+  zone.scrollTop = zone.scrollHeight;
+}
+
+async function envoyerMessageCourse(textePret) {
+  const id = window._chatCourseId;
+  if(!id) return;
+  const champ = document.getElementById('chat-saisie');
+  const texte = (textePret || (champ ? champ.value : '') || '').trim();
+  if(!texte) return;
+  if(!textePret && champ) champ.value = '';
+
+  // On affiche tout de suite, sans attendre le serveur : sur une connexion faible, un
+  // message qui met trois secondes a apparaitre donne l'impression de n'etre pas parti.
+  const zone = document.getElementById('chat-messages');
+  if(zone) {
+    if(zone.querySelector('div[style*="text-align:center"]')) zone.innerHTML = '';
+    zone.insertAdjacentHTML('beforeend',
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:7px;opacity:.55">' +
+      '<div style="max-width:78%;padding:8px 11px;border-radius:13px;font-size:13px;' +
+      'background:#f97316;color:#fff;border-bottom-right-radius:4px">' + esc(texte) +
+      '<div style="font-size:10px;opacity:.7;margin-top:2px;text-align:right">envoi…</div></div></div>');
+    zone.scrollTop = zone.scrollHeight;
+  }
+
+  try {
+    const { error } = await supabaseClient.from('messages_course')
+      .insert({ course_id: id, expediteur: window._chatMoi, texte: texte.slice(0, 500) });
+    if(error) { toast('❌ Message non envoyé. Vérifiez votre connexion.', true); }
+  } catch(e) { toast('❌ Message non envoyé.', true); }
+  chargerMessagesCourse();
+}
+
 function profilChauffeurHtml(t) {
   if(!t) return '';
   return '<div style="display:flex;gap:12px;align-items:center;background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-top:10px;text-align:left">' +
@@ -6710,8 +6866,24 @@ function profilChauffeurHtml(t) {
       '<div style="font-weight:900;font-size:14px">'+esc(t.nom||'—')+'</div>' +
       '<div>🏍️ Matricule : <b style="color:#EAB308">'+esc(t.plaque||'—')+'</b></div>' +
       '<div>🦺 Gilet n° : <b style="color:#EAB308">'+esc(t.gilet||'—')+'</b></div>' +
+      // v9.549 : la marque et la couleur, cote a cote. Une plaque se lit a trois metres ;
+      // une couleur et une marque se reconnaissent a trente. C'est ce que le passager voit
+      // en premier quand il cherche sa voiture dans la rue.
+      ((t.marque || _couleurTaxi(t))
+        ? '<div>🚗 <b style="color:#EAB308">' +
+            esc([t.marque, t.modele].filter(Boolean).join(' ') || '—') + '</b>' +
+            (_couleurTaxi(t) ? ' · <b style="color:#EAB308">' + esc(_couleurTaxi(t)) + '</b>' : '') +
+          '</div>'
+        : '') +
     '</div>' +
   '</div>' +
+  // La photo de face du vehicule, quand elle existe : c'est la preuve visuelle la plus
+  // directe. Elle reste absente tant que le vehicule n'a pas ete enregistre avec sa photo.
+  (t.photoVehicule
+    ? '<img src="' + esc(t.photoVehicule) + '" onclick="agrandirImg(this)" ' +
+      'style="width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:8px;' +
+      'border:1px solid rgba(234,179,8,.4);cursor:zoom-in"/>'
+    : '') +
   '<div style="font-size:11px;color:var(--text2);margin-top:6px">✅ Vérifiez ces informations à l\'arrivée du taxi. En cas de doute, comparez-les avec le QR code scanné.</div>';
 }
 function afficherSuiviCourseConfirmee(demande) {
@@ -6724,6 +6896,13 @@ function afficherSuiviCourseConfirmee(demande) {
     (demande.prixPropose ? '<br>💰 Prix convenu : <b style="color:#EAB308">' + fmt(demande.prixPropose) + '</b>' : '') +
     (t ? '<br><a href="tel:' + esc(t.tel) + '" style="color:#60A5FA;font-weight:700">📞 ' + esc(t.tel) + '</a>' : '') +
     profilChauffeurHtml(t) +
+    // v9.549 : ecrire au chauffeur. A cote de l'appel, pas a la place : un appel reste plus
+    // sur quand le reseau faiblit, et tout le monde ne sait pas ecrire.
+    '<button onclick="ouvrirChatCourse(\'' + demande.id + '\',\'passager\',' +
+      JSON.stringify(esc((t && t.nom) || demande.taxiNom || 'Votre chauffeur')).replace(/"/g, '&quot;') + ')" ' +
+      'style="width:100%;margin-top:9px;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.45);' +
+      'color:#60A5FA;border-radius:10px;padding:11px;font-weight:700;font-size:13px;cursor:pointer">' +
+      '💬 Écrire au chauffeur</button>' +
     '<div style="margin-top:12px;padding:16px;background:linear-gradient(135deg,#f97316,#ea6c00);border-radius:10px;text-align:center">' +
       '<div style="font-size:11px;color:rgba(255,255,255,.85);margin-bottom:6px">🔢 VOTRE CODE DE DÉMARRAGE</div>' +
       '<div style="font-size:32px;font-weight:900;color:#fff;letter-spacing:8px">' + esc(demande.pinConfirmation||'----') + '</div>' +
@@ -8137,6 +8316,13 @@ async function verifierStatutDemandeAuto() {
       (demande.prixPropose ? '<br>💰 Prix convenu : <b style="color:#EAB308">' + fmt(demande.prixPropose) + '</b>' : '') +
       (t ? '<br><a href="tel:' + esc(t.tel) + '" style="color:#60A5FA;font-weight:700">📞 ' + esc(t.tel) + '</a>' : '') +
       profilChauffeurHtml(t) +
+    // v9.549 : ecrire au chauffeur. A cote de l'appel, pas a la place : un appel reste plus
+    // sur quand le reseau faiblit, et tout le monde ne sait pas ecrire.
+    '<button onclick="ouvrirChatCourse(\'' + demande.id + '\',\'passager\',' +
+      JSON.stringify(esc((t && t.nom) || demande.taxiNom || 'Votre chauffeur')).replace(/"/g, '&quot;') + ')" ' +
+      'style="width:100%;margin-top:9px;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.45);' +
+      'color:#60A5FA;border-radius:10px;padding:11px;font-weight:700;font-size:13px;cursor:pointer">' +
+      '💬 Écrire au chauffeur</button>' +
     '<div style="margin-top:12px;padding:16px;background:linear-gradient(135deg,#f97316,#ea6c00);border-radius:10px;text-align:center">' +
       '<div style="font-size:11px;color:rgba(255,255,255,.85);margin-bottom:6px">🔢 VOTRE CODE DE DÉMARRAGE</div>' +
       '<div style="font-size:32px;font-weight:900;color:#fff;letter-spacing:8px">' + esc(demande.pinConfirmation||'----') + '</div>' +
@@ -9670,6 +9856,10 @@ function rClientContent() {
                           <span style="font-size:11px;color:var(--text2)">⏱️ Durée de la course</span><br>
                           <span data-chrono="${_debutCourseTs(d)}" style="font-size:22px;font-weight:900;color:#16A34A;letter-spacing:1px">${_chronoTexte(_debutCourseTs(d))}</span>
                         </div>
+                        <button onclick="ouvrirChatCourse('${d.id}','chauffeur','${esc(d.passagerNom||'Votre passager')}')"
+                          style="width:100%;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.45);color:#60A5FA;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:7px">
+                          💬 Écrire au passager
+                        </button>
                         <button onclick="terminerCourse('${d.id}')"
                           style="flex:1;background:#16A34A;color:#fff;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">
                           ✅ Terminer la course
@@ -13250,7 +13440,9 @@ function appliquerLabelsPhotosEnreg() {
   const pe = DB.photosEnreg || {};
   const etoile = k => pe[k]==='obligatoire' ? ' *' : '';
   const lbls = {
-    'mm-pp-lbl':  (curVehType==='voiture' ? '📸 Voiture' : '📸 Moto') + etoile('moto'),
+    // v9.549 : pour une voiture, l'etoile est toujours la — la photo de face avant est
+    // exigee quel que soit le reglage admin, parce que c'est elle que le passager verra.
+    'mm-pp-lbl':  (curVehType==='voiture' ? '📸 Voiture — FACE AVANT *' : '📸 Moto' + etoile('moto')),
     'mm-ppp-lbl': '🪪 Propriétaire' + etoile('proprio'),
     'mm-pfa-lbl': '🧾 Facture' + etoile('facture'),
     'mm-pcg-lbl': '📄 Carte grise' + etoile('cg'),
@@ -13795,7 +13987,20 @@ async function saveMoto() {
   // Photos obligatoires selon le réglage admin (page Tarifs)
   const pe = DB.photosEnreg || {};
   const photosManquantes = [];
-  if(pe.moto==='obligatoire'    && !getPic('mm-pp'))  photosManquantes.push(curVehType==='voiture'?'photo de la voiture':'photo de la moto');
+  // v9.549 : POUR UN VTC, LA PHOTO DE FACE AVANT EST TOUJOURS EXIGEE.
+  //
+  // Elle ne sert pas au dossier : elle sert au passager. C'est elle qui s'affiche sur son
+  // ecran des que la course est acceptee, a cote de la marque et de la couleur. Sans elle,
+  // il cherche une voiture dont il ne connait que la plaque — illisible a trente metres,
+  // de nuit, sous la pluie.
+  //
+  // Elle reste facultative pour une moto tant que le reglage admin ne l'impose pas : une
+  // moto se reconnait a son gilet numerote, une voiture n'en a pas.
+  if(curVehType === 'voiture' && !getPic('mm-pp')) {
+    photosManquantes.push('photo FACE AVANT de la voiture (obligatoire pour un VTC)');
+  } else if(pe.moto==='obligatoire' && !getPic('mm-pp')) {
+    photosManquantes.push(curVehType==='voiture'?'photo de la voiture':'photo de la moto');
+  }
   const _cltExistant = (document.getElementById('mm-clt-id')||{}).value || '';
   if(pe.proprio==='obligatoire' && !getPic('mm-ppp') && !_cltExistant) photosManquantes.push('photo du propriétaire');
   if(pe.facture==='obligatoire' && !getPic('mm-pfa')) photosManquantes.push('photo de la facture');
