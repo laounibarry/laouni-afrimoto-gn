@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.551';
+window.AFRIMOTO_VERSION = 'v9.552';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -6788,6 +6788,7 @@ function ouvrirChatCourse(courseId, moi, nomAutre) {
   window._chatMoi = (moi === 'chauffeur') ? 'chauffeur' : 'passager';
   // Ouvrir le chat efface les non-lus de cette course.
   window._chatNonLus = 0;
+  _pousserNonLusVersNatif();   // le compteur retombe a zero sur les ecrans natifs aussi
   // L'application native doit savoir que le chat est ouvert, pour ne pas ramener l'ecran
   // de course par-dessus pendant qu'on ecrit.
   try { if(window.AfriMotoNative && AfriMotoNative.chatOuvert) AfriMotoNative.chatOuvert(true); } catch(e) {}
@@ -6812,6 +6813,7 @@ function fermerChatCourse() {
   window._chatCanal = null;
   window._chatCourseId = null;
   window._chatNonLus = 0;
+  _pousserNonLusVersNatif();
   try { if(window.AfriMotoNative && AfriMotoNative.chatOuvert) AfriMotoNative.chatOuvert(false); } catch(e) {}
   closeModal('m-chat-course');
 }
@@ -6851,6 +6853,26 @@ function _chatMaCourse() {
   return null;
 }
 
+// v9.552 — LE COMPTEUR REMONTE JUSQU'AUX ECRANS NATIFS.
+//
+// Pendant une course, les deux parties sont sur la carte dessinee par Android, pas sur la
+// page. Le nombre de messages non lus doit donc y arriver : le bouton « Écrire » y affiche
+// le chiffre, comme le fait le bandeau web pour ceux qui utilisent le site sans l'application.
+function _pousserNonLusVersNatif() {
+  try {
+    if(window.AfriMotoNative && AfriMotoNative.messagesNonLus) {
+      AfriMotoNative.messagesNonLus(Number(window._chatNonLus) || 0);
+    }
+  } catch(e) {}
+  // Le bandeau du chauffeur vit dans son espace client : on le redessine pour que la
+  // pastille apparaisse aussi a qui utilise le site dans un navigateur.
+  try {
+    if(document.getElementById('page-client') &&
+       document.getElementById('page-client').classList.contains('act') &&
+       typeof rClientContent === 'function') rClientContent();
+  } catch(e) {}
+}
+
 function _bipMessage() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -6875,6 +6897,10 @@ function _surMessageRecu(m) {
   window._chatNonLus = (window._chatNonLus || 0) + 1;
   _bipMessage();
   try { toast('💬 ' + String(m.texte || '').slice(0, 60)); } catch(e) {}
+  // v9.552 : le compteur doit remonter jusqu'aux ecrans NATIFS. Pendant une course, ni le
+  // chauffeur ni le passager ne regardent la page : ils sont sur la carte dessinee par
+  // Android. Une pastille posee dans le bandeau web leur reste invisible.
+  _pousserNonLusVersNatif();
   // Hors application au premier plan : une vraie notification Android.
   try {
     if(window.AfriMotoNative && AfriMotoNative.notifierMessage) {
