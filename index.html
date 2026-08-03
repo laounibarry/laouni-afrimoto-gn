@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.549';
+window.AFRIMOTO_VERSION = 'v9.550';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -4386,6 +4386,29 @@ const isAgent = () => DB.user && (DB.user.role === 'agent' || DB.user.role === '
 const isSA = () => DB.user && DB.user.role === 'sousagent';
 const canDeclareVol = () => DB.user && (DB.user.role === 'admin' || DB.user.role === 'owner');
 const canEdit = () => isAgent();
+
+// ════════════════════════════════════════════════════════════════════════════
+// v9.550 — UN CLIENT PEUT DEVENIR VTC OU TAXI MOTO DEPUIS SON PROPRE ESPACE.
+//
+// Jusqu'ici le bouton « Devenir VTC / taxi moto » etait reserve aux agents : le
+// proprietaire d'une voiture devait se deplacer chez un agent pour proposer des courses,
+// alors que le vehicule est deja enregistre a son nom et verifie.
+//
+// La regle reste celle du vehicule, et c'est elle qui protege : on ne devient pas VTC parce
+// qu'on le demande, mais parce qu'on possede une VOITURE enregistree — et taxi moto parce
+// qu'on possede une MOTO. Le type du vehicule decide, pas l'utilisateur. Un vehicule vole
+// ou suspendu ne donne droit a rien.
+// ════════════════════════════════════════════════════════════════════════════
+function _monVehicule(v) {
+  try {
+    if(!v || !DB.user || DB.user.role !== 'client') return false;
+    const cl = DB.clients.find(x => x.id === DB.user.id);
+    if(!cl) return false;
+    return v.clientId === cl.id
+        || (cl.vid && v.id === cl.vid)
+        || (cl.tel && v.phone === cl.tel);
+  } catch(e) { return false; }
+}
 // L'admin peut toujours valider. Un agent ne peut valider que si l'admin lui a explicitement donné ce droit.
 function peutValiderEnregistrements() {
   if(isAdmin()) return true;
@@ -7213,6 +7236,14 @@ function _majBanniereCoursePassager() {
       '<div id="banniere-course-psg" data-sig="' + sig + '" class="card" style="margin-bottom:12px;background:rgba(34,197,94,.12);border:2px solid #22C55E;cursor:pointer" onclick="ouvrirSuiviTaxi(\'' + c.id + '\')">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
           '<div style="font-weight:800;font-size:13px;color:#16A34A">' + libelle + '</div>' +
+          // v9.550 : cote passager aussi, le chat vit pendant toute la course. Le bandeau
+          // est present du moment ou un chauffeur accepte jusqu'a l'arrivee — c'est
+          // exactement la periode ou l'on a besoin de dire « je suis devant la boutique ».
+          '<button onclick="event.stopPropagation();ouvrirChatCourse(\'' + c.id +
+            '\',\'passager\',\'' + esc(c.taxiNom || 'Votre chauffeur').replace(/'/g, "\\'") + '\')" ' +
+            'style="background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.5);color:#60A5FA;' +
+            'border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">' +
+            '💬 Écrire</button>' +
           '<span style="background:#22C55E;color:#fff;border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;white-space:nowrap">🗺️ Voir sur la carte</span>' +
         '</div>' +
       '</div>';
@@ -10159,6 +10190,22 @@ function rClientContent() {
       '<div class="card" style="margin-bottom:12px;background:rgba(34,197,94,.12);border:2px solid #22C55E;cursor:pointer" onclick="entrerModeService(\'' + _courseActiveBanniere.taxiId + '\')">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
           '<div style="font-weight:800;font-size:13px;color:#16A34A">' + _libelleBanniere + '</div>' +
+          // v9.550 : LE CHAT SUIT TOUTE LA COURSE, PAS UN INSTANT.
+          //
+          // En v9.549 je l'avais place dans la carte de course, dans une branche qui ne
+          // s'affiche que pendant « passager a bord, pas encore demarre » — quelques
+          // secondes. Le chauffeur ne pouvait donc jamais ecrire, et c'est ce qui a ete
+          // constate au premier essai. Ici, dans le bandeau de course active, il est
+          // present du moment ou la course est acceptee jusqu'a ce qu'elle se termine :
+          // c'est justement en allant chercher le passager qu'on a besoin de lui parler.
+          //
+          // stopPropagation : sans lui, le clic ouvrirait la course au lieu du chat, le
+          // bandeau entier etant deja cliquable.
+          '<button onclick="event.stopPropagation();ouvrirChatCourse(\'' + _courseActiveBanniere.id +
+            '\',\'chauffeur\',\'' + esc(_courseActiveBanniere.passagerNom || 'Votre passager').replace(/'/g, "\\'") + '\')" ' +
+            'style="background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.5);color:#60A5FA;' +
+            'border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">' +
+            '💬 Écrire</button>' +
           '<span style="background:#22C55E;color:#fff;border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;white-space:nowrap">🗺️ Voir sur la carte</span>' +
         '</div>' +
       '</div>'
@@ -12247,7 +12294,7 @@ function vCard(v, mini=false) {
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
       <button class="btn-blue" style="font-size:11px;padding:5px 9px" onclick="showVeh('${v.id}')">👁️</button>
-      ${canEdit() && !dejaT && !v.stolen && v.statut !== 'suspendu' ? `<button class="btn" style="font-size:10px;padding:5px 7px;background:#7C3AED" onclick="ouvrirDevenirTaxi('${v.id}')" title="${v.type === 'voiture' ? 'Proposer des courses VTC' : 'Devenir taxi moto'}">${v.type === 'voiture' ? '🚗' : '🏍️'}</button>` : ''}
+      ${(canEdit() || _monVehicule(v)) && !dejaT && !v.stolen && v.statut !== 'suspendu' ? `<button class="btn" style="font-size:10px;padding:5px 7px;background:#7C3AED" onclick="ouvrirDevenirTaxi('${v.id}')" title="${v.type === 'voiture' ? 'Proposer des courses VTC' : 'Devenir taxi moto'}">${v.type === 'voiture' ? '🚗' : '🏍️'}</button>` : ''}
       ${canEdit()?`<button class="btn-ghost" style="font-size:11px;padding:5px 9px" onclick="openChgProp('${v.id}')" title="Changer propriétaire">🔄</button>`:''}
       ${canDeclareVol()?`<button class="${v.stolen?'btn-ghost':'btn-red'}" style="font-size:11px;padding:5px 9px" onclick="toggleStolen('${v.id}')">${v.stolen?'🔓':'🚨'}</button>`:''}
     </div>
