@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.544';
+window.AFRIMOTO_VERSION = 'v9.545';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -13813,6 +13813,31 @@ async function saveMoto() {
     vis:{owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false},
     hist:[...DB.mHP,{nom:owner,tel:phone,depuis:dachat||new Date().toISOString().split('T')[0]}]
   };
+
+  // ══ v9.545 — LES CINQ PHOTOS PARTENT AU STOCKAGE, ET AUCUNE NE SE PERD ══
+  //
+  // Jusqu'ici elles etaient ecrites en TEXTE dans la fiche, comme les photos de taxi qui
+  // pesaient deux megaoctets chacune. Et deux d'entre elles n'arrivaient nulle part du tout :
+  // la base n'avait pas de colonne pour la facture ni pour la carte grise. Un agent pouvait
+  // photographier une carte grise chaque jour pendant un an sans qu'aucune soit conservee —
+  // et c'est exactement la piece qu'un juge reclame quand une moto est contestee.
+  //
+  // Ou va quoi, et pourquoi :
+  //   • la photo du VEHICULE dans l'espace public : elle est montree dans le registre, c'est
+  //     ce qui permet a quelqu'un de reconnaitre une moto volee ;
+  //   • le VISAGE du proprietaire, sa PIECE, la FACTURE et la CARTE GRISE dans l'espace
+  //     prive : ce sont des documents personnels. Ils ne s'ouvrent qu'avec une adresse
+  //     signee, valable cinq minutes, delivree au personnel au moment de la consultation.
+  //
+  // Si le depot echoue — reseau coupe — televerserPhoto rend l'image d'origine et
+  // l'enregistrement se poursuit. Mieux vaut une photo lourde qu'une moto non enregistree.
+  toast('⏳ Envoi des photos…');
+  newV.photo        = await televerserPhoto(newV.photo,        'photos',    'vehicules/' + newV.id);
+  newV.photoP       = await televerserPhoto(newV.photoP,       'documents', 'proprietaires/' + newV.id);
+  newV.photoPiece   = await televerserPhoto(newV.photoPiece,   'documents', 'pieces/' + newV.id);
+  newV.photoFacture = await televerserPhoto(newV.photoFacture, 'documents', 'factures/' + newV.id);
+  newV.photoCG      = await televerserPhoto(newV.photoCG,      'documents', 'cartes-grises/' + newV.id);
+
   DB.vehs.push(newV);
 
   // ── SÉCURITÉ : la sauvegarde Supabase doit RÉUSSIR avant de générer le QR ──
@@ -14237,10 +14262,11 @@ async function ouvrirDossierLitige(type, id) {
   // Les pieces d'identite vivent dans un espace prive : il faut une adresse signee,
   // valable quelques minutes, pour les afficher.
   const veh = d.vehicule || {}, ps = d.passager || {}, ch = d.chauffeur || {};
-  const [pVeh, pProp, pPieceV, pProfilP, pPieceP, pSelfie] = await Promise.all([
+  const [pVeh, pProp, pPieceV, pProfilP, pPieceP, pSelfie, pFacture, pCG] = await Promise.all([
     adressePhotoPrivee(veh.photo_vehicule), adressePhotoPrivee(veh.photo_proprietaire),
     adressePhotoPrivee(veh.photo_piece),    adressePhotoPrivee(ps.photo_profil),
-    adressePhotoPrivee(ps.photo_piece),     adressePhotoPrivee(ch.photo || ch.selfie)
+    adressePhotoPrivee(ps.photo_piece),     adressePhotoPrivee(ch.photo || ch.selfie),
+    adressePhotoPrivee(veh.photo_facture),  adressePhotoPrivee(veh.photo_carte_grise)
   ]);
 
   const estCourse = d.type === 'course';
@@ -14331,6 +14357,8 @@ async function ouvrirDossierLitige(type, id) {
       ['Photo du véhicule', pVeh],
       ['Photo du propriétaire', pProp],
       ['Pièce d\'identité du propriétaire', pPieceV],
+      ['Facture d\'achat', pFacture],
+      ['Carte grise', pCG],
       ['Photo du passager', pProfilP],
       ['Pièce d\'identité du passager', pPieceP]
     ]) +
