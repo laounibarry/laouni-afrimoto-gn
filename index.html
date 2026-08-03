@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.550';
+window.AFRIMOTO_VERSION = 'v9.551';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -6786,6 +6786,11 @@ window._chatCanal = null;
 function ouvrirChatCourse(courseId, moi, nomAutre) {
   window._chatCourseId = courseId;
   window._chatMoi = (moi === 'chauffeur') ? 'chauffeur' : 'passager';
+  // Ouvrir le chat efface les non-lus de cette course.
+  window._chatNonLus = 0;
+  // L'application native doit savoir que le chat est ouvert, pour ne pas ramener l'ecran
+  // de course par-dessus pendant qu'on ecrit.
+  try { if(window.AfriMotoNative && AfriMotoNative.chatOuvert) AfriMotoNative.chatOuvert(true); } catch(e) {}
   const t = document.getElementById('chat-titre');
   if(t) t.textContent = nomAutre || (window._chatMoi === 'chauffeur' ? 'Votre passager' : 'Votre chauffeur');
 
@@ -6806,8 +6811,100 @@ function fermerChatCourse() {
   try { if(window._chatCanal) supabaseClient.removeChannel(window._chatCanal); } catch(e) {}
   window._chatCanal = null;
   window._chatCourseId = null;
+  window._chatNonLus = 0;
+  try { if(window.AfriMotoNative && AfriMotoNative.chatOuvert) AfriMotoNative.chatOuvert(false); } catch(e) {}
   closeModal('m-chat-course');
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// v9.551 — SAVOIR QU'UN MESSAGE EST ARRIVE, SANS OUVRIR LE CHAT
+//
+// Un message qu'il faut aller chercher ne sert a rien : le chauffeur regarde la route, le
+// passager regarde la rue. Cette veille tourne en permanence pendant une course, meme chat
+// ferme, et previent de trois facons :
+//
+//   • un son court — assez pour etre entendu dans la circulation, assez discret pour ne pas
+//     etre confondu avec la sonnerie de course ;
+//   • une pastille rouge sur le bouton du bandeau, avec le nombre de messages non lus ;
+//   • une notification Android quand l'application n'est pas au premier plan.
+//
+// Elle est independante du chat : c'est justement quand il est ferme qu'elle est utile.
+// ════════════════════════════════════════════════════════════════════════════
+window._chatNonLus = 0;
+window._veilleCourseId = null;
+window._veilleCanal = null;
+
+function _chatMonRole() {
+  try {
+    if(typeof _courseActiveDuPassager === 'function' && _courseActiveDuPassager()) return 'passager';
+    if(typeof courseActive === 'function' && courseActive()) return 'chauffeur';
+  } catch(e) {}
+  return null;
+}
+function _chatMaCourse() {
+  try {
+    const p = (typeof _courseActiveDuPassager === 'function') ? _courseActiveDuPassager() : null;
+    if(p) return p;
+    const c = (typeof courseActive === 'function') ? courseActive() : null;
+    if(c) return c;
+  } catch(e) {}
+  return null;
+}
+
+function _bipMessage() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; o.type = 'sine';
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.30);
+    o.start(); o.stop(ctx.currentTime + 0.32);
+    setTimeout(() => { try { ctx.close(); } catch(e) {} }, 600);
+  } catch(e) {}
+}
+
+function _surMessageRecu(m) {
+  const moi = window._chatMoi || _chatMonRole();
+  if(!m || m.expediteur === moi) return;          // c'est le mien : rien a signaler
+  const chatOuvert = window._chatCourseId === m.course_id &&
+                     (document.getElementById('m-chat-course') || {}).className === 'modal-bot open';
+  if(chatOuvert) { chargerMessagesCourse(); return; }
+
+  window._chatNonLus = (window._chatNonLus || 0) + 1;
+  _bipMessage();
+  try { toast('💬 ' + String(m.texte || '').slice(0, 60)); } catch(e) {}
+  // Hors application au premier plan : une vraie notification Android.
+  try {
+    if(window.AfriMotoNative && AfriMotoNative.notifierMessage) {
+      AfriMotoNative.notifierMessage(
+        moi === 'chauffeur' ? 'Votre passager' : 'Votre chauffeur',
+        String(m.texte || '').slice(0, 120));
+    }
+  } catch(e) {}
+  // Le bandeau porte la pastille : on le redessine.
+  try { if(typeof _majBanniereCoursePassager === 'function') _majBanniereCoursePassager(); } catch(e) {}
+}
+
+function _veilleMessagesCourse() {
+  const c = _chatMaCourse();
+  const id = c ? c.id : null;
+  if(id === window._veilleCourseId) return;       // rien n'a change
+  try { if(window._veilleCanal) supabaseClient.removeChannel(window._veilleCanal); } catch(e) {}
+  window._veilleCanal = null;
+  window._veilleCourseId = id;
+  window._chatNonLus = 0;
+  if(!id) return;
+  try {
+    window._veilleCanal = supabaseClient.channel('veille-chat-' + id)
+      .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages_course', filter: 'course_id=eq.' + id },
+          function(p){ _surMessageRecu(p && p.new); })
+      .subscribe();
+  } catch(e) { }
+}
+setInterval(_veilleMessagesCourse, 3000);
 
 function _ecouterMessagesCourse(courseId) {
   try { if(window._chatCanal) supabaseClient.removeChannel(window._chatCanal); } catch(e) {}
@@ -7230,7 +7327,9 @@ function _majBanniereCoursePassager() {
     const existant = document.getElementById('banniere-course-psg');
     if(!c) { if(existant) existant.remove(); return; }
     const libelle = c.enCours ? '🛣️ Course en cours' : '🏍️ Chauffeur en route vers vous';
-    const sig = c.id + '|' + libelle;
+    // v9.551 : le nombre de non-lus entre dans la signature, sinon le bandeau ne serait
+    // jamais redessine et la pastille n'apparaitrait pas.
+    const sig = c.id + '|' + libelle + '|' + (window._chatNonLus || 0);
     if(existant && existant.dataset.sig === sig) return; // deja a jour : ne pas reecrire le DOM
     const html =
       '<div id="banniere-course-psg" data-sig="' + sig + '" class="card" style="margin-bottom:12px;background:rgba(34,197,94,.12);border:2px solid #22C55E;cursor:pointer" onclick="ouvrirSuiviTaxi(\'' + c.id + '\')">' +
@@ -7243,7 +7342,13 @@ function _majBanniereCoursePassager() {
             '\',\'passager\',\'' + esc(c.taxiNom || 'Votre chauffeur').replace(/'/g, "\\'") + '\')" ' +
             'style="background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.5);color:#60A5FA;' +
             'border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">' +
-            '💬 Écrire</button>' +
+            '💬 Écrire' +
+            // La pastille rouge : le nombre de messages qu'on n'a pas encore lus.
+            (window._chatNonLus > 0
+              ? ' <span style="background:#EF4444;color:#fff;border-radius:10px;padding:1px 7px;' +
+                'font-size:11px;margin-left:3px">' + window._chatNonLus + '</span>'
+              : '') +
+            '</button>' +
           '<span style="background:#22C55E;color:#fff;border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;white-space:nowrap">🗺️ Voir sur la carte</span>' +
         '</div>' +
       '</div>';
@@ -10205,7 +10310,13 @@ function rClientContent() {
             '\',\'chauffeur\',\'' + esc(_courseActiveBanniere.passagerNom || 'Votre passager').replace(/'/g, "\\'") + '\')" ' +
             'style="background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.5);color:#60A5FA;' +
             'border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">' +
-            '💬 Écrire</button>' +
+            '💬 Écrire' +
+            // La pastille rouge : le nombre de messages qu'on n'a pas encore lus.
+            (window._chatNonLus > 0
+              ? ' <span style="background:#EF4444;color:#fff;border-radius:10px;padding:1px 7px;' +
+                'font-size:11px;margin-left:3px">' + window._chatNonLus + '</span>'
+              : '') +
+            '</button>' +
           '<span style="background:#22C55E;color:#fff;border-radius:20px;padding:8px 14px;font-weight:800;font-size:12px;white-space:nowrap">🗺️ Voir sur la carte</span>' +
         '</div>' +
       '</div>'
@@ -25223,17 +25334,33 @@ body.mode-service .nav-inner{display:none!important}
   // Dans l'application, la carte de course est desormais dessinee par Android. Le site lui
   // transmet ici l'etat complet de la course, chaque seconde. Aucun effet hors application :
   // AfriMotoNative n'existe que dans l'application.
-  var _svcDernierEta = '', _svcDerniereCourseNatif = '';
+  var _svcDernierEta = '', _svcDerniereCourseNatif = '', _svcNulsConsecutifs = 0;
   function _svcPousserVersNatif(){
     if(!(window.AfriMotoNative && AfriMotoNative.majCourseNative)) return;
     var d = courseActive();
     if(!d){
-      if(_svcDerniereCourseNatif !== ''){
+      // ══ v9.551 — POURQUOI LE CHAT SE REFERMAIT TOUT SEUL ══
+      //
+      // Une seule reponse vide suffisait a fermer l'ecran de course natif. Or il en arrive
+      // au moment precis ou la page reprend la main — quand on revient du chat, la liste des
+      // courses n'est pas encore relue. L'enchainement etait donc :
+      //   le chauffeur ouvre le chat  ->  la page reprend la main  ->  courseActive() vide
+      //   une fraction de seconde  ->  l'ecran de course se ferme  ->  une seconde plus tard
+      //   la course reapparait  ->  l'ecran se ROUVRE, par-dessus le chat.
+      //
+      // D'ou l'impression que le chat « quitte » au bout de quelques secondes.
+      //
+      // On exige desormais TROIS reponses vides d'affilee. Une course qui se termine
+      // vraiment ferme l'ecran trois secondes plus tard, ce qui ne se remarque pas ; un
+      // trou passager ne ferme plus rien.
+      _svcNulsConsecutifs = (_svcNulsConsecutifs || 0) + 1;
+      if(_svcNulsConsecutifs >= 3 && _svcDerniereCourseNatif !== ''){
         _svcDerniereCourseNatif = '';
         try{ if(AfriMotoNative.fermerEcranCourse) AfriMotoNative.fermerEcranCourse(); }catch(e){}
       }
       return;
     }
+    _svcNulsConsecutifs = 0;
     var etape = d.enCours ? 'encours' : (d.statutAttribution === 'effectuee' ? 'effectuee' : 'acceptee');
     var titre = d.enCours ? 'Course en cours'
               : (etape === 'effectuee' ? 'Passager à bord' : 'Passager à récupérer');
