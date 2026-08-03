@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.552';
+window.AFRIMOTO_VERSION = 'v9.553';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2868,6 +2868,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <div>
         <div style="font-weight:900;font-size:15px">💬 <span id="chat-titre">Message</span></div>
         <div style="font-size:11px;color:var(--text2)" id="chat-sous">Pendant la course seulement</div>
+        <!-- v9.553 : les deux parties doivent savoir que ces messages peuvent finir devant
+             un juge. C'est honnete, et ca calme les echanges : on n'ecrit pas la meme chose
+             quand on sait qu'un tribunal peut lire. -->
+        <div style="font-size:10px;color:#EAB308;margin-top:3px">⚖️ Ces messages peuvent être produits en cas de litige.</div>
       </div>
       <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="fermerChatCourse()">✕</button>
     </div>
@@ -7035,6 +7039,20 @@ function profilChauffeurHtml(t) {
 function afficherSuiviCourseConfirmee(demande) {
   const t = DB.taxis.find(x => x.id === demande.taxiId);
   openModal('m-recherche-auto');
+  // ══ v9.553 — LE COMPTE A REBOURS DE LA RECHERCHE N'A PLUS RIEN A FAIRE ICI ══
+  //
+  // Un chauffeur a accepte : la recherche est finie. Le grand nombre jaune qui restait
+  // affiche — « 21584s » — etait le temps restant d'une recherche qui n'existait plus, et
+  // le bouton « Annuler la recherche » en dessous ne pouvait qu'inquieter : le passager
+  // croyait qu'on cherchait encore, alors que son taxi etait en route.
+  //
+  // On arrete le decompte et on retire les deux, ici, au moment ou la course est confirmee.
+  try {
+    if(typeof rechercheAutoEnCours !== 'undefined' && rechercheAutoEnCours &&
+       rechercheAutoEnCours.intervalleCompteur) clearInterval(rechercheAutoEnCours.intervalleCompteur);
+  } catch(e) {}
+  const _cpt = document.getElementById('ra-compteur'); if(_cpt) _cpt.textContent = '';
+  const _ann = document.getElementById('ra-btn-annuler'); if(_ann) _ann.style.display = 'none';
   document.getElementById('ra-icone').innerHTML = '✅';
   document.getElementById('ra-titre').textContent = 'Course confirmée !';
   document.getElementById('ra-detail').innerHTML =
@@ -25360,9 +25378,24 @@ body.mode-service .nav-inner{display:none!important}
   // Dans l'application, la carte de course est desormais dessinee par Android. Le site lui
   // transmet ici l'etat complet de la course, chaque seconde. Aucun effet hors application :
   // AfriMotoNative n'existe que dans l'application.
-  var _svcDernierEta = '', _svcDerniereCourseNatif = '', _svcNulsConsecutifs = 0;
+  var _svcDernierEta = '', _svcDerniereCourseNatif = '', _svcNulsConsecutifs = 0, _chatEtatEnvoye = false;
   function _svcPousserVersNatif(){
     if(!(window.AfriMotoNative && AfriMotoNative.majCourseNative)) return;
+    // ══ v9.553 — L'ETAT DU CHAT EST REPETE, PAS ANNONCE UNE FOIS ══
+    //
+    // En v9.552 le site prevenait l'application une seule fois a l'ouverture et une fois a
+    // la fermeture. Si la fenetre se refermait autrement — bouton retour d'Android, page
+    // rechargee — l'application ne l'apprenait jamais et gardait l'ecran natif bloque.
+    // C'est ce qui a fait disparaitre la carte du passager : le suivi refusait de s'ouvrir.
+    //
+    // On le repete donc chaque seconde. Si le site se tait, l'application libere l'ecran
+    // d'elle-meme au bout de vingt secondes : plus rien ne peut rester coince.
+    try {
+      if(AfriMotoNative.chatOuvert){
+        var _ouv = (document.getElementById('m-chat-course') || {}).className === 'modal-bot open';
+        if(_ouv || _chatEtatEnvoye) { AfriMotoNative.chatOuvert(_ouv); _chatEtatEnvoye = _ouv; }
+      }
+    } catch(e){}
     var d = courseActive();
     if(!d){
       // ══ v9.551 — POURQUOI LE CHAT SE REFERMAIT TOUT SEUL ══
