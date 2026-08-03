@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.545';
+window.AFRIMOTO_VERSION = 'v9.546';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -890,6 +890,56 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     const r = _roleEnregistre();
     return r === 'admin' || r === 'agent' || r === 'sousagent';
   }
+  // ══ v9.546 — L'HISTORIQUE, PAGE PAR PAGE ══
+  //
+  // Avant : une seule requete, plafonnee a mille lignes par le serveur. L'ecran Historique
+  // montrait donc la moitie de l'activite, et surtout personne ne pouvait dire QUELLE
+  // moitie — ni « les plus recentes », ni « celles d'avant telle date ». Juste mille, au
+  // hasard de ce que le serveur avait renvoye. D'ou le bandeau rouge a chaque ouverture.
+  //
+  // Maintenant : une fenetre de temps, chargee EN ENTIER, page par page. Rien ne manque a
+  // l'interieur des quatre-vingt-dix derniers jours. Au-dela, on ne telecharge rien : la
+  // recherche interroge le serveur (chercher_mouvements), comme pour le registre des
+  // vehicules — l'approche qui a tenu a 500 000 lignes.
+  //
+  // Le garde-fou des vingt pages n'est pas un plafond deguise : s'il est atteint, on le DIT.
+  const FENETRE_MOUVEMENTS_JOURS = 90;
+  let _mouvementsIncomplets = false;
+
+  async function _chargerMouvements() {
+    const depuis = new Date(Date.now() - FENETRE_MOUVEMENTS_JOURS * 864e5).toISOString();
+    const PAGE = 1000, MAX_PAGES = 20;
+    let tout = [], page = 0;
+    _mouvementsIncomplets = false;
+    try {
+      while (page < MAX_PAGES) {
+        const { data, error } = await supabaseClient.from('mouvements').select('*')
+          .gte('date', depuis)
+          .order('date', { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error) {
+          // La colonne « date » n'existe pas encore (journal-mouvements.sql pas execute) :
+          // on retombe sur l'ancienne methode plutot que de ne rien afficher.
+          const r = await supabaseClient.from('mouvements').select('*')
+            .order('created_at', { ascending: false }).limit(PLAFOND_LIGNES);
+          return { data: r.data || [] };
+        }
+        if (!data || !data.length) break;
+        tout = tout.concat(data);
+        if (data.length < PAGE) break;
+        page++;
+      }
+      if (page >= MAX_PAGES) {
+        _mouvementsIncomplets = true;
+        try { addDebugLog('HISTORIQUE : plus de ' + (MAX_PAGES * PAGE) +
+          ' ecritures sur ' + FENETRE_MOUVEMENTS_JOURS + ' jours — la fenetre doit etre reduite'); } catch(e) {}
+      }
+    } catch (e) {
+      try { addDebugLog('HISTORIQUE : chargement interrompu — ' + ((e && e.message) || e)); } catch(er) {}
+    }
+    return { data: tout };
+  }
+
   function _verifierPlafond(nom, tableau) {
     if(tableau && tableau.length >= PLAFOND_LIGNES) {
       _tablesTronquees.push(nom + ' (' + tableau.length + ')');
@@ -967,9 +1017,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // par enregistrement — et elle n'est lue QUE par les ecrans du personnel (historique,
         // gestion, recharges, fiche d'un compte). Un passager ou un chauffeur la telechargeait
         // entierement a chaque ouverture sans jamais s'en servir.
-        _perso ? supabaseClient.from('mouvements').select('*')
-                   .order('date', {ascending: false}).limit(PLAFOND_LIGNES)
-               : Promise.resolve({ data: [] }),
+        // v9.546 : plus de coupure au hasard. Voir _chargerMouvements() plus bas — le
+        // chargement se fait page par page, sur une fenetre de temps que l'on peut expliquer.
+        _perso ? _chargerMouvements() : Promise.resolve({ data: [] }),
         // v9.515 : la corbeille entiere n'est utile qu'a l'ecran du personnel. Mais deux
         // controles de CONNEXION la consultent (compte supprime, vehicule supprime) : on garde
         // donc ces deux categories pour tout le monde, et rien d'autre.
@@ -1050,7 +1100,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       _verifierPlafond('taxis', DB.taxis);
       _verifierPlafond('courses', DB.demandesCourse);
       _verifierPlafond('trajets', DB.trajets);
-      _verifierPlafond('mouvements', DB.mouvements);
+      // v9.546 : l'historique n'est plus coupe au hasard, il est borne dans le TEMPS et
+      // charge en entier. Le controle de plafond ne s'y applique donc plus : il ne signale
+      // que le cas ou meme la fenetre de 90 jours deborde.
+      if (_mouvementsIncomplets) _tablesTronquees.push('historique (fenêtre de ' + FENETRE_MOUVEMENTS_JOURS + ' jours saturée)');
       if(_tablesTronquees.length) {
         const _msg = '⚠️ DONNEES INCOMPLETES — ' + _tablesTronquees.join(', ') +
           '. Le serveur ne renvoie plus tout : il faut passer au chargement par pages.';
@@ -19100,6 +19153,62 @@ function setGestTab(t) {
 function setVehFiltre(t){ window.vehFiltreType = t; if(typeof rGestion==='function') rGestion(); }
 
 // ════════════════════════════════════════════════════════════════════════════
+// v9.546 — CHERCHER AU-DELA DES 90 JOURS GARDES EN MEMOIRE.
+//
+// L'application ne telecharge plus que les trois derniers mois d'ecritures. C'est une
+// fenetre qu'on peut expliquer, contrairement a l'ancienne coupure a mille lignes dont
+// personne ne pouvait dire ce qu'elle laissait dehors.
+//
+// Mais un litige remonte parfois a plus loin. Cette recherche interroge donc le journal
+// ENTIER sur le serveur, et n'affiche que ce qui n'est pas deja sous les yeux.
+// ════════════════════════════════════════════════════════════════════════════
+async function chercherHistoriqueAncien() {
+  const zone = document.getElementById('hist-serveur');
+  if(!zone) return;
+  const q = nrm((document.getElementById('gest-q') || {}).value || '');
+  if(!q || q.length < 2) { zone.innerHTML = ''; return; }
+
+  let d = null;
+  try {
+    const r = await supabaseClient.rpc('chercher_mouvements', { p_terme: q, p_limite: 200 });
+    if(!r.error) d = r.data;
+  } catch(e) { }
+  if(!d || d.ok !== true) { zone.innerHTML = ''; return; }
+
+  // On ne remontre pas ce qui est deja dans la liste du dessus.
+  const dejaLa = new Set((DB.mouvements || []).map(m => m.id));
+  const anciens = (d.mouvements || []).filter(m => !dejaLa.has(m.id));
+  if(!anciens.length) {
+    zone.innerHTML = '<div style="font-size:11px;color:var(--text2);margin:8px 0">' +
+      '✓ Rien de plus dans le journal complet (' + (d.total_journal || 0) + ' écritures).</div>';
+    return;
+  }
+
+  zone.innerHTML =
+    '<div style="margin:14px 0 8px;padding:9px 12px;background:rgba(96,165,250,.09);' +
+      'border:1px solid rgba(96,165,250,.3);border-radius:12px;font-size:12px;color:var(--text2)">' +
+      '🗄️ <b>' + anciens.length + '</b> écriture' + (anciens.length > 1 ? 's' : '') +
+      ' de plus de 90 jours, trouvée' + (anciens.length > 1 ? 's' : '') + ' dans le journal complet ' +
+      '(' + (d.total_journal || 0) + ' au total). Elles ne sont pas chargées sur cet appareil.' +
+    '</div>' +
+    anciens.map(m => {
+      const dt = m.date ? new Date(m.date) : null;
+      const quand = (dt && !isNaN(dt)) ? dt.toLocaleDateString('fr-FR') + ' à ' +
+        dt.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}) : '—';
+      return '<div class="card" style="margin-bottom:8px;padding:11px;opacity:.85">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:800">' + esc(m.de || '—') +
+              ' <span style="color:#60A5FA">→</span> ' + esc(m.vers || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--text2);margin-top:3px">' + quand + '</div>' +
+            (m.desc ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + esc(m.desc) + '</div>' : '') +
+          '</div>' +
+          '<div style="font-size:14px;font-weight:900;color:#60A5FA;flex-shrink:0">' + fmt(m.montant || 0) + '</div>' +
+        '</div></div>';
+    }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // TRESORERIE — les totaux viennent du serveur, jamais du telephone.
 //
 // Pourquoi : le serveur ne renvoie jamais plus de mille lignes de mouvements. Additionner
@@ -20071,6 +20180,14 @@ function rGestion() {
         'Total en circulation : <b>' + fmt(_total) + '</b> sur ' + _actifs.length + ' transfert(s) valide(s). ' +
         'Annuler un transfert <b>d\u00e9bite le b\u00e9n\u00e9ficiaire et recr\u00e9dite l\'exp\u00e9diteur</b> : l\'op\u00e9ration est enti\u00e8rement invers\u00e9e.' +
       '</div>';
+
+    // v9.546 : l'application ne garde en memoire que les 90 derniers jours. Quand on
+    // cherche quelqu'un, il faut donc pouvoir aller au-dela \u2014 sans rien telecharger.
+    if(_q && _q.length >= 2) {
+      html += '<div id="hist-serveur"><div style="font-size:11px;color:var(--text2);margin:8px 0">' +
+        '\u23f3 Recherche dans le journal complet\u2026</div></div>';
+      setTimeout(chercherHistoriqueAncien, 0);
+    }
 
     if(!_tr.length) {
       html += '<div class="empty">\ud83d\udcb5<br>Aucun transfert</div>';
