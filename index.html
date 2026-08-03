@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.553';
+window.AFRIMOTO_VERSION = 'v9.554';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -6840,10 +6840,16 @@ window._chatNonLus = 0;
 window._veilleCourseId = null;
 window._veilleCanal = null;
 
+// La course du chauffeur passe par « window._courseActiveChauffeur » : la fonction d'origine
+// est enfermee dans une portee que ces deux-ci ne voient pas.
+function _chatCourseChauffeur() {
+  try { return window._courseActiveChauffeur ? window._courseActiveChauffeur() : null; }
+  catch(e) { return null; }
+}
 function _chatMonRole() {
   try {
     if(typeof _courseActiveDuPassager === 'function' && _courseActiveDuPassager()) return 'passager';
-    if(typeof courseActive === 'function' && courseActive()) return 'chauffeur';
+    if(_chatCourseChauffeur()) return 'chauffeur';
   } catch(e) {}
   return null;
 }
@@ -6851,8 +6857,7 @@ function _chatMaCourse() {
   try {
     const p = (typeof _courseActiveDuPassager === 'function') ? _courseActiveDuPassager() : null;
     if(p) return p;
-    const c = (typeof courseActive === 'function') ? courseActive() : null;
-    if(c) return c;
+    return _chatCourseChauffeur();
   } catch(e) {}
   return null;
 }
@@ -7039,19 +7044,18 @@ function profilChauffeurHtml(t) {
 function afficherSuiviCourseConfirmee(demande) {
   const t = DB.taxis.find(x => x.id === demande.taxiId);
   openModal('m-recherche-auto');
-  // ══ v9.553 — LE COMPTE A REBOURS DE LA RECHERCHE N'A PLUS RIEN A FAIRE ICI ══
+  // ══ v9.554 — CE QUE J'AI CASSE EN v9.553, ET POURQUOI ══
   //
-  // Un chauffeur a accepte : la recherche est finie. Le grand nombre jaune qui restait
-  // affiche — « 21584s » — etait le temps restant d'une recherche qui n'existait plus, et
-  // le bouton « Annuler la recherche » en dessous ne pouvait qu'inquieter : le passager
-  // croyait qu'on cherchait encore, alors que son taxi etait en route.
+  // J'avais ecrit ici « clearInterval(rechercheAutoEnCours.intervalleCompteur) » en croyant
+  // arreter un simple compte a rebours. Ce n'en est pas un : cet intervalle fait tourner
+  // verifierStatutDemandeAuto() CHAQUE SECONDE, c'est-a-dire toute la machine d'etat de la
+  // course cote passager — l'acceptation, le prix propose, l'annulation, le suivi.
   //
-  // On arrete le decompte et on retire les deux, ici, au moment ou la course est confirmee.
-  try {
-    if(typeof rechercheAutoEnCours !== 'undefined' && rechercheAutoEnCours &&
-       rechercheAutoEnCours.intervalleCompteur) clearInterval(rechercheAutoEnCours.intervalleCompteur);
-  } catch(e) {}
-  const _cpt = document.getElementById('ra-compteur'); if(_cpt) _cpt.textContent = '';
+  // Je l'ai donc arretee net, depuis une fonction que cette machine venait elle-meme
+  // d'appeler. D'ou la course et la carte cassees des deux cotes.
+  //
+  // Le compte a rebours se retire la ou il s'affiche, pas en tuant la boucle : voir dans
+  // verifierStatutDemandeAuto, ou il est desormais masque des qu'une course est acceptee.
   const _ann = document.getElementById('ra-btn-annuler'); if(_ann) _ann.style.display = 'none';
   document.getElementById('ra-icone').innerHTML = '✅';
   document.getElementById('ra-titre').textContent = 'Course confirmée !';
@@ -8449,9 +8453,27 @@ async function verifierStatutDemandeAuto() {
     return; // le compte à rebours est suspendu pendant la décision du passager
   }
 
+  // v9.554 : le compte a rebours ne concerne QUE la recherche d'un taxi. Des qu'une course
+  // est acceptee, il n'y a plus rien a chercher — le nombre jaune qui restait affiche
+  // (« 21584s ») etait le reste d'une recherche qui n'existait plus, et le bouton
+  // « Annuler la recherche » juste dessous laissait croire au passager qu'on cherchait
+  // encore alors que son taxi etait deja en route.
+  //
+  // On les masque ICI, dans la boucle qui les dessine — surtout pas en arretant la boucle,
+  // qui fait aussi tourner toute la course.
+  // La valeur reste calculee dans tous les cas : elle sert plus bas a detecter l'expiration
+  // de la recherche. Seul son AFFICHAGE change.
   const secondesRestantes = Math.max(0, Math.ceil((rch.finA - Date.now()) / 1000));
+  const _courseEnMarche = demande.statutAttribution === 'acceptee' ||
+                          demande.statutAttribution === 'effectuee' || demande.enCours;
   const compteurEl = document.getElementById('ra-compteur');
-  if(compteurEl) compteurEl.textContent = secondesRestantes + 's';
+  if(_courseEnMarche) {
+    if(compteurEl) compteurEl.textContent = '';
+    const _btnAnn = document.getElementById('ra-btn-annuler');
+    if(_btnAnn) _btnAnn.style.display = 'none';
+  } else if(compteurEl) {
+    compteurEl.textContent = secondesRestantes + 's';
+  }
 
   if(demande.statutAttribution === 'annulee_chauffeur') {
     clearInterval(rch.intervalleCompteur);
@@ -25239,6 +25261,11 @@ body.mode-service .nav-inner{display:none!important}
       return ids.indexOf(x.taxiId)!==-1 && (x.statutAttribution==='acceptee' || x.statutAttribution==='effectuee' || x.enCours);
     })||null;
   }
+  // v9.554 : cette fonction vit dans une fermeture — la veille des messages, qui est definie
+  // au niveau global, ne pouvait pas la voir. Pour un CHAUFFEUR elle ne trouvait donc aucune
+  // course, ne s'abonnait a rien, et aucun message ne lui etait jamais signale : ni bip, ni
+  // bouton rouge, ni notification. Cote passager tout marchait, d'ou l'asymetrie constatee.
+  window._courseActiveChauffeur = courseActive;
   window._svcEstEnService=function(){ return !!taxiEnLigne(); };
 
   // ── SYNCHRO SERVEUR : vehicules + courses, toutes les 5 s, sans condition d'etat ──
