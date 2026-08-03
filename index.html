@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.564';
+window.AFRIMOTO_VERSION = 'v9.565';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1891,7 +1891,15 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   // Tables dont la suppression passe obligatoirement par le serveur, avec un jeton du
   // personnel. Une suppression y est définitive et concerne un dossier opposable en
   // justice : elle ne doit pas dépendre d'une simple clef publique lisible dans le site.
-  const TABLES_PROTEGEES = { trajets:'trajet', demandes_course:'course' };
+  // v9.565 : la liste s'etend aux onze autres tables ouvertes. Le serveur tient sa propre
+  // liste blanche — celle-ci ne fait qu'indiquer au site par ou passer.
+  const TABLES_PROTEGEES = {
+    trajets:'trajet', demandes_course:'course',
+    clients:'clients', taxis:'taxis', vehicules:'vehicules',
+    agents:'agents', sous_agents:'sous_agents', passagers:'passagers',
+    annonces:'annonces', alertes:'alertes', mouvements:'mouvements',
+    corbeille:'corbeille', liste_noire_reservations:'liste_noire_reservations'
+  };
 
   async function sbDeleteItem(table, id) {
     const typeProtege = TABLES_PROTEGEES[table];
@@ -2003,11 +2011,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     } catch(e) { console.warn('sbSaveConfig:', e && e.message); return false; }
   }
 
+  // v9.565 : la corbeille passe par le meme chemin que le reste. Vider la corbeille est
+  // une suppression definitive — elle merite le jeton et la trace au journal.
   async function sbDeleteCorbeille(id) {
-    try {
-      const {error} = await supabaseClient.from('corbeille').delete().eq('id', id);
-      if(error) console.warn('sbDeleteCorbeille:', error.message);
-    } catch(e) { if(e.name !== 'DataCloneError') console.warn('sbDeleteCorbeille:', e.message); }
+    return await sbDeleteItem('corbeille', id);
   }
 </script>
 </head>
@@ -5786,7 +5793,10 @@ async function prendreSessionUnique(user) {
     if(error) {
       // v9.457 : si l'ecriture echoue (contrainte manquante...), la VIEILLE trace restait et
       // ejectait a tort la nouvelle connexion ("connecte ailleurs" fantome). On efface et reecrit.
-      try { await supabaseClient.from('sessions_uniques').delete().eq('compte_id', compte); } catch(e2) {}
+      // v9.565 : la table est fermée à la suppression directe. Ce secours passe par une
+      // fonction du serveur, sans jeton — un client qui se reconnecte n'a évidemment pas
+      // de mot de passe du personnel, et libérer un verrou d'appareil ne détruit rien.
+      try { await supabaseClient.rpc('liberer_session_unique', { p_compte_id: compte }); } catch(e2) {}
       const { error: e3 } = await supabaseClient.from('sessions_uniques').insert(ligne);
       try { addDebugLog(e3 ? ('APPAREIL (2e essai) : ' + e3.message) : 'APPAREIL : session reprise apres nettoyage'); } catch(e4) {}
       return;
@@ -12039,43 +12049,37 @@ function demanderCommentairePhoto(callback) {
   openModal('m-comment-photo');
 }
 
-// Purge automatique : les photos reçues sont supprimées 72h après leur envoi
-async function nettoyerPhotosSignalements() {
+// v9.565 : les trois nettoyages des vérifications sont devenus UNE fonction du serveur.
+// Ils s'exécutaient dans le navigateur de chaque visiteur ; c'était le travail du serveur,
+// et cela empêchait de fermer la table à qui possède la clef publique du site.
+// Les règles n'ont pas changé : photos de plus de 72 h, dix vérifications au plus par moto
+// (signalements comptés à part), signalements de motos retrouvées depuis 30 jours.
+// Une fois toutes les six heures par appareil : c'est du ménage, pas une urgence.
+async function purgerVerificationsServeur() {
   try {
-    const cutoff = new Date(Date.now() - 72*3600*1000).toISOString();
-    await supabaseClient.from('verifications').delete().eq('mode', 'photo').lt('date', cutoff);
-  } catch(e) { console.warn('nettoyerPhotosSignalements:', e && e.message); }
+    const cle = 'afri_derniere_purge_verifs';
+    const dernier = parseInt(localStorage.getItem(cle) || '0', 10) || 0;
+    if(Date.now() - dernier < 6*3600*1000) return;
+    localStorage.setItem(cle, String(Date.now()));
+    const { data } = await supabaseClient.rpc('purger_verifications');
+    if(data && data.ok) try { addDebugLog('PURGE vérifications : ' + (data.photos||0) +
+      ' photos, ' + (data.au_dela_de_dix||0) + ' au-delà de dix, ' + (data.retrouvees||0) +
+      ' retrouvées'); } catch(e) {}
+  } catch(e) { /* le ménage n'est jamais bloquant */ }
 }
 
-// Ne conserver que les 10 plus récentes par moto (vérifications ET signalements, comptés séparément)
-async function purgerVieillesVerifs(vehId) {
-  try {
-    const [{data: v1}, {data: v2}] = await Promise.all([
-      supabaseClient.from('verifications').select('id').eq('veh_id', vehId).neq('mode', 'signalement').neq('mode', 'photo')
-        .order('date', {ascending:false}).range(10, 200),
-      supabaseClient.from('verifications').select('id').eq('veh_id', vehId).eq('mode', 'signalement')
-        .order('date', {ascending:false}).range(10, 200),
-    ]);
-    const ids = [...(v1||[]), ...(v2||[])].map(x=>x.id);
-    if(ids.length) await supabaseClient.from('verifications').delete().in('id', ids);
-  } catch(e) { console.warn('purgerVieillesVerifs:', e && e.message); }
-}
+// Purge automatique : les photos reçues sont supprimées 72h après leur envoi
+async function nettoyerPhotosSignalements() { return purgerVerificationsServeur(); }
+
+// Ne conserver que les 10 plus récentes par moto (vérifications ET signalements, comptés
+// séparément). La règle est désormais appliquée par le serveur, pour toutes les motos à la
+// fois — plus besoin de la déclencher moto par moto.
+async function purgerVieillesVerifs(vehId) { return purgerVerificationsServeur(); }
 
 // Moto retrouvée : 30 jours après, les positions reçues (signalements) sont supprimées.
 // (Un signalement n'arrive que sur moto volée ; si la moto n'est plus volée et que le
 // signalement date de plus de 30 jours, il n'a plus d'utilité.)
-async function nettoyerSignalementsRetrouves() {
-  try {
-    const idsNonVolees = (DB.vehs||[]).filter(v => !v.stolen && v.statut !== 'vole').map(v => v.id);
-    if(!idsNonVolees.length) return;
-    const cutoff = new Date(Date.now() - 30*24*3600*1000).toISOString();
-    for(let i = 0; i < idsNonVolees.length; i += 100) {
-      await supabaseClient.from('verifications').delete()
-        .eq('mode', 'signalement').lt('date', cutoff)
-        .in('veh_id', idsNonVolees.slice(i, i + 100));
-    }
-  } catch(e) { console.warn('nettoyerSignalementsRetrouves:', e && e.message); }
-}
+async function nettoyerSignalementsRetrouves() { return purgerVerificationsServeur(); }
 const MODES_VERIF = {
   qr_externe: '📷 Scan QR (téléphone)',
   qr_camera:  '📷 Scan QR (caméra du site)',
@@ -17589,9 +17593,10 @@ function debloquerReservation(id) {
     // Supprimer de la liste noire locale
     DB.listeNoireReservations = DB.listeNoireReservations.filter(x => x.id !== id);
     
-    // Supprimer de Supabase
+    // Supprimer de Supabase — v9.565 : par le serveur, avec le jeton de l'administration.
     try {
-      supabaseClient.from('liste_noire_reservations').delete().eq('id', id).then(() => {
+      sbDeleteItem('liste_noire_reservations', id).then((ok) => {
+        if(!ok) { toast('⚠️ Déblocage refusé par le serveur', true); return; }
         toast('✅ Numéro débloqué');
         addDebugLog(`✅ Débloqué depuis admin: ${entry.telephone} / ${entry.email}`);
         rGestion(); // Refresh affichage
@@ -17608,9 +17613,9 @@ function removeFromBlacklist(id) {
   // 🔧 Auto-débloquage (à utiliser pour fonctionnalité future)
   DB.listeNoireReservations = DB.listeNoireReservations.filter(x => x.id !== id);
   
-  // 🔧 Sauvegarder dans Supabase
+  // 🔧 Sauvegarder dans Supabase — v9.565 : par le serveur, avec le jeton.
   try {
-    supabaseClient.from('liste_noire_reservations').delete().eq('id', id);
+    sbDeleteItem('liste_noire_reservations', id);
   } catch(e) {}
 }
 
