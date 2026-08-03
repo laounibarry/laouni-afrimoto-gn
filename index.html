@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.560';
+window.AFRIMOTO_VERSION = 'v9.561';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -6223,11 +6223,15 @@ async function doLogin() {
         try { addDebugLog('SESSION personnel ouverte (' + curRole + ')'); } catch(e) {}
       } else {
         window._jetonPersonnel = null;
+        // v9.561 : la raison s'affiche a l'ecran. Un echec silencieux nous a deja coute un
+        // aller-retour : le jeton n'etait pas delivre et rien ne le disait.
         try { addDebugLog('SESSION personnel refusee : ' + ((_s && _s.raison) || 'sans reponse')); } catch(e) {}
+        try { toast('⚠️ Session serveur refusée : ' + ((_s && _s.raison) || 'sans réponse'), true); } catch(e) {}
       }
     } catch(e) {
       window._jetonPersonnel = null;
       try { addDebugLog('SESSION personnel indisponible'); } catch(er) {}
+      try { toast('⚠️ Session serveur injoignable.', true); } catch(er) {}
     }
   }
   // v9.541 : les tables ne partent plus en entier. Il faut donc aller chercher la fiche et
