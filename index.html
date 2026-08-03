@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.559';
+window.AFRIMOTO_VERSION = 'v9.560';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -5823,6 +5823,13 @@ function saveSession(user) {
 }
 function clearSession() {
   try { localStorage.removeItem('afrimoto_session'); } catch(e) {}
+  // v9.560 : le jeton du personnel meurt avec la session. On le dit aussi au serveur, pour
+  // qu'il ne reste pas valable douze heures apres un depart.
+  try {
+    const j = window._jetonPersonnel;
+    window._jetonPersonnel = null;
+    if(j) supabaseClient.rpc('fermer_session_personnel', { p_jeton: j });
+  } catch(e) {}
 }
 function loadSession() {
   try {
@@ -6191,6 +6198,38 @@ async function doLogin() {
   loginAttempts = 0;
   DB.user = user;
   saveSession(user);
+
+  // ══ v9.560 — LE PERSONNEL RECOIT UNE PREUVE D'IDENTITE DU SERVEUR ══
+  //
+  // Le site se connecte a la base avec UNE SEULE clef, la meme pour tout le monde et
+  // lisible dans ce fichier. La base ne peut donc pas distinguer un administrateur d'un
+  // inconnu : c'est pour cela que les courses et les trajets restent supprimables par
+  // n'importe qui.
+  //
+  // Ici, le mot de passe qui vient d'etre accepte est represente une seconde fois AU
+  // SERVEUR, qui delivre en echange un jeton valable douze heures. Les operations
+  // dangereuses l'exigeront. Un inconnu, lui, ne l'a pas.
+  //
+  // Le jeton ne survit pas a la fermeture de l'onglet : il n'est pas ecrit sur le disque.
+  // C'est volontaire — un jeton retrouve dans le stockage du navigateur vaudrait un mot
+  // de passe.
+  if(curRole === 'admin' || curRole === 'agent' || curRole === 'sousagent') {
+    try {
+      const { data: _s } = await supabaseClient.rpc('ouvrir_session_personnel', {
+        p_role: curRole, p_identifiant: id, p_mot_de_passe: pw
+      });
+      if(_s && _s.ok === true && _s.jeton) {
+        window._jetonPersonnel = _s.jeton;
+        try { addDebugLog('SESSION personnel ouverte (' + curRole + ')'); } catch(e) {}
+      } else {
+        window._jetonPersonnel = null;
+        try { addDebugLog('SESSION personnel refusee : ' + ((_s && _s.raison) || 'sans reponse')); } catch(e) {}
+      }
+    } catch(e) {
+      window._jetonPersonnel = null;
+      try { addDebugLog('SESSION personnel indisponible'); } catch(er) {}
+    }
+  }
   // v9.541 : les tables ne partent plus en entier. Il faut donc aller chercher la fiche et
   // les vehicules de CETTE personne, sinon son espace s'ouvrirait vide.
   try { if(window.rechargerMesDonnees) await window.rechargerMesDonnees(user.role, user.id || user.vid); } catch(e) {}
