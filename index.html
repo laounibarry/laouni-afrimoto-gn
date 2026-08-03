@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.555';
+window.AFRIMOTO_VERSION = 'v9.556';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -14858,7 +14858,24 @@ async function ouvrirDossierLitige(type, id) {
     // Chaque ligne porte l'heure a la seconde et le nom de celui qui parle. Aucun tri, aucun
     // resume : l'ordre est celui du serveur, et rien n'est retire.
     ((d.messages && d.messages.length)
-      ? '<h2>5. Ce que les deux parties se sont écrit</h2>' +
+      // v9.556 : le titre porte le nombre de messages et l'heure du premier au dernier.
+      //
+      // Sans cela, deux conversations differentes se ressemblent : tout le monde appuie sur
+      // les memes phrases pretes, et les premieres lignes sont donc identiques d'un dossier
+      // a l'autre. On a failli conclure a un melange de donnees alors que le cloisonnement
+      // etait juste. Devant un juge, ce doute serait bien plus genant.
+      ? '<h2>5. Ce que les deux parties se sont écrit — ' + d.messages.length + ' message' +
+        (d.messages.length > 1 ? 's' : '') +
+        (function(){
+          const a = d.messages[0] && d.messages[0].quand ? new Date(d.messages[0].quand) : null;
+          const b = d.messages[d.messages.length-1] && d.messages[d.messages.length-1].quand
+                    ? new Date(d.messages[d.messages.length-1].quand) : null;
+          const hh = function(x){ return String(x.getHours()).padStart(2,'0') + ':' +
+                                         String(x.getMinutes()).padStart(2,'0') + ':' +
+                                         String(x.getSeconds()).padStart(2,'0'); };
+          if(!a || isNaN(a)) return '';
+          return ', de ' + hh(a) + (b && !isNaN(b) ? ' à ' + hh(b) : '');
+        })() + '</h2>' +
         '<table>' + d.messages.map(function(m){
           const h = m.quand ? new Date(m.quand) : null;
           const hh = (h && !isNaN(h)) ? (h.toLocaleDateString('fr-FR') + ' ' +
