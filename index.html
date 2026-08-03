@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.558';
+window.AFRIMOTO_VERSION = 'v9.559';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1266,7 +1266,6 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // Charger identifiant et mot de passe admin depuis Supabase
         if(cfg.admin_id) DB.adminId = cfg.admin_id;
         if(cfg.admin_pass_hash) DB.adminPass = cfg.admin_pass_hash;
-        if(cfg.admin_pass_clair) DB.adminPassClair = cfg.admin_pass_clair;
   }
 
   // ── Mappers : colonnes Supabase → objets JS attendus par le code ──
@@ -4038,8 +4037,8 @@ const TOUTES_DESTINATIONS = [...PREFECTURES_GN, ...VILLES_VOISINES];
 const DB = {
   user: null,
   adminId: 'LAOUNIBARRY',
-  adminPass: 'diami2014',
-  adminPassClair: 'diami2014',
+  // v9.559 : l'EMPREINTE, plus le mot de passe. Ce fichier est public.
+  adminPass: '1042063b3ffe4baa4773d3139273bcb25599c0cfc592471715cade9d6499478e',
   adminEmail: 'djoniwouri@gmail.com',
   adminNom: 'Barry',
   adminPrenom: 'Mamadou Bassirou',
@@ -4279,7 +4278,10 @@ async function connexionServeur(role, identifiant, motDePasse) {
 // Hache tous les mots de passe en clair au démarrage (données de démo incluses).
 // Après cet appel, DB ne contient plus aucun mot de passe lisible directement.
 async function hashAllPasswords() {
-  DB.adminPass = await hashPw(DB.adminPass);
+  // v9.559 : une empreinte fait 64 caracteres. La rehacher donnait une empreinte
+  // d'empreinte, que la connexion ne pouvait plus reconnaitre — d'ou la rustine du
+  // mot de passe en clair, ajoutee au lieu de corriger la cause.
+  if(DB.adminPass && String(DB.adminPass).length < 60) DB.adminPass = await hashPw(DB.adminPass);
   for(const a of DB.agents) a.pass = await hashPw(a.pass);
   for(const s of DB.sousAgents) s.pass = await hashPw(s.pass);
   for(const c of DB.clients) c.pass = await hashPw(c.pass);
@@ -5914,7 +5916,6 @@ async function doLogin() {
   let user = null;
 
   if(curRole==='admin' && nrm(id)===nrm(DB.adminId) && (
-    pw === DB.adminPassClair ||
     (await verifyPw(pw, DB.adminPass))
   )) {
     user = {role:'admin', name: (DB.adminPrenom||'Mamadou Bassirou') + ' ' + (DB.adminNom||'Barry')};
@@ -12667,8 +12668,7 @@ async function validerChangerMdp() {
   if(type==='passager')  obj = DB.passagers.find(p=>p.id===id);
   if(!obj){err.textContent='⚠️ Compte introuvable.';err.style.display='block';return;}
   // Vérifier ancien MDP
-  const ancienOk = obj.pass === DB.adminPassClair // cas admin
-    || await verifyPw(ancien, obj.pass);
+  const ancienOk = await verifyPw(ancien, obj.pass);
   if(!ancienOk){err.textContent='❌ Ancien mot de passe incorrect.';err.style.display='block';return;}
   // Sauvegarder nouveau
   obj.pass = await hashPw(nv);
@@ -21285,17 +21285,16 @@ async function changeMdpAdmin() {
     ' Notez bien ces informations avant de continuer — sans elles, vous perdrez l\'accès à cet espace.';
 
   askConfirm(messageConfirm, async () => {
-    if(newId) { DB.adminId = newId; DB.adminPassClair = DB.adminPassClair; }
+    if(newId) { DB.adminId = newId; }
     if(newEmail) DB.adminEmail = newEmail;
-    if(nv) { DB.adminPass = await hashPw(nv); DB.adminPassClair = nv; }
+    if(nv) { DB.adminPass = await hashPw(nv); }
     // Sauvegarder dans Supabase pour persister après rechargement
     try {
       await supabaseClient.from('config_admin').upsert({
         id: 1,
         admin_id: DB.adminId,
         admin_email: DB.adminEmail,
-        admin_pass_hash: DB.adminPass,
-        admin_pass_clair: DB.adminPassClair
+        admin_pass_hash: DB.adminPass
       });
     } catch(e) { console.warn('Sauvegarde admin:', e.message); }
     document.getElementById('mdp-admin-id').value = '';
@@ -24671,7 +24670,10 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   // toujours vraie — mais le mot de passe admin dependait de l'etat du registre, ce qui
   // n'a aucun sens. Le « if » est supprime.
 
-  DB.adminPass = await hashPw(DB.adminPass);
+  // v9.559 : une empreinte fait 64 caracteres. La rehacher donnait une empreinte
+  // d'empreinte, que la connexion ne pouvait plus reconnaitre — d'ou la rustine du
+  // mot de passe en clair, ajoutee au lieu de corriger la cause.
+  if(DB.adminPass && String(DB.adminPass).length < 60) DB.adminPass = await hashPw(DB.adminPass);
   // Hasher les mots de passe démo
   // Ne re-hasher que les mots de passe en clair (< 60 chars) — pas ceux déjà hashés par Supabase
   for(const a of DB.agents)     if(a.pass && a.pass.length < 60) a.pass = await hashPw(a.pass);
