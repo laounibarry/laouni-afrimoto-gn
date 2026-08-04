@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.572';
+window.AFRIMOTO_VERSION = 'v9.573';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -21263,8 +21263,33 @@ function rGestion() {
     // 'all' = pas de limite
     
     // 🎯 APPLIQUER FILTRES
+    // ══ v9.573 — QUATRE FILTRES SUR SIX NE TROUVAIENT RIEN ══
+    //
+    // Ils comparaient « m.type » a des valeurs qui n'existent nulle part dans les donnees :
+    //
+    //     'commission'  aucun mouvement n'a ce type
+    //     'frais'       aucun non plus
+    //     'trajets'     le type reel s'ecrit « trajet », au singulier — 687 lignes cachees
+    //     'rech_annule' « annule » n'est pas un type mais une case cochee
+    //
+    // Seuls « Tous » et « Recharges » fonctionnaient. Les autres affichaient « Aucun
+    // mouvement » en permanence, ce qui laissait croire qu'il n'y avait rien a voir.
+    //
+    // Les categories existent bel et bien, mais elles se lisent dans la DESTINATION et la
+    // DESCRIPTION, pas dans le type. Verifie sur vos donnees : 225 frais, 46 recharges,
+    // 20 commissions, 687 mouvements de trajet.
+    const _categorie = (m) => {
+      if(m.annule) return 'annules';
+      if(m.type === 'trajet') return 'trajets';
+      if(m.type !== 'rech') return 'autres';
+      const desc = nrm(m.desc || '');
+      if(desc.indexOf('frais') >= 0) return 'frais';
+      if(nrm(m.vers || '').indexOf('commission') >= 0) return 'commissions';
+      return 'recharges';
+    };
+
     let mouvementsFiltres = tousLesMovements.filter(m => {
-      const typeMatch = filterType === 'all' || m.type === filterType;
+      const typeMatch = filterType === 'all' || _categorie(m) === filterType;
       const periodMatch = filterPeriod === 'all' || new Date(m.date) >= dateLimit;
       const searchMatch = !filterSearch || 
         (m.de && m.de.toLowerCase().includes(filterSearch)) ||
@@ -21321,11 +21346,11 @@ function rGestion() {
       
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn${filterType === 'all' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'all'; rGestion()">📊 Tous</button>
-        <button class="btn${filterType === 'rech' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'rech'; rGestion()">💵 Recharges</button>
-        <button class="btn${filterType === 'commission' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'commission'; rGestion()">📈 Commissions</button>
+        <button class="btn${filterType === 'recharges' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'recharges'; rGestion()">💵 Recharges</button>
+        <button class="btn${filterType === 'commissions' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'commissions'; rGestion()">📈 Commissions</button>
         <button class="btn${filterType === 'frais' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'frais'; rGestion()">💳 Frais</button>
         <button class="btn${filterType === 'trajets' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'trajets'; rGestion()">🚗 Trajets</button>
-        <button class="btn${filterType === 'rech_annule' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'rech_annule'; rGestion()">❌ Annulés</button>
+        <button class="btn${filterType === 'annules' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'annules'; rGestion()">❌ Annulés</button>
       </div>
       
       <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
