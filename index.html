@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.568';
+window.AFRIMOTO_VERSION = 'v9.569';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -4973,7 +4973,7 @@ function envoyerCorbeille(listeOrigine, id, label, messageConfirm, apresSuppr) {
   askConfirm(messageConfirm, async () => {
     const item = DB[listeOrigine].find(x => x.id === id);
     if(!item) { toast('Élément introuvable', true); return; }
-    const tableMap = {agents:'agents',sousAgents:'sous_agents',clients:'clients',passagers:'passagers',vehs:'vehicules',taxis:'taxis',trajets:'trajets',annonces:'annonces',alertes:'alertes'};
+    const tableMap = {agents:'agents',sousAgents:'sous_agents',clients:'clients',passagers:'passagers',vehs:'vehicules',taxis:'taxis',trajets:'trajets',annonces:'annonces',alertes:'alertes',demandesCourse:'demandes_course'};
     
     addDebugLog('🗑️ SUPPRIMER: ' + label + ' (type: ' + listeOrigine + ')');
     
@@ -5055,7 +5055,8 @@ async function nettoyageAutoCorbeilleExpires() {
         'sousAgents': 'sous_agents',
         'trajets': 'trajets',
         'annonces': 'annonces',
-        'alertes': 'alertes'
+        'alertes': 'alertes',
+        'demandesCourse': 'demandes_course'   // v9.569 : manquait ici aussi
       };
       const tableName = tableMap[entree.listeOrigine];
       if(tableName) {
@@ -5228,17 +5229,29 @@ async function restaurerCorbeille(corbeilleId) {
     sbSaveConfig();
   }
   
-  const tableMap = {agents:'agents',sousAgents:'sous_agents',clients:'clients',passagers:'passagers',vehs:'vehicules',taxis:'taxis',trajets:'trajets',annonces:'annonces',alertes:'alertes'};
-  
+  const tableMap = {agents:'agents',sousAgents:'sous_agents',clients:'clients',passagers:'passagers',vehs:'vehicules',taxis:'taxis',trajets:'trajets',annonces:'annonces',alertes:'alertes',demandesCourse:'demandes_course'};
+
+  if(!Array.isArray(DB[entree.listeOrigine])) DB[entree.listeOrigine] = [];
   DB[entree.listeOrigine].unshift(entree.data);
-  
+
   addDebugLog('📝 Ajouté à DB.' + entree.listeOrigine + ' (' + DB[entree.listeOrigine].length + ' items)');
-  
+
   // 🔧 REMETTRE DANS SUPABASE AVEC AWAIT!
-  const sbFnMap = {agents:sbSaveAgent,sousAgents:sbSaveSousAgent,clients:sbSaveClient,passagers:sbSavePassager,vehs:sbSaveVehicule,taxis:sbSaveTaxi,trajets:sbSaveTrajet,annonces:sbSaveAnnonce,alertes:sbSaveAlerte};
+  // v9.569 : « demandesCourse » manquait dans cette liste. Une course restituée revenait
+  // donc à l'écran sans jamais être réécrite sur le serveur — elle disparaissait au
+  // rechargement suivant, et rien ne le signalait. La fonction d'enregistrement existait
+  // pourtant déjà ; elle n'était simplement pas branchée ici.
+  const sbFnMap = {agents:sbSaveAgent,sousAgents:sbSaveSousAgent,clients:sbSaveClient,passagers:sbSavePassager,vehs:sbSaveVehicule,taxis:sbSaveTaxi,trajets:sbSaveTrajet,annonces:sbSaveAnnonce,alertes:sbSaveAlerte,demandesCourse:sbSaveDemandeCourse};
   if(sbFnMap[entree.listeOrigine]) {
     await sbFnMap[entree.listeOrigine](entree.data);  // ✅ AWAIT!
     addDebugLog('💾 Sauvegardé dans Supabase');
+  } else {
+    // Une restitution qui ne réécrit rien ne doit PAS se présenter comme réussie. C'est
+    // exactement ce qui rendait l'anomalie invisible : l'élément revenait à l'écran, le
+    // message disait « Restauré », et le serveur n'avait rien reçu.
+    addDebugLog('❌ RESTAURATION : aucune fonction pour « ' + entree.listeOrigine + ' »');
+    toast('❌ Restitution impossible pour ce type (' + entree.listeOrigine + ') — rien n\'a été réécrit.', true);
+    return;
   }
   
   DB.corbeille = DB.corbeille.filter(c => c.id !== corbeilleId);
@@ -5266,7 +5279,8 @@ function supprimerDefinitivement(corbeilleId) {
         'sousAgents': 'sous_agents',
         'trajets': 'trajets',
         'annonces': 'annonces',
-        'alertes': 'alertes'
+        'alertes': 'alertes',
+        'demandesCourse': 'demandes_course'   // v9.569 : manquait ici aussi
       };
       const tableName = tableMap[entree.listeOrigine];
       if(tableName) {
