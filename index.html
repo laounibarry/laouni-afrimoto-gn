@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.575';
+window.AFRIMOTO_VERSION = 'v9.576';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1284,7 +1284,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photo:r.photo_url||r.photo||'', actif:r.actif!==false, code:r.code||r.num,
       peutValider:r.peut_valider||r.peutValider||false,
       peutVoirCourses:r.peut_voir_courses||r.peutVoirCourses||false,
-      email:r.email||'', created_at:r.created_at };
+      email:r.email||'', created_at:r.created_at,
+      // v9.576 : relecture de l'identite, desormais reellement enregistree.
+      dateNaissance:r.date_naissance||'', lieuNaissance:r.lieu_naissance||'',
+      profession:r.profession||'', nomPere:r.nom_pere||'', nomMere:r.nom_mere||'',
+      pieceType:r.piece_type||'', pieceNum:r.piece_num||'',
+      pieceDelivrance:r.piece_delivrance||'', pieceExpiration:r.piece_expiration||'',
+      piecePhoto:r.piece_photo||'', piecePhotoVerso:r.piece_photo_verso||'' };
   }
   function mapSousAgent(r) {
     return { id:r.id, num:r.num||r.code, name:r.nom||r.name, agId:r.agent_id||r.ag_id||r.agId,
@@ -1325,6 +1331,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photoProfil:r.photo_profil||r.photoProfil||r.photo_url||r.photo||'',
       photo:r.photo_profil||r.photo_url||r.photo||'',   // ancien nom, garde pour compatibilite
       photoPiece:r.photo_piece||r.photo_piece_url||r.photoPiece||'',
+      photoPieceVerso:r.photo_piece_verso||r.photo_piece_verso_url||'',   // v9.576
       valide:r.valide||false, consentement:r.consentement||false,
       dateConsentement:r.date_consentement||null, created_at:r.created_at };
   }
@@ -1346,6 +1353,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photoFacture:r.photo_facture_url||r.photoFacture||'',
       photoCG:r.photo_cg_url||r.photoCG||'',
       photoPiece:r.photo_piece_url||r.photoPiece||'',
+      photoPieceVerso:r.photo_piece_verso_url||r.photo_piece_verso||'',   // v9.576
       dateNaissance:r.date_naissance||r.dateNaissance||'',
       lieuNaissance:r.lieu_naissance||r.lieuNaissance||'',
       nationalite:r.nationalite||'',
@@ -1696,7 +1704,17 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       telephone:ag.tel||null, email:ag.email||null, solde:ag.solde||0,
       actif:ag.actif!==false, peut_valider:ag.peutValider||false,
       peut_voir_courses:ag.peutVoirCourses||false,
-      photo_url:ag.photo||null, pass_hash:ag.pass||null };
+      photo_url:ag.photo||null, pass_hash:ag.pass||null,
+      // ══ v9.576 — CES CHAMPS N'ETAIENT ENVOYES NULLE PART ══
+      // Le formulaire les demandait depuis toujours ; la fonction ne les transmettait pas
+      // et la table n'avait pas les colonnes. L'identite de l'agent — celui qui encaisse
+      // l'argent et enregistre les vehicules — vivait dans la memoire du navigateur et
+      // disparaissait au rechargement.
+      date_naissance:ag.dateNaissance||null, lieu_naissance:ag.lieuNaissance||null,
+      profession:ag.profession||null, nom_pere:ag.nomPere||null, nom_mere:ag.nomMere||null,
+      piece_type:ag.pieceType||null, piece_num:ag.pieceNum||null,
+      piece_delivrance:ag.pieceDelivrance||null, piece_expiration:ag.pieceExpiration||null,
+      piece_photo:ag.piecePhoto||null, piece_photo_verso:ag.piecePhotoVerso||null };
     const alts = { nom:'name', responsable:'resp', prefecture:'pref', adresse:'addr',
       ville:'city', telephone:'tel', photo_url:'photo' };
     await sbUpsertSouple('agents', row, alts);
@@ -1741,6 +1759,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       piece_identite:ps.piece||null,
       photo_profil:ps.photoProfil||ps.photo||null,
       photo_piece:ps.photoPiece||null,
+      photo_piece_verso:ps.photoPieceVerso||null,   // v9.576
       valide:ps.valide||false, consentement:ps.consentement||false,
       date_consentement:ps.dateConsentement||null,
       // v9.567 : les avertissements donnés à un passager n'étaient envoyés NULLE PART.
@@ -1790,6 +1809,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photo_facture_url:v.photoFacture||null,
       photo_cg_url:v.photoCG||null,
       photo_piece_url:v.photoPiece||null,
+      photo_piece_verso_url:v.photoPieceVerso||null,   // v9.576
       date_naissance:v.dateNaissance||null,
       lieu_naissance:v.lieuNaissance||null,
       date_enregistrement:v.reg||null,
@@ -2905,7 +2925,22 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           <input type="file" accept="image/*" id="insp-photo" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'insp-photo-prev','insp-photo-ph')"/>
         </label>
       </div>
-      <div style="font-size:10px;color:var(--text2);margin-top:5px">📸 Prenez une photo claire et lisible de votre carte d'identité ou passeport.</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:5px">📸 Le RECTO : la face avec votre photo.</div>
+    </div>
+    <!-- v9.576 : le VERSO est demandé lui aussi. Sur une CNI guinéenne, il porte la date et
+         le lieu de délivrance et la signature — un recto seul ne permet ni de vérifier la
+         pièce, ni de s'en servir devant un juge. -->
+    <div class="fld">
+      <div class="lbl">Photo de la pièce — VERSO *</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <img id="insp-photo-verso-prev" style="width:70px;height:70px;border-radius:10px;object-fit:cover;display:none;border:2px solid rgba(249,115,22,.3)"/>
+        <div id="insp-photo-verso-ph" style="width:70px;height:70px;border-radius:10px;background:rgba(0,0,0,.25);border:1px dashed rgba(249,115,22,.4);display:flex;align-items:center;justify-content:center;font-size:22px">🪪</div>
+        <label class="btn-ghost" style="padding:9px 14px;font-size:12px;cursor:pointer;position:relative;overflow:hidden">
+          📷 Ajouter le verso
+          <input type="file" accept="image/*" id="insp-photo-verso" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'insp-photo-verso-prev','insp-photo-verso-ph')"/>
+        </label>
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin-top:5px">📸 Le VERSO : la face avec la date de délivrance et la signature.</div>
     </div>
     <div class="fld">
       <div class="lbl">Photo de profil (votre visage) *</div>
@@ -3661,10 +3696,18 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       </div>
     </div>
     <div class="grid2" style="margin-bottom:12px">
-      <div><div class="lbl" id="mm-ppi-lbl">🪪 Pièce d'identité</div>
+      <div><div class="lbl" id="mm-ppi-lbl">🪪 Pièce d'identité — RECTO</div>
         <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
           <img id="mm-ppi" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-ppi-ph">📷</span>
           <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-ppi','mm-ppi-ph')"/>
+        </label>
+      </div>
+      <!-- v9.576 : le verso. Sur une CNI guinéenne il porte la date et le lieu de
+           délivrance et la signature — le recto seul ne permet pas de vérifier la pièce. -->
+      <div><div class="lbl" id="mm-ppiv-lbl">🪪 Pièce d'identité — VERSO</div>
+        <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+          <img id="mm-ppiv" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="mm-ppiv-ph">📷</span>
+          <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'mm-ppiv','mm-ppiv-ph')"/>
         </label>
       </div>
     </div>
@@ -5356,6 +5399,7 @@ async function soumettreInscriptionPassager() {
   const email = document.getElementById('insp-email').value.trim();
   const piece = document.getElementById('insp-piece').value.trim();
   const photoPiece = getPic('insp-photo-prev');
+  const photoPieceVerso = getPic('insp-photo-verso-prev');   // v9.576
   const photoProfil = getPic('insp-selfie-prev');
   const userLogin = document.getElementById('insp-user').value.trim();
   const pass = document.getElementById('insp-pass').value;
@@ -5415,6 +5459,10 @@ async function soumettreInscriptionPassager() {
   // d'identite dans l'emplacement prive, lisible seulement par l'administration.
   const _urlProfil = await televerserPhoto(photoProfil || '', 'photos', 'passagers/' + userLogin);
   const _urlPiece  = await televerserPhoto(photoPiece  || '', 'documents', 'pieces/' + userLogin);
+  // v9.576 : le verso suit le même chemin que le recto — emplacement privé, lisible par la
+  // seule administration.
+  const _urlPieceVerso = await televerserPhoto(photoPieceVerso || '', 'documents', 'pieces/' + userLogin + '-verso');
+  newPs.photoPieceVerso = _urlPieceVerso;
 
   // v9.519 : le SERVEUR cree le compte — unicite et numero unique compris.
   let sauvegardeOk = null;
@@ -5447,6 +5495,16 @@ async function soumettreInscriptionPassager() {
       // Le serveur a tranche : on adopte SON identifiant et SON numero.
       newPs.id = _rep.id; newPs.num = _rep.num; num = _rep.num;
       sauvegardeOk = true;
+      // v9.576 : la fonction serveur qui crée le compte ne connaît pas encore le verso.
+      // Plutôt que d'y toucher — elle contrôle l'unicité, c'est délicat — on complète la
+      // fiche juste après. Si cette écriture échoue, le compte existe quand même : mieux
+      // vaut un verso manquant qu'une inscription perdue.
+      if(_urlPieceVerso) {
+        try {
+          await supabaseClient.from('passagers')
+            .update({ photo_piece_verso: _urlPieceVerso }).eq('id', newPs.id);
+        } catch(e) { try { addDebugLog('VERSO passager non enregistré'); } catch(er) {} }
+      }
     }
   } catch(e) {
     try { addDebugLog('INSCRIPTION serveur erreur : ' + ((e && e.message) || e)); } catch(er) {}
@@ -13911,7 +13969,7 @@ function showVeh(id) {
     </div>
     ${v.photo?`<img src="${v.photo}" onclick="agrandirImg(this,'Photo du v\u00e9hicule \u2014 ${v.mat||v.num||''}')" style="width:100%;height:130px;object-fit:cover;border-radius:9px;margin-bottom:12px;cursor:pointer" title="Cliquer pour agrandir"/>`:''}
     ${v.photoP?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><img src="${v.photoP}" onclick="agrandirImg(this,'Photo du propri\u00e9taire \u2014 ${v.mat||v.num||''}')" style="width:56px;height:56px;object-fit:cover;border-radius:50%;border:2px solid rgba(249,115,22,.4);cursor:pointer" title="Cliquer pour agrandir"/><span style="font-size:12px;color:var(--text2)">Photo propriétaire</span></div>`:''}
-    ${(_peutVoirDocsVeh(v) && (v.photoFacture||v.photoCG||v.photoPiece))?`<div class="sect">📎 Documents</div>
+    ${(_peutVoirDocsVeh(v) && (v.photoFacture||v.photoCG||v.photoPiece||v.photoPieceVerso))?`<div class="sect">📎 Documents</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
       ${v.photoFacture?`<div style="text-align:center"><img src="${v.photoFacture}" onclick="agrandirImg(this,'Facture / attestation \u2014 ${v.mat||v.num||''}')" style="width:95px;height:70px;object-fit:cover;border-radius:8px;border:1.5px solid rgba(249,115,22,.35);cursor:pointer" title="Cliquer pour agrandir"/><div style="font-size:9px;color:var(--text2);margin-top:2px">🧾 Facture / Attestation</div></div>`:''}
       ${v.photoCG?`<div style="text-align:center"><img src="${v.photoCG}" onclick="agrandirImg(this,'Carte grise \u2014 ${v.mat||v.num||''}')" style="width:95px;height:70px;object-fit:cover;border-radius:8px;border:1.5px solid rgba(249,115,22,.35);cursor:pointer" title="Cliquer pour agrandir"/><div style="font-size:9px;color:var(--text2);margin-top:2px">📄 Carte grise</div></div>`:''}
@@ -14096,8 +14154,8 @@ function openAddMoto() {
   document.getElementById('mm-statut').value='actif';
   document.getElementById('merr').style.display='none';
   document.getElementById('mm-hist').innerHTML='';
-  ['mm-pp','mm-ppp','mm-pfa','mm-pcg','mm-ppi'].forEach(id=>{const e=document.getElementById(id);if(e){e.src='';e.style.display='none';}});
-  ['mm-pp-ph','mm-ppp-ph','mm-pfa-ph','mm-pcg-ph','mm-ppi-ph'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});
+  ['mm-pp','mm-ppp','mm-pfa','mm-pcg','mm-ppi','mm-ppiv'].forEach(id=>{const e=document.getElementById(id);if(e){e.src='';e.style.display='none';}});
+  ['mm-pp-ph','mm-ppp-ph','mm-pfa-ph','mm-pcg-ph','mm-ppi-ph','mm-ppiv-ph'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});
   setVehType('moto');
   const tsel = document.getElementById('mm-cat');
   tsel.innerHTML = DB.tarifs.map(t=>`<option value="${t.id}">${t.label} — ${fmt(t.prix)}</option>`).join('');
@@ -14436,7 +14494,8 @@ function docsProprioHtml(v) {
   const docs = [
     ['🧾 Facture', v.photoFacture],
     ['📄 Carte grise', v.photoCG],
-    ['🪪 Pièce d\'identité', v.photoPiece]
+    ['🪪 Pièce d\'identité — recto', v.photoPiece],
+    ["🪪 Pièce d'identité — verso", v.photoPieceVerso]   // v9.576
   ].filter(d => d[1]);
   if(!docs.length) return '';
   return '<div class="card" style="margin-bottom:14px">' +
@@ -14644,6 +14703,8 @@ async function saveMoto() {
     photoP:getPic('mm-ppp') || (_cltExistant ? ((DB.vehs.find(vx => vx.clientId === _cltExistant && vx.photoP)||{}).photoP || null) : null),
     photoFacture:getPic('mm-pfa'), photoCG:getPic('mm-pcg'),
     photoPiece:getPic('mm-ppi') || (_cltExistant ? ((DB.vehs.find(vx => vx.clientId === _cltExistant && vx.photoPiece)||{}).photoPiece || null) : null),
+    // v9.576 : le verso, repris de la fiche existante du proprietaire s'il en a deja une.
+    photoPieceVerso:getPic('mm-ppiv') || (_cltExistant ? ((DB.vehs.find(vx => vx.clientId === _cltExistant && vx.photoPieceVerso)||{}).photoPieceVerso || null) : null),
     nationalite:((document.getElementById('mm-nationalite')||{}).value||'').trim(),
     profession:((document.getElementById('mm-profession')||{}).value||'').trim(),
     nomPere:((document.getElementById('mm-nom-pere')||{}).value||'').trim(),
@@ -14681,6 +14742,7 @@ async function saveMoto() {
   newV.photo        = await televerserPhoto(newV.photo,        'photos',    'vehicules/' + newV.id);
   newV.photoP       = await televerserPhoto(newV.photoP,       'documents', 'proprietaires/' + newV.id);
   newV.photoPiece   = await televerserPhoto(newV.photoPiece,   'documents', 'pieces/' + newV.id);
+  newV.photoPieceVerso = await televerserPhoto(newV.photoPieceVerso || '', 'documents', 'pieces/' + newV.id + '-verso');
   newV.photoFacture = await televerserPhoto(newV.photoFacture, 'documents', 'factures/' + newV.id);
   newV.photoCG      = await televerserPhoto(newV.photoCG,      'documents', 'cartes-grises/' + newV.id);
 
@@ -22546,7 +22608,10 @@ function editPassager(id) {
     // avant la correction de l'enregistrement n'en ont aucune : sans ce champ, leur ⚠️
     // serait reste pour toujours.
     {key:'photoProfil',label:'Photo de profil (visage)',type:'photo',val:p.photoProfil||''},
-    {key:'photoPiece',label:"Photo de la pièce d'identité",type:'photo',rond:false,val:p.photoPiece||''}
+    {key:'photoPiece',label:"Pièce d'identité — RECTO",type:'photo',rond:false,val:p.photoPiece||''},
+    // v9.576 : le verso est modifiable comme le recto — sinon l'administration ne pourrait
+    // jamais completer une fiche ancienne, qui n'en a pas.
+    {key:'photoPieceVerso',label:"Pièce d'identité — VERSO",type:'photo',rond:false,val:p.photoPieceVerso||''}
   ], function(){
     p.prenom=ev('prenom')||p.prenom; p.nom=ev('nom')||p.nom;
     p.tel=ev('tel')||p.tel; p.email=ev('email')||p.email; p.piece=ev('piece')||p.piece;
@@ -22555,6 +22620,7 @@ function editPassager(id) {
     // Aucune nouvelle photo choisie : on garde celle d'avant plutot que de l'effacer.
     p.photoProfil = evPhoto('photoProfil') || p.photoProfil || '';
     p.photoPiece  = evPhoto('photoPiece')  || p.photoPiece  || '';
+    p.photoPieceVerso = evPhoto('photoPieceVerso') || p.photoPieceVerso || '';   // v9.576
     if(ev('pass')) { hashPw(ev('pass')).then(h => { p.pass=h; sbSavePassager(p); }); }
     else { sbSavePassager(p); } // AUDIT : les modifications n'étaient jamais persistées
     closeModal('m-edit'); rGestion(); toast('✅ Passager mis à jour');
@@ -22953,6 +23019,19 @@ document.addEventListener('DOMContentLoaded', () => {
           </label>
         </div>
       </div>
+      <!-- v9.576 : le verso. Un agent encaisse de l'argent et enregistre des vehicules :
+           sa piece doit etre au dossier en entier, comme celle d'un client. -->
+      <div class="fld">
+        <div class="lbl">Photo de la pièce — VERSO</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <img id="ag-piece-verso-preview" style="width:80px;height:56px;border-radius:8px;object-fit:cover;display:none;border:2px solid rgba(249,115,22,.3)"/>
+          <div id="ag-piece-verso-ph" style="width:80px;height:56px;border-radius:8px;background:rgba(0,0,0,.08);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:20px">🪪</div>
+          <label class="btn-ghost" style="padding:9px 14px;font-size:12px;cursor:pointer;position:relative;overflow:hidden">
+            📷 Ajouter le verso
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer" onchange="previewImg(this,'ag-piece-verso-preview','ag-piece-verso-ph')"/>
+          </label>
+        </div>
+      </div>
       <div class="fld"><div class="lbl">Mot de passe *</div><div style="display:flex;gap:8px"><input type="password" id="ag-pass" placeholder="••••••" style="flex:1"/><button class="btn-ghost" style="flex-shrink:0;padding:0 12px;font-size:18px" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'">👁️</button></div></div>
       <div class="info-gold" style="margin-bottom:10px">🔑 L'identifiant de connexion (AGT-XXX) sera généré automatiquement et affiché sur le QR code.</div>
       <div class="fld"><div class="lbl">Solde initial (GNF)</div><input type="number" id="ag-solde" placeholder="0"/></div>
@@ -23015,6 +23094,7 @@ async function saveAg() {
     pieceDelivrance: document.getElementById('ag-piece-delivrance').value||'',
     pieceExpiration: document.getElementById('ag-piece-expiration').value||'',
     piecePhoto: pieceImg && pieceImg.style.display!=='none' ? pieceImg.src : '',
+    piecePhotoVerso: getPic('ag-piece-verso-preview') || '',   // v9.576
     solde:parseInt(document.getElementById('ag-solde').value)||0,
     photo: photoImg.src,
     actif:true
