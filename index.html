@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.566';
+window.AFRIMOTO_VERSION = 'v9.567';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1134,6 +1134,14 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       //
       // Cette fonction va chercher UNIQUEMENT ce qui appartient a la personne qui vient
       // d'entrer. Elle est appelee juste apres la connexion.
+      // v9.567 : le personnel a besoin de TOUT, et le chargement complet ne se declenchait
+      // qu'au demarrage de la page. Consequence : en se connectant en admin, on arrivait
+      // dans un espace vide — la liste des vehicules et des clients n'avait jamais ete
+      // demandee, parce qu'au moment du chargement on n'etait encore personne. Il fallait
+      // recharger la page pour que la session enregistree soit lue. Cette fonction permet
+      // de refaire ce travail juste apres la connexion, sans que vous ayez a actualiser.
+      window.chargerDonneesCompletes = chargerDonnéesSupabase;
+
       window.rechargerMesDonnees = async function(role, id) {
         if(!id) return;
         try {
@@ -1735,6 +1743,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photo_piece:ps.photoPiece||null,
       valide:ps.valide||false, consentement:ps.consentement||false,
       date_consentement:ps.dateConsentement||null,
+      // v9.567 : les avertissements donnés à un passager n'étaient envoyés NULLE PART.
+      // Le compteur montait à l'écran, l'enregistrement ne le contenait pas, et aucune
+      // erreur ne le signalait — la colonne n'existait même pas côté serveur.
+      avertissements:ps.avertissements||0,
+      appreciations:ps.appreciations||0,
+      details_avertissements:ps.detailsAvertissements||[],
+      details_appreciations:ps.detailsAppreciations||[],
       pass_hash:ps.pass||null };  // ← CRUCIAL : le mot de passe n'était jamais sauvegardé → connexion impossible après rechargement
     // Replis pour les bases plus anciennes, dont les colonnes portaient d'autres noms.
     const alts = { telephone:'tel', user_login:'login', piece_identite:'piece',
@@ -2019,6 +2034,36 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 </script>
 </head>
 <body>
+
+<script>
+// v9.567 : au rechargement, on voyait l'espace public quelques secondes avant d'être ramené
+// dans le sien. Ce n'était pas une déconnexion : la page publique est simplement ce qui
+// s'affiche pendant que les données arrivent. Mais à l'écran, cela ressemble à une panne.
+// Si une session est enregistrée, on couvre l'écran le temps du chargement. Le voile est
+// retiré au moment où l'espace s'ouvre — et de toute façon au bout de 12 secondes, pour
+// qu'un incident réseau ne laisse jamais l'utilisateur devant un écran figé.
+(function() {
+  try {
+    if(!localStorage.getItem('afrimoto_session')) return;
+    var v = document.createElement('div');
+    v.id = 'voile-demarrage';
+    v.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#120d09;display:flex;' +
+      'flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#ff9d3c;' +
+      'font-family:system-ui,sans-serif';
+    v.innerHTML = '<div style="font-size:26px;font-weight:800">Laouni AfriMoto GN</div>' +
+      '<div style="color:#c9b8a8;font-size:14px">Ouverture de votre espace…</div>' +
+      '<div style="width:150px;height:3px;background:#3a2415;border-radius:2px;overflow:hidden">' +
+      '<div style="width:40%;height:100%;background:#e2610b;animation:_vd 1.1s ease-in-out infinite"></div></div>' +
+      '<style>@keyframes _vd{0%{margin-left:-40%}100%{margin-left:100%}}</style>';
+    document.body.appendChild(v);
+    window._retirerVoile = function() {
+      var e = document.getElementById('voile-demarrage');
+      if(e) { e.style.transition = 'opacity .25s'; e.style.opacity = '0'; setTimeout(function(){ try { e.remove(); } catch(x) {} }, 260); }
+    };
+    setTimeout(window._retirerVoile, 12000);
+  } catch(e) {}
+})();
+</script>
 
 <div id="toast" class="toast"></div>
 
@@ -6455,7 +6500,17 @@ async function doLogin() {
   }
   // v9.541 : les tables ne partent plus en entier. Il faut donc aller chercher la fiche et
   // les vehicules de CETTE personne, sinon son espace s'ouvrirait vide.
-  try { if(window.rechargerMesDonnees) await window.rechargerMesDonnees(user.role, user.id || user.vid); } catch(e) {}
+  // v9.567 : pour le personnel, ce n'est pas SA fiche qu'il faut mais TOUT le registre.
+  // Sans cela l'espace admin s'ouvrait sans une seule moto, et il fallait actualiser la
+  // page pour que la session enregistrée soit relue. On refait donc le chargement complet
+  // ici, une fois que l'on sait qui vient d'entrer.
+  try {
+    if(['admin','agent','sousagent'].includes(user.role)) {
+      if(window.chargerDonneesCompletes) await window.chargerDonneesCompletes();
+    } else if(window.rechargerMesDonnees) {
+      await window.rechargerMesDonnees(user.role, user.id || user.vid);
+    }
+  } catch(e) { try { addDebugLog('RECHARGEMENT apres connexion : ' + ((e && e.message) || e)); } catch(er) {} }
   window._derniereConnexionExplicite = Date.now(); // v9.457 : la DERNIERE connexion gagne
   prendreSessionUnique(user); // v9.348 : cet appareil devient le seul connecte
   synchroniserAbonnementPush(); // v9.350 : les canaux suivent le compte qui vient d'ouvrir
@@ -25139,6 +25194,8 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   await verifierRetourOM();
   goPage(pageDepart);
   updateNav();
+  // v9.567 : l'espace est ouvert et rempli — on peut retirer le voile de démarrage.
+  try { if(window._retirerVoile) window._retirerVoile(); } catch(e) {}
 })();
 
 async function adminAvertirChauffeur(id,nom){
@@ -25353,8 +25410,11 @@ function avertirChauffeur(chauffeurId, nom) {
     
     supabaseClient.from('clients').update({ 
       avertissements: cl.avertissements,
-      detailsAvertissements: cl.detailsAvertissements
-    }).eq('id', cl.id).then(async () => {
+      details_avertissements: cl.detailsAvertissements
+    }).eq('id', cl.id).then(async (_r) => {
+      // v9.567 : on regarde enfin si le serveur a accepte. Avant, l'e-mail partait et le
+      // message « enregistre » s'affichait meme quand la base avait tout refuse.
+      if(_r && _r.error) { toast('❌ Non enregistré : ' + _r.error.message, true); return; }
       logMvt('avertissement', '⚠️ Vous avez reçu un avertissement', 0, '', cl.tel);
       await _envoyerEmailAvertissement(cl, 'Violation des règles de la plateforme Laouni AfriMoto GN');
       toast('⚠️ ' + nom + ' a reçu un avertissement (email envoyé)');
@@ -25384,8 +25444,11 @@ function avertirChauffeurParNom(nom) {
     
     supabaseClient.from('clients').update({ 
       avertissements: cl.avertissements,
-      detailsAvertissements: cl.detailsAvertissements
-    }).eq('id', cl.id).then(async () => {
+      details_avertissements: cl.detailsAvertissements
+    }).eq('id', cl.id).then(async (_r) => {
+      // v9.567 : on regarde enfin si le serveur a accepte. Avant, l'e-mail partait et le
+      // message « enregistre » s'affichait meme quand la base avait tout refuse.
+      if(_r && _r.error) { toast('❌ Non enregistré : ' + _r.error.message, true); return; }
       logMvt('avertissement', '⚠️ Vous avez reçu un avertissement', 0, '', cl.tel);
       await _envoyerEmailAvertissement(cl, 'Violation des règles de la plateforme Laouni AfriMoto GN');
       toast('⚠️ ' + nom + ' a reçu un avertissement (email envoyé)');
@@ -25415,8 +25478,11 @@ function suspendreChauffeur(chauffeurId, nom) {
     
     supabaseClient.from('clients').update({ 
       suspendu: true,
-      detailsAvertissements: cl.detailsAvertissements
-    }).eq('id', cl.id).then(async () => {
+      details_avertissements: cl.detailsAvertissements
+    }).eq('id', cl.id).then(async (_r) => {
+      // v9.567 : on regarde enfin si le serveur a accepte. Avant, l'e-mail partait et le
+      // message « enregistre » s'affichait meme quand la base avait tout refuse.
+      if(_r && _r.error) { toast('❌ Non enregistré : ' + _r.error.message, true); return; }
       logMvt('suspension', '⛔ Votre compte a été suspendu. Vous ne pouvez plus publier de trajets.', 0, '', cl.tel);
       await _envoyerEmailSuspension(cl);
       toast('⛔ ' + nom + ' a été suspendu (email envoyé)');
@@ -25446,8 +25512,11 @@ function suspendreChauffeurParNom(nom) {
     
     supabaseClient.from('clients').update({ 
       suspendu: true,
-      detailsAvertissements: cl.detailsAvertissements
-    }).eq('id', cl.id).then(async () => {
+      details_avertissements: cl.detailsAvertissements
+    }).eq('id', cl.id).then(async (_r) => {
+      // v9.567 : on regarde enfin si le serveur a accepte. Avant, l'e-mail partait et le
+      // message « enregistre » s'affichait meme quand la base avait tout refuse.
+      if(_r && _r.error) { toast('❌ Non enregistré : ' + _r.error.message, true); return; }
       logMvt('suspension', '⛔ Votre compte a été suspendu. Vous ne pouvez plus publier de trajets.', 0, '', cl.tel);
       await _envoyerEmailSuspension(cl);
       toast('⛔ ' + nom + ' a été suspendu (email envoyé)');
@@ -25477,8 +25546,11 @@ function apprecierChauffeur(chauffeurId, nom) {
     
     supabaseClient.from('clients').update({ 
       appreciations: cl.appreciations,
-      detailsAppreciations: cl.detailsAppreciations
-    }).eq('id', cl.id).then(async () => {
+      details_appreciations: cl.detailsAppreciations
+    }).eq('id', cl.id).then(async (_r) => {
+      // v9.567 : on regarde enfin si le serveur a accepte. Avant, l'e-mail partait et le
+      // message « enregistre » s'affichait meme quand la base avait tout refuse.
+      if(_r && _r.error) { toast('❌ Non enregistré : ' + _r.error.message, true); return; }
       logMvt('appreciation', '👍 Vous avez reçu une appréciation', 0, '', cl.tel);
       await _envoyerEmailAppreciation(cl);
       toast('👍 ' + nom + ' a reçu une appréciation (email envoyé)');
