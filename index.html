@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.573';
+window.AFRIMOTO_VERSION = 'v9.574';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -20224,6 +20224,40 @@ window._tresoJours = window._tresoJours || 30;
 
 function choisirPeriodeTresorerie(j){ window._tresoJours = j; if(typeof rGestion==='function') rGestion(); }
 
+// ══ v9.574 — LES TOTAUX DE « TRANSFERTS (DÉTAIL) » VIENNENT DU SERVEUR ══
+//
+// Ils étaient additionnés sur le téléphone, à partir des 90 derniers jours gardés en
+// mémoire. En choisissant « 1 an » ou « Tout », l'écran affichait donc un total incomplet
+// — sans le dire. Un chiffre absent se remarque ; un chiffre faux se recopie.
+//
+// Le serveur applique EXACTEMENT les mêmes règles de catégorie que la liste, pour que le
+// total et les lignes ne puissent pas se contredire.
+async function chargerTotauxMouvements() {
+  const zoneC = document.getElementById('mvt-credits');
+  if(!zoneC) return; // l'utilisateur a quitté l'écran entre-temps
+  const jours = { '7j':7, '30j':30, '90j':90, '1y':365, 'all':0 }[window._mvtFilterPeriod || '30j'];
+  const cat   = window._mvtFilterType || 'all';
+  const mettre = (id, txt) => { const e = document.getElementById(id); if(e) e.textContent = txt; };
+  try {
+    const { data, error } = await supabaseClient.rpc('totaux_mouvements',
+      { p_jours: jours, p_categorie: cat });
+    if(error || !data || data.ok !== true) throw new Error(error ? error.message : 'sans réponse');
+    const net = Number(data.net) || 0;
+    mettre('mvt-credits', fmt(Number(data.credits) || 0));
+    mettre('mvt-debits',  fmt(Math.abs(Number(data.debits) || 0)));
+    mettre('mvt-net',     (net >= 0 ? '+' : '') + fmt(net));
+    mettre('mvt-total',   String(data.total || 0));
+    const e = document.getElementById('mvt-net');
+    if(e) e.style.color = net >= 0 ? '#22C55E' : '#EF4444';
+    mettre('mvt-portee', 'Totaux calculés par le serveur, sur la totalité du registre.');
+  } catch(err) {
+    // On n'invente pas un chiffre de remplacement. Un total faux sur un écran de comptes
+    // est plus dangereux qu'un total absent.
+    ['mvt-credits','mvt-debits','mvt-net','mvt-total'].forEach(id => mettre(id, '—'));
+    mettre('mvt-portee', '⚠️ Totaux indisponibles — exécutez totaux-mouvements.sql dans Supabase.');
+  }
+}
+
 async function chargerTresorerie(){
   const zone = document.getElementById('treso-corps');
   if(!zone) return;
@@ -21246,6 +21280,8 @@ function rGestion() {
     }
 
   } else if(gestTab==='historique-complet') {
+    // v9.574 : les quatre totaux du haut sont demandés au serveur, une fois l'écran dessiné.
+    setTimeout(chargerTotauxMouvements, 0);
     // 💳 DASHBOARD FINANCIER ULTRA INTELLIGENT
     const tousLesMovements = (DB.mouvements || []).sort((a,b) => new Date(b.date) - new Date(a.date));
     
@@ -21321,21 +21357,22 @@ function rGestion() {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px">
           <div style="background:rgba(34,197,94,.15);border-radius:8px;padding:10px;text-align:center">
             <div style="font-size:11px;color:var(--text2);margin-bottom:4px">💰 CRÉDITS</div>
-            <div style="font-size:16px;font-weight:900;color:#22C55E">${fmt(stats.totalCredit)}</div>
+            <div id="mvt-credits" style="font-size:16px;font-weight:900;color:#22C55E">…</div>
           </div>
           <div style="background:rgba(239,68,68,.15);border-radius:8px;padding:10px;text-align:center">
             <div style="font-size:11px;color:var(--text2);margin-bottom:4px">💸 DÉBITS</div>
-            <div style="font-size:16px;font-weight:900;color:#EF4444">${fmt(Math.abs(stats.totalDebit))}</div>
+            <div id="mvt-debits" style="font-size:16px;font-weight:900;color:#EF4444">…</div>
           </div>
           <div style="background:rgba(251,191,36,.15);border-radius:8px;padding:10px;text-align:center">
             <div style="font-size:11px;color:var(--text2);margin-bottom:4px">⚖️ NET</div>
-            <div style="font-size:16px;font-weight:900;color:${stats.netChange >= 0 ? '#22C55E' : '#EF4444'}">${stats.netChange >= 0 ? '+' : ''}${fmt(stats.netChange)}</div>
+            <div id="mvt-net" style="font-size:16px;font-weight:900;color:#22C55E">…</div>
           </div>
           <div style="background:rgba(59,130,246,.15);border-radius:8px;padding:10px;text-align:center">
             <div style="font-size:11px;color:var(--text2);margin-bottom:4px">📊 TOTAL</div>
-            <div style="font-size:16px;font-weight:900;color:#3B82F6">${stats.total}</div>
+            <div id="mvt-total" style="font-size:16px;font-weight:900;color:#3B82F6">…</div>
           </div>
         </div>
+        <div id="mvt-portee" style="font-size:10px;color:var(--text2);text-align:center"></div>
       </div>
       
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -21361,7 +21398,11 @@ function rGestion() {
         <button class="btn${filterPeriod === 'all' ? '' : '-ghost'}" style="font-size:10px;padding:6px 10px" onclick="window._mvtFilterPeriod = 'all'; rGestion()">Tout</button>
       </div>
       
-      <div class="sect" style="margin-top:0;margin-bottom:8px">📋 Détails (${mouvementsFiltres.length})</div>
+      ${/* v9.574 : ce compte est celui des lignes AFFICHABLES ici (90 derniers jours gardés
+            en mémoire). Il peut être inférieur au TOTAL du haut, qui vient du serveur et
+            couvre tout le registre. On le dit, plutôt que de laisser deux chiffres se
+            contredire en silence. */''}
+      <div class="sect" style="margin-top:0;margin-bottom:8px">📋 Détails (${mouvementsFiltres.length} affichés)</div>
     `;
     
     // ❌ SI PAS DE MOUVEMENTS
