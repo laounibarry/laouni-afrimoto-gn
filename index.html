@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.574';
+window.AFRIMOTO_VERSION = 'v9.575';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2691,13 +2691,18 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     </div>
     <div id="dt-moto-info" class="info" style="margin-bottom:14px"></div>
 
-    <div class="sect" style="margin-top:0">Photo de profil conducteur</div>
+    <!-- v9.575 : SELFIE OBLIGATOIRE, LA GALERIE N'EST PLUS PROPOSÉE.
+         Un conducteur pouvait choisir n'importe quelle image du téléphone comme photo de
+         profil. C'est celle que le passager voit pour reconnaître qui vient le chercher —
+         et celle qui figure au dossier de litige. Une photo prise sur le moment est la
+         seule qui prouve quelque chose. Même règle que l'inscription passager. -->
+    <div class="sect" style="margin-top:0">Photo de profil conducteur (selfie)</div>
     <label id="dt-photo-label" style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(239,68,68,.5);border-radius:50%;width:90px;height:90px;cursor:pointer;overflow:hidden;margin:0 auto 14px;background:rgba(239,68,68,.04);position:relative">
       <img id="dt-photo-preview" src="" style="display:none;width:100%;height:100%;object-fit:cover"/>
-      <div id="dt-photo-ph" style="text-align:center;font-size:10px;color:#9CA3AF;font-weight:600;padding:8px">📷<br>Photo</div>
-      <input type="file" accept="image/*" id="dt-photo-input" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer" onchange="previewDtPhoto(this)"/>
+      <div id="dt-photo-ph" style="text-align:center;font-size:10px;color:#9CA3AF;font-weight:600;padding:8px">🤳<br>Selfie</div>
+      <input type="file" accept="image/*" capture="user" id="dt-photo-input" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer" onchange="previewDtPhoto(this)"/>
     </label>
-    <div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:14px">Si vide, la photo de la moto sera utilisée</div>
+    <div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:14px">🤳 Selfie pris sur le moment — la galerie n'est pas proposée. C'est cette photo que le passager voit pour vous reconnaître.</div>
 
     <div class="fld" id="dt-bloc-gilet"><div class="lbl">Num&eacute;ro de gilet *</div><input type="text" id="dt-gilet" placeholder="Ex: 0124"/></div>
     <div class="fld" id="dt-bloc-places" style="display:none"><div class="lbl">Nombre de places passagers *</div>
