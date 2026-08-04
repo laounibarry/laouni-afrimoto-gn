@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.569';
+window.AFRIMOTO_VERSION = 'v9.570';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -20086,6 +20086,38 @@ const _ECRANS_DIRECT = {
   }}
 };
 
+// v9.570 : quelle liste locale, et quel convertisseur, pour chaque table.
+// Sert a l'ecran « Suppression en masse », dont la table depend du registre choisi dans le
+// menu. Une course restituee doit reapparaitre la SANS actualiser — c'est precisement
+// l'ecran ou l'on constate qu'elle est revenue.
+const _LISTES_PAR_TABLE = {
+  clients:         function() { return [DB.clients,        mapClient]; },
+  vehicules:       function() { return [DB.vehs,           mapVehicule]; },
+  taxis:           function() { return [DB.taxis,          mapTaxi]; },
+  trajets:         function() { return [DB.trajets,        mapTrajet]; },
+  demandes_course: function() { return [DB.demandesCourse, mapDemandeCourse]; },
+  annonces:        function() { return [DB.annonces,       mapAnnonce]; },
+  passagers:       function() { return [DB.passagers,      mapPassager]; },
+  mouvements:      function() { return [DB.mouvements,     mapMouvement]; },
+  corbeille:       function() { return [DB.corbeille,      mapCorbeille]; }
+};
+
+function _brancherEcranSuppression() {
+  const cfg = REGISTRES_SUPPR[window._supprType || 'courses'] || REGISTRES_SUPPR.courses;
+  const source = _LISTES_PAR_TABLE[cfg.table];
+  if(!source) return;
+  // Le nom du canal porte la table : changer de registre rebranche automatiquement.
+  _abonnerEcran('gest-suppression-' + cfg.table,
+    { event: '*', schema: 'public', table: cfg.table },
+    function(p) {
+      try {
+        const s = source();
+        _appliquerChangement(s[0], p, s[1]);
+      } catch(e) { return; }
+      if(gestTab === 'suppression' && typeof rGestion === 'function') rGestion();
+    });
+}
+
 function _brancherEcranGestion(onglet) {
   const cfg = _ECRANS_DIRECT[onglet];
   if(!cfg) return;
@@ -20327,6 +20359,7 @@ function rGestion() {
   // couvre tous les chemins — retour en arriere, ouverture directe, rechargement.
   // _abonnerEcran ne fait rien si le canal est deja celui-ci.
   if(gestTab === 'journal') _brancherJournalAcces();
+  else if(gestTab === 'suppression') _brancherEcranSuppression();
   else if(_ECRANS_DIRECT[gestTab]) _brancherEcranGestion(gestTab);
   else if(window._canalEcran && window._canalEcran.nom &&
           (window._canalEcran.nom === 'journal' ||
@@ -21976,8 +22009,16 @@ const REGISTRES_SUPPR = {
                label:x=>((x.mat||x.vin||'?').toUpperCase())+' · '+(x.owner||''), date:x=>x.created_at||x.reg||'' },
   passagers: { liste:'passagers',      table:'passagers',       corbeille:true,  nom:'passagers',
                label:x=>((x.prenom||'')+' '+(x.nom||'')).trim()+' · '+(x.num||''), date:x=>x.created_at||x.dateInscription||'' },
-  taxis:     { liste:'taxis',          table:'taxis',           corbeille:true,  nom:'taxis',
+  // v9.570 : la table « taxis » contient les DEUX métiers — 18 motos et 2 voitures
+  // aujourd'hui. Les mélanger dans un seul registre obligeait à faire le tri à l'œil avant
+  // une suppression en masse, sur un écran où l'on coche « tout sélectionner ». On les
+  // sépare : c'est ainsi que vous les distinguez, et c'est ce que l'écran doit montrer.
+  taxis:     { liste:'taxis',          table:'taxis',           corbeille:true,  nom:'taxis moto',
+               filtre:x=>(x.typeVehicule||x.type_vehicule||'moto') !== 'voiture',
                label:x=>(x.nom||'?')+' · '+(x.plaque||'')+' · Gilet '+(x.gilet||'?'), date:x=>x.created_at||x.reg||'' },
+  taxisVtc:  { liste:'taxis',          table:'taxis',           corbeille:true,  nom:'taxis VTC',
+               filtre:x=>(x.typeVehicule||x.type_vehicule||'moto') === 'voiture',
+               label:x=>(x.nom||'?')+' · '+(x.plaque||'')+' · '+((x.marque||'')+' '+(x.modele||'')).trim(), date:x=>x.created_at||x.reg||'' },
   trajets:   { liste:'trajets',        table:'trajets',         corbeille:true,  nom:'trajets',
                label:x=>(x.depart||'?')+' → '+(x.arrivee||'?')+(x.date?' · '+x.date:''), date:x=>x.created_at||x.date||'' },
   courses:   { liste:'demandesCourse', table:'demandes_course', corbeille:true, nom:'courses',
@@ -21997,6 +22038,8 @@ function _itemsSupprFiltres() {
   const d2 = (document.getElementById('suppr-d2')||{}).value || '';
   const cfg = REGISTRES_SUPPR[type] || REGISTRES_SUPPR.courses;
   let items = (DB[cfg.liste]||[]).slice();
+  // v9.570 : deux registres peuvent partager la même table (taxis moto / taxis VTC).
+  if(typeof cfg.filtre === 'function') items = items.filter(cfg.filtre);
   if(d1) items = items.filter(x => { const d = String(cfg.date(x)||''); return d && d.slice(0,10) >= d1; });
   if(d2) items = items.filter(x => { const d = String(cfg.date(x)||''); return d && d.slice(0,10) <= d2; });
   return { type, cfg, items, d1, d2 };
@@ -22008,7 +22051,10 @@ function rSuppressionMasse() {
   window._supprType = type;
   const idsVisibles = new Set(items.map(x => x.id));
   supprSel = new Set([...supprSel].filter(id => idsVisibles.has(id)));
-  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🏍️ Taxi moto',taxis:'🏍️ Taxi moto',trajets:'🚙 Voyager',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
+  // v9.570 : « passagers » portait le libellé « Taxi moto ». Deux lignes identiques dans la
+  // liste, et la troisième désignait en réalité les passagers — sur un écran de suppression
+  // en masse, se tromper de registre efface les mauvaises personnes.
+  const opts = {clients:'👤 Clients',vehs:'🏍️ Motos & voitures',passagers:'🧍 Passagers',taxis:'🏍️ Taxi moto',taxisVtc:'🚗 Taxi VTC',trajets:'🚙 Voyager',courses:'📍 Courses',annonces:'🏷️ Annonces',historique:'📜 Historique (mouvements)',corbeille:'🗑️ Corbeille'};
   return '<div class="card">' +
     '<div class="sect" style="margin-top:0">🧹 Suppression en masse — Admin</div>' +
     '<div class="grid2" style="margin-bottom:8px">' +
