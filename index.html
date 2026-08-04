@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.570';
+window.AFRIMOTO_VERSION = 'v9.571';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -8532,7 +8532,7 @@ function confirmerDemandeCourse() {
     // v9.539 : la commission du passager arrive au compte de la societe.
     mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Commission course')
       .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
-    logMvt('rech', '🚕 Commission course taxi — ' + ps.prenom + ' ' + ps.nom + ' → ' + t.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {cibleType:'passager',cibleId:ps.id});
+    logMvt('rech', '🚕 Commission course taxi — ' + ps.prenom + ' ' + ps.nom + ' → ' + t.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {sourceType:'passager',sourceId:ps.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
   }
   const _nvDemande = {
     id: gid(), taxiId: t.id, taxiNom: t.nom, taxiPlaque: t.plaque,
@@ -8657,7 +8657,7 @@ function demarrerRechercheAutomatique(commissionDejaPayee) {
   if(!dejaPayee && !_commissionAuTaxi()) { // v9.366
     mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Frais de recherche')
       .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
-    logMvt('rech', '🚕 Frais de recherche course taxi — ' + ps.prenom + ' ' + ps.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {cibleType:'passager',cibleId:ps.id});
+    logMvt('rech', '🚕 Frais de recherche course taxi — ' + ps.prenom + ' ' + ps.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {sourceType:'passager',sourceId:ps.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
   }
 
   // v9.381 : le point de prise en charge est fige pour toute la recherche.
@@ -9335,7 +9335,7 @@ async function debiterTaxiCommission(demande) {
   }
   const nom = cl ? ((cl.prenom || '') + ' ' + (cl.nom || '')).trim() : (demande.taxiNom || '');
   logMvt('rech', '\ud83c\udfcd\ufe0f Commission course taxi \u2014 ' + (demande.taxiNom || nom), m,
-    nom, 'Soci\u00e9t\u00e9 (commission)', { cibleType: 'client', cibleId: cl ? cl.id : null });
+    nom, 'Soci\u00e9t\u00e9 (commission)', { sourceType: 'client', sourceId: cl ? cl.id : null, cibleType: 'societe' }); // v9.571 : le payeur est la SOURCE, pas la cible.
   try { addDebugLog('COMMISSION : ' + m + ' pr\u00e9lev\u00e9s au chauffeur'); } catch(e) {}
 }
 
@@ -17478,7 +17478,7 @@ async function _publierTrajetDefinitif() {
       // v9.539 : les frais arrivent au compte de la societe au lieu de disparaitre.
       const _f1 = await mouvementSolde('client', cl.id, 'societe', 'societe', fraisInfo.montant, 'Publication trajet');
       if(_f1 !== true) { cl.solde -= fraisInfo.montant; await sbSaveClient(cl); }
-      logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,fraisInfo.montant,cl.prenom+' '+cl.nom,'Système',{cibleType:'client',cibleId:cl.id});
+      logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,fraisInfo.montant,cl.prenom+' '+cl.nom,'Système',{sourceType:'client',sourceId:cl.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
     }
   }
 
@@ -19454,7 +19454,7 @@ function saveAnnonce() {
       if(cl.solde < frais) { err.textContent='⚠️ Solde insuffisant (frais requis : '+fmt(frais)+').'; err.style.display='block'; return; }
       mouvementSolde('client', cl.id, 'societe', 'societe', frais, 'Publication annonce')
         .then(function(f){ if(f !== true) { cl.solde -= frais; sbSaveClient(cl); } });
-      logMvt('rech','Publication annonce vente — '+cl.prenom+' '+cl.nom,frais,cl.prenom+' '+cl.nom,'Système',{cibleType:'client',cibleId:cl.id});
+      logMvt('rech','Publication annonce vente — '+cl.prenom+' '+cl.nom,frais,cl.prenom+' '+cl.nom,'Système',{sourceType:'client',sourceId:cl.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
     }
   }
 
@@ -21192,7 +21192,12 @@ function rGestion() {
     html = '<div class="sect" style="margin-top:0">\ud83d\udcb5 Transferts et recharges (' + _tr.length + ')</div>' +
       '<div class="qr-note-txt" style="font-size:11px;margin-bottom:14px">' +
         'Total en circulation : <b>' + fmt(_total) + '</b> sur ' + _actifs.length + ' transfert(s) valide(s). ' +
-        'Annuler un transfert <b>d\u00e9bite le b\u00e9n\u00e9ficiaire et recr\u00e9dite l\'exp\u00e9diteur</b> : l\'op\u00e9ration est enti\u00e8rement invers\u00e9e.' +
+        'Annuler un transfert <b>d\u00e9bite le b\u00e9n\u00e9ficiaire et recr\u00e9dite l\'exp\u00e9diteur</b> : l\'op\u00e9ration est enti\u00e8rement invers\u00e9e. ' +
+        // v9.571 : dit explicitement ce qui n'est PAS annulable, plut\u00f4t que de laisser
+        // croire que tout l'est. Les frais vers\u00e9s \u00e0 la soci\u00e9t\u00e9 se remboursent par le
+        // remboursement automatique, pas par ce bouton.
+        '<b style="color:#EAB308">Les frais et commissions vers\u00e9s \u00e0 la soci\u00e9t\u00e9 ne sont pas annulables ici</b> \u2014 ' +
+        'la soci\u00e9t\u00e9 n\'est pas un compte de l\'application, il n\'y aurait personne \u00e0 recr\u00e9diter.' +
       '</div>';
 
     // v9.546 : l'application ne garde en memoire que les 90 derniers jours. Quand on
@@ -21225,8 +21230,13 @@ function rGestion() {
             '</div>' +
             '<div style="text-align:right;flex-shrink:0">' +
               '<div style="font-size:15px;font-weight:900;color:' + (m.annule ? '#777' : '#EAB308') + '">' + fmt(mt) + '</div>' +
-              (m.annule ? '' :
-                '<button class="btn-red" style="font-size:10px;padding:5px 9px;margin-top:6px" onclick="annulerRecharge(\'' + esc(m.id) + '\')">\u274c Annuler</button>') +
+              // v9.571 : le bouton ne s'affiche que si l'operation est REELLEMENT
+              // inversable \u2014 les deux comptes identifies. Avant, il apparaissait partout et
+              // ne se refusait qu'apres avoir debite. Un bouton qu'on ne doit pas cliquer
+              // ne doit pas exister.
+              (m.annule ? '' : (_transfertAnnulable(m)
+                ? '<button class="btn-red" style="font-size:10px;padding:5px 9px;margin-top:6px" onclick="annulerRecharge(\'' + esc(m.id) + '\')">\u274c Annuler</button>'
+                : '<div style="font-size:9px;color:var(--text2);margin-top:6px;max-width:120px">Non annulable<br>(frais soci\u00e9t\u00e9)</div>')) +
             '</div>' +
           '</div>' +
         '</div>';
@@ -21418,7 +21428,8 @@ function rGestion() {
             </div>
           </div>
           <div class="sect">📋 Mouvements récents</div>
-          ${DB.mouvements.filter(m => m.cibleId === data.id && m.cibleType === 'client').slice(0, 10).map((m, i) => `
+          ${DB.mouvements.filter(m => (m.cibleId === data.id && m.cibleType === 'client')
+                                   || (m.sourceId === data.id && m.sourceType === 'client')).slice(0, 10).map((m, i) => `
             <div class="card" style="margin-bottom:8px;padding:10px;font-size:11px">
               <div style="font-weight:700;margin-bottom:2px">${m.type === 'rech' ? '💵 Recharge' : m.type === 'commission' ? '📊 Commission' : '📝 ' + m.type}</div>
               <div style="color:var(--text2);margin-bottom:2px">${new Date(m.date).toLocaleDateString('fr-FR')} à ${new Date(m.date).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
@@ -24250,6 +24261,17 @@ function rHistorique() {
 // l'expediteur : l'argent disparaissait purement et simplement.
 // Ici l'operation est inversee des deux cotes, quel que soit le type de compte.
 // ════════════════════════════════════════════════
+// v9.571 : un transfert n'est inversable que si l'on sait QUI debiter et QUI recrediter.
+// Les deux doivent etre des comptes de l'application. La societe n'en est pas un : ses
+// soldes sont tenus par le serveur, dans une table que l'application ne peut pas ecrire.
+function _transfertAnnulable(m) {
+  if(!m || m.annule || m.type !== 'rech') return false;
+  const benef = _compteParType(m.cibleType, m.cibleId);
+  const expType = m.sourceType || (m.agentId ? 'agent' : null);
+  const exp = _compteParType(expType, m.sourceId || m.agentId);
+  return !!(benef && exp);
+}
+
 function _compteParType(type, id) {
   if(!type || !id) return null;
   if(type === 'agent')     return DB.agents.find(a => a.id === id) || null;
@@ -24285,13 +24307,29 @@ function annulerRecharge(id) {
   const exp = _compteParType(expType, m.sourceId || m.agentId);
 
   if(!benef) { toast('\u274c B\u00e9n\u00e9ficiaire introuvable : annulation impossible.', true); return; }
+
+  // \u2550\u2550 v9.571 \u2014 POURQUOI CE CONTROLE ARRIVE MAINTENANT AVANT, ET PLUS APRES \u2550\u2550
+  //
+  // Ce bouton debitait le beneficiaire, PUIS constatait qu'il ne savait pas qui recrediter,
+  // et affichait \u00ab verifiez son solde a la main \u00bb. L'argent etait deja retire. Sur une
+  // ligne de commission, ou l'expediteur est la societe (qui n'est pas un compte de
+  // l'application), annuler retirait donc 1 000 GNF au passager \u2014 celui qui avait PAYE \u2014
+  // et ne les rendait a personne. Mille francs disparaissaient a chaque clic.
+  //
+  // Une operation d'argent qu'on ne peut pas inverser en entier ne doit pas commencer.
+  if(!exp) {
+    toast('\u26d4 Cette ligne n\'est pas annulable ici : l\'exp\u00e9diteur n\'est pas un compte de l\'application ' +
+          '(frais ou commission vers la soci\u00e9t\u00e9). Rien n\'a \u00e9t\u00e9 modifi\u00e9.', true);
+    return;
+  }
   if((benef.solde || 0) < montant) {
     toast('\u26d4 Impossible : ' + _nomCompte(benef) + ' a d\u00e9j\u00e0 d\u00e9pens\u00e9 cet argent (solde ' + fmt(benef.solde || 0) + ').', true);
     return;
   }
 
-  askConfirm('Annuler ce transfert de ' + fmt(montant) + ' ? ' + _nomCompte(benef) +
-    ' sera d\u00e9bit\u00e9, et ' + (exp ? _nomCompte(exp) : 'l\'exp\u00e9diteur') + ' recr\u00e9dit\u00e9 du m\u00eame montant.',
+  askConfirm('Annuler ce transfert de ' + fmt(montant) + ' ?\n\n' +
+    '\u2796 ' + _nomCompte(benef) + ' sera D\u00c9BIT\u00c9 de ' + fmt(montant) + '\n' +
+    '\u2795 ' + _nomCompte(exp) + ' sera RECR\u00c9DIT\u00c9 de ' + fmt(montant),
     async function() {
       benef.solde = (benef.solde || 0) - montant;
       await _sauverCompte(m.cibleType, benef);
@@ -24311,9 +24349,10 @@ function annulerRecharge(id) {
         _nomCompte(benef), exp ? _nomCompte(exp) : '\u2014',
         { annulation: true, mouvementAnnule: m.id });
 
-      if(!exp) toast('\u26a0\ufe0f ' + fmt(montant) + ' retir\u00e9s \u00e0 ' + _nomCompte(benef) +
-        ', mais l\'exp\u00e9diteur n\'a pas pu \u00eatre identifi\u00e9 : v\u00e9rifiez son solde \u00e0 la main.', true);
-      else toast('\u2705 Transfert annul\u00e9 : ' + fmt(montant) + ' rendus \u00e0 ' + _nomCompte(exp));
+      // v9.571 : le cas \u00ab expediteur inconnu \u00bb ne peut plus arriver ici \u2014 il est refuse
+      // avant le moindre debit. Le message d'avertissement qui suivait le retrait n'a donc
+      // plus lieu d'etre : on ne previent plus apres coup, on n'agit plus du tout.
+      toast('\u2705 Transfert annul\u00e9 : ' + fmt(montant) + ' rendus \u00e0 ' + _nomCompte(exp));
 
       rGestion(); updateNav();
     });
