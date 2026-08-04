@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.567';
+window.AFRIMOTO_VERSION = 'v9.568';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -20011,12 +20011,78 @@ function _abonnerEcran(nom, options, surChangement) {
   if(window._canalEcran.nom === nom) return;   // deja branche sur cet ecran
   _detacherEcran();
   try {
-    window._canalEcran.canal = supabaseClient
-      .channel('ecran-' + nom + '-' + Date.now())
-      .on('postgres_changes', options, surChangement)
-      .subscribe();
+    // v9.568 : « options » accepte desormais PLUSIEURS tables. L'onglet Avis en surveille
+    // deux (avis chauffeurs et avis courses) ; sans cela il aurait fallu deux canaux, donc
+    // deux connexions permanentes, pour un seul ecran.
+    let c = supabaseClient.channel('ecran-' + nom + '-' + Date.now());
+    (Array.isArray(options) ? options : [options]).forEach(function(o) {
+      c = c.on('postgres_changes', o, surChangement);
+    });
+    window._canalEcran.canal = c.subscribe();
     window._canalEcran.nom = nom;
   } catch(e) { }
+}
+
+// ══ v9.568 — LE DIRECT SUR LES ECRANS D'ADMINISTRATION ══
+//
+// Jusqu'ici, la tresorerie, la corbeille, les avis, la liste noire, les agents et les
+// sous-agents n'arrivaient qu'au chargement de la page. Il fallait actualiser pour voir
+// ce qui venait de se passer — et sur un ecran qui sert a rendre des comptes, un chiffre
+// vieux de dix minutes se lit exactement comme un chiffre a jour.
+//
+// La regle que je garde : UN ECRAN = UN ABONNEMENT, retire des qu'on quitte l'ecran.
+// Abonner chaque telephone a tout serait la meilleure facon de faire tomber la base le
+// jour ou le ministere enverra son million d'inscriptions.
+
+// Applique un seul changement a une liste locale, sans tout retelecharger.
+function _appliquerChangement(tableau, p, convertir) {
+  if(!Array.isArray(tableau) || !p) return;
+  const brut = p.new || p.old;
+  const id = brut && brut.id;
+  if(!id) return;
+  const i = tableau.findIndex(x => x && x.id === id);
+  if(p.eventType === 'DELETE') { if(i >= 0) tableau.splice(i, 1); return; }
+  const ligne = convertir ? convertir(p.new) : { ...p.new };
+  if(i >= 0) tableau[i] = ligne; else tableau.unshift(ligne);
+}
+
+const _ECRANS_DIRECT = {
+  // La tresorerie ne recalcule RIEN sur le telephone : elle redemande ses totaux au
+  // serveur. Un total calcule vaut mieux qu'un total devine, surtout celui-la.
+  // « redessiner: false » : chargerTresorerie remplit deja la zone. Redessiner tout l'ecran
+  // par-dessus relancerait le calcul une seconde fois pour rien.
+  tresorerie: { tables: ['mouvements'], redessiner: false, suite: function(p) {
+    _appliquerChangement(DB.mouvements, p, mapMouvement);
+    if(typeof chargerTresorerie === 'function') chargerTresorerie();
+  }},
+  bilan:      { tables: ['mouvements'], suite: function(p) { _appliquerChangement(DB.mouvements, p, mapMouvement); } },
+  transferts: { tables: ['mouvements'], suite: function(p) { _appliquerChangement(DB.mouvements, p, mapMouvement); } },
+  corbeille:  { tables: ['corbeille'],  suite: function(p) { _appliquerChangement(DB.corbeille, p, mapCorbeille); } },
+  agents:     { tables: ['agents'],     suite: function(p) { _appliquerChangement(DB.agents, p, mapAgent); } },
+  sas:        { tables: ['sous_agents'],suite: function(p) { _appliquerChangement(DB.sousAgents, p, mapSousAgent); } },
+  avis:       { tables: ['avis_chauffeurs', 'avis_courses'], suite: function(p) {
+    _appliquerChangement(p.table === 'avis_courses' ? DB.avisCourses : DB.avisChauffeurs, p, mapAvis);
+  }},
+  securite:   { tables: ['liste_noire_reservations'], suite: function(p) {
+    _appliquerChangement(DB.listeNoireReservations, p, function(r) {
+      return { id:r.id, telephone:r.telephone||'', email:r.email||'',
+               date_blocage:r.date_blocage, raison:r.raison||'Fraude: 3+ réservations non confirmées',
+               count:r.count||3 };
+    });
+  }}
+};
+
+function _brancherEcranGestion(onglet) {
+  const cfg = _ECRANS_DIRECT[onglet];
+  if(!cfg) return;
+  _abonnerEcran('gest-' + onglet,
+    cfg.tables.map(function(t) { return { event:'*', schema:'public', table:t }; }),
+    function(p) {
+      try { cfg.suite(p); } catch(e) { return; }
+      // On ne redessine que si l'onglet est encore celui-la : l'utilisateur a pu en changer
+      // entre l'arrivee du message et son traitement.
+      if(cfg.redessiner !== false && gestTab === onglet && typeof rGestion === 'function') rGestion();
+    });
 }
 
 // ── LE JOURNAL D'ACCES, EN DIRECT ──────────────────────────────────────────
@@ -20247,7 +20313,10 @@ function rGestion() {
   // couvre tous les chemins — retour en arriere, ouverture directe, rechargement.
   // _abonnerEcran ne fait rien si le canal est deja celui-ci.
   if(gestTab === 'journal') _brancherJournalAcces();
-  else if(window._canalEcran && window._canalEcran.nom === 'journal') _detacherEcran();
+  else if(_ECRANS_DIRECT[gestTab]) _brancherEcranGestion(gestTab);
+  else if(window._canalEcran && window._canalEcran.nom &&
+          (window._canalEcran.nom === 'journal' ||
+           window._canalEcran.nom.indexOf('gest-') === 0)) _detacherEcran();
   const q = nrm((document.getElementById('gest-q')||{}).value||'');
   let html = '';
 
