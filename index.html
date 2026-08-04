@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.571';
+window.AFRIMOTO_VERSION = 'v9.572';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2450,12 +2450,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('mdp')" id="gt-mdp" style="font-size:12px;padding:7px 11px">🔑 MDP</button>
     <button class="btn-ghost" onclick="setGestTab('zones')" id="gt-zones" style="font-size:12px;padding:7px 11px">🌍 Zones</button>
     <button class="btn-ghost" onclick="setGestTab('avis')" id="gt-avis" style="font-size:12px;padding:7px 11px">⭐ Avis</button>
-    <button class="btn-ghost" onclick="setGestTab('passagers')" id="gt-passagers" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto / VTC</button>
+    <button class="btn-ghost" onclick="setGestTab('passagers')" id="gt-passagers" style="font-size:12px;padding:7px 11px">🧍 Passagers</button>
     <button class="btn-ghost" onclick="setGestTab('bilan')" id="gt-bilan" style="font-size:12px;padding:7px 11px">📊 Bilan</button>
     <button class="btn-ghost" onclick="setGestTab('tresorerie')" id="gt-tresorerie" style="font-size:12px;padding:7px 11px">🏦 Trésorerie</button>
-    <button class="btn-ghost" onclick="setGestTab('transferts')" id="gt-transferts" style="font-size:12px;padding:7px 11px">&#128181; Transferts</button>
+    <button class="btn-ghost" onclick="setGestTab('transferts')" id="gt-transferts" style="font-size:12px;padding:7px 11px">&#128181; Transferts (liste)</button>
     <button class="btn-ghost" onclick="setGestTab('courses')" id="gt-courses" style="font-size:12px;padding:7px 11px">📜 Historique courses</button>
-    <button class="btn-ghost" onclick="setGestTab('historique-complet')" id="gt-historique-complet" style="font-size:12px;padding:7px 11px">💳 Transferts</button>
+    <button class="btn-ghost" onclick="setGestTab('historique-complet')" id="gt-historique-complet" style="font-size:12px;padding:7px 11px">💳 Transferts (détail)</button>
     <button class="btn-ghost" onclick="setGestTab('validation')" id="gt-validation" style="font-size:12px;padding:7px 11px">⏳ Validation</button>
     <button class="btn-ghost" onclick="setGestTab('corbeille')" id="gt-corbeille" style="font-size:12px;padding:7px 11px">🗑️ Corbeille</button>
     <button class="btn-ghost" onclick="setGestTab('suppression')" id="gt-suppression" style="font-size:12px;padding:7px 11px">🧹 Suppression</button>
@@ -21236,7 +21236,8 @@ function rGestion() {
               // ne doit pas exister.
               (m.annule ? '' : (_transfertAnnulable(m)
                 ? '<button class="btn-red" style="font-size:10px;padding:5px 9px;margin-top:6px" onclick="annulerRecharge(\'' + esc(m.id) + '\')">\u274c Annuler</button>'
-                : '<div style="font-size:9px;color:var(--text2);margin-top:6px;max-width:120px">Non annulable<br>(frais soci\u00e9t\u00e9)</div>')) +
+                : '<div style="font-size:9px;color:var(--text2);margin-top:6px;max-width:120px">Non annulable<br>(' +
+                  (_versSociete(m) ? 'frais soci\u00e9t\u00e9' : 'compte introuvable') + ')</div>')) +
             '</div>' +
           '</div>' +
         '</div>';
@@ -24264,12 +24265,23 @@ function rHistorique() {
 // v9.571 : un transfert n'est inversable que si l'on sait QUI debiter et QUI recrediter.
 // Les deux doivent etre des comptes de l'application. La societe n'en est pas un : ses
 // soldes sont tenus par le serveur, dans une table que l'application ne peut pas ecrire.
+// L'argent est-il allé VERS la société ? C'est le seul cas réellement problématique : sur
+// ces lignes, le compte enregistré est celui qui a PAYÉ, et l'annuler le débiterait une
+// seconde fois.
+function _versSociete(m) {
+  if(!m) return false;
+  if(m.cibleType === 'societe') return true;
+  const v = nrm(m.vers || '');
+  return v.indexOf('societe') >= 0 || v.indexOf('systeme') >= 0;
+}
+
 function _transfertAnnulable(m) {
   if(!m || m.annule || m.type !== 'rech') return false;
-  const benef = _compteParType(m.cibleType, m.cibleId);
-  const expType = m.sourceType || (m.agentId ? 'agent' : null);
-  const exp = _compteParType(expType, m.sourceId || m.agentId);
-  return !!(benef && exp);
+  if(_versSociete(m)) return false;
+  // v9.572 : il suffit de savoir QUI débiter. Exiger aussi un expéditeur était trop strict
+  // et bloquait les recharges faites par l'administration — là, personne n'a « envoyé »
+  // l'argent, l'administration l'a créé. L'annuler consiste simplement à le retirer.
+  return !!_compteParType(m.cibleType, m.cibleId);
 }
 
 function _compteParType(type, id) {
@@ -24317,9 +24329,15 @@ function annulerRecharge(id) {
   // et ne les rendait a personne. Mille francs disparaissaient a chaque clic.
   //
   // Une operation d'argent qu'on ne peut pas inverser en entier ne doit pas commencer.
-  if(!exp) {
-    toast('\u26d4 Cette ligne n\'est pas annulable ici : l\'exp\u00e9diteur n\'est pas un compte de l\'application ' +
-          '(frais ou commission vers la soci\u00e9t\u00e9). Rien n\'a \u00e9t\u00e9 modifi\u00e9.', true);
+  //
+  // v9.572 : je m'etais trompe de critere. J'avais bloque toutes les lignes SANS expediteur
+  // \u2014 ce qui a bloque du meme coup les recharges faites par l'administration, qui n'ont
+  // legitimement pas d'expediteur : personne n'a \u00ab envoye \u00bb cet argent, l'administration
+  // l'a cree. Le vrai probleme n'est pas l'absence d'expediteur, c'est que sur les frais
+  // verses a la societe, le compte enregistre est celui qui a PAYE.
+  if(_versSociete(m)) {
+    toast('\u26d4 Cette ligne n\'est pas annulable ici : c\'est un frais vers\u00e9 \u00e0 la soci\u00e9t\u00e9, ' +
+          'et le compte enregistr\u00e9 est celui qui a pay\u00e9. Rien n\'a \u00e9t\u00e9 modifi\u00e9.', true);
     return;
   }
   if((benef.solde || 0) < montant) {
@@ -24329,7 +24347,8 @@ function annulerRecharge(id) {
 
   askConfirm('Annuler ce transfert de ' + fmt(montant) + ' ?\n\n' +
     '\u2796 ' + _nomCompte(benef) + ' sera D\u00c9BIT\u00c9 de ' + fmt(montant) + '\n' +
-    '\u2795 ' + _nomCompte(exp) + ' sera RECR\u00c9DIT\u00c9 de ' + fmt(montant),
+    (exp ? '\u2795 ' + _nomCompte(exp) + ' sera RECR\u00c9DIT\u00c9 de ' + fmt(montant)
+         : '\u2795 Personne n\'est recr\u00e9dit\u00e9 : cet argent avait \u00e9t\u00e9 cr\u00e9\u00e9 par l\'administration, il est simplement retir\u00e9.'),
     async function() {
       benef.solde = (benef.solde || 0) - montant;
       await _sauverCompte(m.cibleType, benef);
@@ -24349,10 +24368,10 @@ function annulerRecharge(id) {
         _nomCompte(benef), exp ? _nomCompte(exp) : '\u2014',
         { annulation: true, mouvementAnnule: m.id });
 
-      // v9.571 : le cas \u00ab expediteur inconnu \u00bb ne peut plus arriver ici \u2014 il est refuse
-      // avant le moindre debit. Le message d'avertissement qui suivait le retrait n'a donc
-      // plus lieu d'etre : on ne previent plus apres coup, on n'agit plus du tout.
-      toast('\u2705 Transfert annul\u00e9 : ' + fmt(montant) + ' rendus \u00e0 ' + _nomCompte(exp));
+      // v9.572 : les deux cas sont d\u00e9sormais l\u00e9gitimes et distincts. Ce qui est interdit \u2014
+      // annuler un frais vers\u00e9 \u00e0 la soci\u00e9t\u00e9 \u2014 a \u00e9t\u00e9 refus\u00e9 avant le moindre d\u00e9bit.
+      toast(exp ? '\u2705 Transfert annul\u00e9 : ' + fmt(montant) + ' rendus \u00e0 ' + _nomCompte(exp)
+                : '\u2705 Recharge annul\u00e9e : ' + fmt(montant) + ' retir\u00e9s \u00e0 ' + _nomCompte(benef));
 
       rGestion(); updateNav();
     });
