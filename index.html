@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.590';
+window.AFRIMOTO_VERSION = 'v9.591';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9897,10 +9897,17 @@ async function _lireMesCoursesEntrantes() {
   const ids = DB.taxis.filter(t => t.tel === cl.tel).map(t => t.id);
   if(!ids.length) return;
   try {
+    // ══ v9.591 — SANS LES ANNULATIONS, LE TELEPHONE NE SAIT JAMAIS QUE C'EST FINI ══
+    //
+    // Je filtrais sur « en_attente, prix_propose, acceptee ». Une course ANNULEE n'etait donc
+    // jamais relue : le telephone gardait eternellement l'ancien statut, sa fenetre restait
+    // ouverte et l'alarme continuait de sonner. C'est ce qui sonnait sans arret.
+    //
+    // On relit desormais TOUT ce qui me concerne. C'est justement le changement de statut
+    // qu'il faut voir arriver — pas seulement les courses encore vivantes.
     const { data } = await supabaseClient.from('demandes_course')
       .select('*').in('taxi_id', ids)
-      .in('statut_attribution', ['en_attente','prix_propose','acceptee'])
-      .order('date', { ascending: false }).limit(5);
+      .order('date', { ascending: false }).limit(8);
     if(!data) return;
     data.forEach(function(r) {
       const m = mapDemandeCourse(r);
@@ -9911,6 +9918,14 @@ async function _lireMesCoursesEntrantes() {
 }
 
 function verifierDemandeEntrante() {
+  // v9.591 : FILET. Quelle que soit la raison — statut manque, fenetre fermee a la main,
+  // course disparue — une alarme ne doit JAMAIS survivre a la course qui l'a declenchee.
+  try {
+    if(!demandeEntranteActuelle &&
+       !document.getElementById('m-course-entrante').classList.contains('open')) {
+      alarmeCourseStop();
+    }
+  } catch(e) {}
   if(!DB.user || DB.user.role !== 'client') return;
   // ══ v9.589 — LA FENETRE NE RESTE PLUS OUVERTE POUR RIEN ══
   //
@@ -25878,12 +25893,24 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   // ── Mode lien direct QR code taxi ──
   const taxiParam = urlParams.get('taxi');
   if(taxiParam) {
-    const taxi = DB.taxis.find(t => t.id === taxiParam);
-    if(taxi) {
-      afficherFichePubliqueTaxi(taxi);
-    } else {
-      afficherErreurQR(taxiParam);
-    }
+    // v9.591 : meme correction que pour le QR vehicule. « DB.taxis » est bien telechargee
+    // pour tous aujourd'hui, mais elle ne le restera pas quand il y aura des milliers de
+    // taxis — et un scan qui depend de cela finira par echouer sans prevenir.
+    (async function() {
+      let taxi = DB.taxis.find(t => t.id === taxiParam);
+      if(!taxi) {
+        try {
+          const { data } = await supabaseClient.from('taxis').select('*').eq('id', taxiParam).limit(1);
+          if(data && data[0]) {
+            taxi = mapTaxi(data[0]);
+            const i = DB.taxis.findIndex(x => x.id === taxi.id);
+            if(i >= 0) DB.taxis[i] = taxi; else DB.taxis.push(taxi);
+          }
+        } catch(e) {}
+      }
+      if(taxi) afficherFichePubliqueTaxi(taxi);
+      else afficherErreurQR(taxiParam);
+    })();
     return;
   }
 
@@ -25894,13 +25921,41 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   const vParam = urlParams.get('v');
   if(vParam) {
     window.history.replaceState({}, '', window.location.pathname);
-    const vehQR = trouverVehiculeDepuisQR(vParam);
-    if(vehQR) {
-      if(vehQR.valide !== false) enregistrerVerification(vehQR.id, 'qr_externe');
-      afficherFichePubliqueQR(vehQR);
-    } else {
-      afficherErreurQR(String(vParam||''));
-    }
+    // ══ v9.591 — LE SCAN EXTERIEUR INTERROGE LE SERVEUR, COMME LA CAMERA DE L'APP ══
+    //
+    // « trouverVehiculeDepuisQR » ne cherche que dans la copie LOCALE du registre. Depuis
+    // qu'on ne telecharge plus le registre sur chaque telephone — il vise le million de
+    // lignes — cette copie est VIDE pour un visiteur. Le scan exterieur ne pouvait donc
+    // plus rien trouver, alors que la camera de l'application, elle, interroge le serveur.
+    //
+    // Deux chemins pour la meme question, un seul mis a jour : c'est la faute.
+    (async function() {
+      let vehQR = trouverVehiculeDepuisQR(vParam);
+      if(!vehQR) {
+        try { await rafraichirVehiculesEtTaxis(String(vParam || '')); } catch(e) {}
+        vehQR = trouverVehiculeDepuisQR(vParam);
+      }
+      // Le QR peut aussi porter un identifiant interne : on tente la fiche directe.
+      if(!vehQR) {
+        try {
+          const _id = String(vParam || '').trim();
+          if(/^[0-9a-fA-F-]{30,}$/.test(_id)) {
+            const { data } = await supabaseClient.from('vehicules').select('*').eq('id', _id).limit(1);
+            if(data && data[0]) {
+              vehQR = mapVehicule(data[0]);
+              const i = DB.vehs.findIndex(x => x.id === vehQR.id);
+              if(i >= 0) DB.vehs[i] = vehQR; else DB.vehs.push(vehQR);
+            }
+          }
+        } catch(e) {}
+      }
+      if(vehQR) {
+        if(vehQR.valide !== false) enregistrerVerification(vehQR.id, 'qr_externe');
+        afficherFichePubliqueQR(vehQR);
+      } else {
+        afficherErreurQR(String(vParam||''));
+      }
+    })();
     return;
   }
   const taxiParam2 = urlParams.get('taxi');
