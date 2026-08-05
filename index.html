@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.580';
+window.AFRIMOTO_VERSION = 'v9.581';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -10466,9 +10466,9 @@ function rClientContent() {
                   <b>${Number(t.rayonKm) || 5} km</b> de vous.
                 </div>
                 <div style="display:flex;gap:5px;flex-wrap:wrap">
-                  ${[3,4,5,6,7,10,15].map(km => {
+                  ${[1,2,3,4,5,6,7,8,9,10,15,20,30,50].map(km => {
                     const actif = (Number(t.rayonKm) || 5) === km;
-                    return '<button class="' + (actif ? 'btn' : 'btn-ghost') + '" style="flex:1;min-width:52px;font-size:12px;padding:9px 4px" ' +
+                    return '<button class="' + (actif ? 'btn' : 'btn-ghost') + '" style="flex:1 0 auto;min-width:46px;font-size:12px;padding:9px 3px" ' +
                            'onclick="reglerRayonTaxi(\'' + t.id + '\',' + km + ')">' + km + ' km</button>';
                   }).join('')}
                 </div>
@@ -26664,9 +26664,9 @@ body.mode-service .nav-inner{display:none!important}
         '<span style="font-size:11px">Plus large = plus de courses, mais plus de route \u00e0 faire pour aller chercher.</span>' +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        [3,4,5,6,7,10,15].map(function(km){
+        [1,2,3,4,5,6,7,8,9,10,15,20,30,50].map(function(km){
           var a = (km === actuel);
-          return '<button data-km="' + km + '" style="flex:1;min-width:56px;padding:14px 4px;border-radius:12px;' +
+          return '<button data-km="' + km + '" style="flex:1 0 auto;min-width:50px;padding:12px 3px;border-radius:12px;' +
                  'font-weight:900;font-size:14px;cursor:pointer;border:2px solid ' + (a ? '#16a34a' : '#ddd') + ';' +
                  'background:' + (a ? '#16a34a' : '#fff') + ';color:' + (a ? '#fff' : '#111') + '">' + km + ' km</button>';
         }).join('') +
