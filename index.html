@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.578';
+window.AFRIMOTO_VERSION = 'v9.579';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -8666,7 +8666,7 @@ function _listeTaxisPourRecherche(_ref) {
     .sort(_comparerTaxis);
 }
 
-function demarrerRechercheAutomatique(commissionDejaPayee) {
+async function demarrerRechercheAutomatique(commissionDejaPayee) {
   // v9.422 : si l'ecran carte passager est ouvert, ce sont ses champs qui font foi
   const _paxOn = document.body.classList.contains('mode-passager');
   let _dep = (((_paxOn && document.getElementById('pax-depart')) || document.getElementById('pa-depart')||{}).value||'').trim();
@@ -8728,82 +8728,145 @@ function demarrerRechercheAutomatique(commissionDejaPayee) {
   // Il etait jusqu'ici relu dans contacterProchainTaxi() sous un nom qui
   // n'existait pas la-bas — le code s'arretait net et la demande n'etait
   // jamais envoyee au chauffeur.
-  rechercheAutoEnCours = {liste, index: 0, demandeId: null, intervalleCompteur: null, finA: null, ref: _ref, commissionPayee: dejaPayee ? commissionDejaPayee : commission};
+  // ══ v9.579 — LA COURSE EST CREEE UNE SEULE FOIS ══
+  //
+  // Elle etait creee dans « contacterProchainTaxi », donc UNE PAR CHAUFFEUR CONTACTE.
+  // Cinq chauffeurs = cinq lignes, et deux boucles simultanees = deux chauffeurs qui
+  // sonnent. Desormais : une demande du passager, une ligne. Le serveur y deplace le
+  // chauffeur designe, l'une apres l'autre.
+  const _pointA = _pointArrivee || null;
+  const _prixVoulu = parseInt(((document.body.classList.contains('mode-passager') && document.getElementById('pax-prix')) || document.getElementById('pa-prix') || {}).value) || 0;
+  const _nouvelleCourse = {
+    id: gid(),
+    taxiId: null, taxiNom: '', taxiPlaque: '',
+    passagerId: ps.id, passagerNom: ps.prenom + ' ' + ps.nom, passagerTel: ps.tel,
+    lat: _ref.lat, lng: _ref.lng,
+    latArrivee: _pointA ? _pointA.lat : null, lngArrivee: _pointA ? _pointA.lng : null,
+    prixPassager: _prixVoulu,
+    typeVehicule: filtrePassagerType || _typeTaxi(liste[0]),
+    created_at: new Date().toISOString(), date: new Date().toISOString(),
+    vue: false, commission,
+    depart: _dep, arrivee: _arr,
+    mode: 'auto', statutAttribution: 'en_attente'
+  };
+  DB.demandesCourse.unshift(_nouvelleCourse);
+  // On ATTEND l'enregistrement : le serveur ne peut pas attribuer une course qu'il ne
+  // connait pas encore. C'est la seule attente du parcours, elle dure le temps d'un aller-retour.
+  const _okCourse = await sbSaveDemandeCourse(_nouvelleCourse);
+  if (_okCourse === false) {
+    toast('❌ Votre demande n' + AP + 'a pas pu etre enregistree. Verifiez votre connexion et reessayez.', true);
+    DB.demandesCourse = DB.demandesCourse.filter(d => d.id !== _nouvelleCourse.id);
+    return;
+  }
+
+  rechercheAutoEnCours = { liste, index: 0, demandeId: _nouvelleCourse.id, intervalleCompteur: null,
+                           finA: null, ref: _ref, tour: 0,
+                           commissionPayee: dejaPayee ? commissionDejaPayee : commission };
   openModal('m-recherche-auto');
   contacterProchainTaxi();
 }
 
-function contacterProchainTaxi() {
+// ══ v9.579 — UNE DEMANDE = UNE LIGNE, ET LE SERVEUR CHOISIT ══
+//
+// AVANT : chaque tentative creait une NOUVELLE course. Un trajet contacte a cinq
+// chauffeurs faisait cinq lignes dans la base. Il suffisait que la boucle parte deux fois
+// — rechargement de page, double appui, deux onglets — pour que deux lignes vivent en
+// parallele, chacune pointant sur un chauffeur different. LES DEUX SONNAIENT, et aucun
+// verrou ne pouvait l'empecher : c'etaient deux courses distinctes aux yeux de la base.
+//
+// La liste des chauffeurs etait aussi une PHOTO prise au demarrage, puis parcourue par
+// index. Un chauffeur qui coupait en cours de recherche y restait, et son tour arrivait.
+//
+// MAINTENANT : la course est creee une seule fois. A chaque tour on demande au serveur
+// « a qui proposer ? ». Il verrouille la ligne, regarde qui est joignable A CET INSTANT,
+// deplace le taxi_id, et retient ceux qui ont deja ete appeles.
+//
+// Deux telephones ne peuvent plus sonner ensemble : il n'y a qu'UNE case taxi_id.
+async function contacterProchainTaxi() {
   const rch = rechercheAutoEnCours;
-  if(!rch) return;
-  if(rch.index >= rch.liste.length) {
-    // ════════════════════════════════════════════════
-    // v9.488 — LA RECHERCHE NE S'ARRETE PLUS TOUTE SEULE
-    // Avant : des que tous les chauffeurs de la liste avaient refuse ou n'avaient pas repondu,
-    // la recherche s'arretait et le passager DEVAIT appuyer sur un bouton pour la relancer.
-    // C'est contraire au fonctionnement attendu : une fois la course demandee, la recherche
-    // doit continuer d'elle-meme. On refait donc un tour — la liste est RECONSTRUITE (des
-    // chauffeurs ont pu se mettre en service ou se liberer entre-temps), avec exactement les
-    // memes criteres de proximite, de notes et de perimetre. Seule l'annulation par le
-    // passager arrete la recherche.
-    // ════════════════════════════════════════════════
-    rch.tour = (rch.tour || 1) + 1;
+  if(!rch || !rch.demandeId) return;
+
+  const _replanifier = (secondes) => {
+    if(rch._minuteurTour) clearTimeout(rch._minuteurTour);
+    rch._minuteurTour = setTimeout(() => {
+      if(rechercheAutoEnCours === rch) contacterProchainTaxi();
+    }, Math.max(1, secondes) * 1000);
+  };
+
+  let r;
+  try {
+    const { data, error } = await supabaseClient.rpc('attribuer_prochain_taxi', {
+      p_course_id: rch.demandeId, p_delai_s: 25, p_fraicheur: 180, p_age_max_s: 900
+    });
+    if(error) throw new Error(error.message);
+    r = data || {};
+  } catch(e) {
+    // Reseau : on ne renonce pas a la recherche pour une coupure. On retente.
+    try { addDebugLog('ATTRIBUTION indisponible : ' + ((e && e.message) || e)); } catch(er) {}
+    _replanifier(5);
+    return;
+  }
+  if(rechercheAutoEnCours !== rch) return;   // le passager a annule entre-temps
+
+  // — Un chauffeur a accepte : le suivi de statut prend le relais.
+  if(r.ok === true && r.etat === 'deja_acceptee') { verifierStatutDemandeAuto(); return; }
+
+  // — Un nouveau chauffeur vient d'etre designe : on le previent et on l'affiche.
+  if(r.ok === true && r.etat === 'propose') {
+    const demande = DB.demandesCourse.find(d => d.id === rch.demandeId);
+    if(demande) {
+      demande.taxiId = r.taxi_id; demande.taxiNom = r.nom; demande.taxiPlaque = r.plaque;
+      demande.statutAttribution = 'en_attente';
+    }
+    // La notification ne part qu'a la DESIGNATION, jamais aux tours d'attente : sans cela
+    // le meme chauffeur recevrait une alerte par seconde.
+    try {
+      envoyerNotifPush('taxi:' + r.taxi_id, '🏍️ Nouvelle demande de course',
+        ((demande && demande.passagerNom) || 'Un passager') + ' vous demande une course. Ouvrez l application pour proposer votre prix.');
+    } catch(e) {}
+    const _dist = (r.distance_km != null) ? (' · ' + r.distance_km + ' km') : '';
+    document.getElementById('ra-icone').textContent = '📡';
+    document.getElementById('ra-titre').textContent = 'Contact en cours...';
+    document.getElementById('ra-detail').innerHTML =
+      esc(r.nom || 'Chauffeur') + _dist +
+      '<br><span style="font-size:11px">Appel n°' + (r.appel_no || 1) + '</span>';
+    if(rch.intervalleCompteur) clearInterval(rch.intervalleCompteur);
+    rch.intervalleCompteur = setInterval(() => verifierStatutDemandeAuto(), 1000);
+    verifierStatutDemandeAuto();
+    _replanifier((r.reste_s || 25) + 1);
+    return;
+  }
+
+  // — Une offre est deja en cours : on attend, on ne double personne.
+  if(r.ok === true && r.etat === 'offre_en_cours') { _replanifier((r.reste_s || 5) + 1); return; }
+
+  // — Personne de libre pour l'instant. La recherche NE S'ARRETE PAS : un chauffeur peut
+  //   se liberer ou se remettre en service d'une seconde a l'autre.
+  if(r.raison === 'aucun_disponible') {
+    rch.tour = (rch.tour || 0) + 1;
     document.getElementById('ra-icone').textContent = '🔄';
     document.getElementById('ra-titre').textContent = 'Recherche en cours...';
     document.getElementById('ra-detail').innerHTML =
-      'Aucun chauffeur n\'a encore accept&eacute;. <b>Nous continuons &agrave; chercher automatiquement</b> — vous n\'avez rien &agrave; faire.' +
-      '<div style="font-size:11px;color:var(--text2);margin-top:6px">Tour ' + rch.tour + ' &middot; nouvelle tentative dans quelques secondes</div>';
+      'Aucun chauffeur n' + AP + 'a encore accepté. <b>Nous continuons à chercher automatiquement</b> — vous n' + AP + 'avez rien à faire.' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:6px">Tour ' + rch.tour + '</div>';
     document.getElementById('ra-compteur').textContent = '';
-    if(rch._minuteurTour) clearTimeout(rch._minuteurTour);
-    rch._minuteurTour = setTimeout(function () {
-      const r2 = rechercheAutoEnCours;
-      if(!r2 || r2 !== rch) return; // le passager a annule, ou une autre recherche a pris le relais
-      r2.liste = _listeTaxisPourRecherche(r2.ref || _positionDeReference());
-      r2.index = 0;
-      contacterProchainTaxi(); // liste vide -> on repasse ici et on retentera au tour suivant
-    }, 10000);
+    _replanifier(10);
     return;
   }
-  const t = rch.liste[rch.index];
-  const ps = DB.passagers.find(x=>x.id===DB.user.id);
-  const commission = _commissionPourTaxi(t) || 0; // v9.389
 
-  // v9.381 : le point retenu au lancement de la recherche
-  const refC = rch.ref || _positionDeReference();
-  if(!refC || refC.lat == null) {
-    toast('\u26a0\ufe0f Point de prise en charge perdu. Reprenez la recherche.', true);
-    try { addDebugLog('RECHERCHE : point de prise en charge introuvable'); } catch(e) {}
-    closeModal('m-recherche-auto');
+  // — La demande n'a plus lieu d'etre.
+  if(r.raison === 'demande_perimee' || r.raison === 'course_fermee') {
+    toast(r.raison === 'demande_perimee'
+      ? '⏱️ Cette demande a expiré. Relancez une recherche.'
+      : '⛔ Cette course n' + AP + 'est plus active.', true);
+    try { closeModal('m-recherche-auto'); } catch(e) {}
+    if(rch.intervalleCompteur) clearInterval(rch.intervalleCompteur);
+    if(rch._minuteurTour) clearTimeout(rch._minuteurTour);
     rechercheAutoEnCours = null;
     return;
   }
 
-  document.getElementById('ra-icone').textContent = '📡';
-  document.getElementById('ra-titre').textContent = 'Contact en cours...';
-  document.getElementById('ra-detail').innerHTML = esc(t.nom) + ' · ' + formatDistance(t._distance) + '<br><span style="font-size:11px">Tentative ' + (rch.index+1) + '/' + rch.liste.length + '</span>';
-
-  const demande = {
-    id: gid(), taxiId: t.id, taxiNom: t.nom, taxiPlaque: t.plaque,
-    passagerId: ps.id, passagerNom: ps.prenom+' '+ps.nom, passagerTel: ps.tel,
-    lat: refC.lat, lng: refC.lng,
-    latArrivee: _pointArrivee ? _pointArrivee.lat : null, lngArrivee: _pointArrivee ? _pointArrivee.lng : null, // v9.375
-    prixPassager: parseInt(((document.body.classList.contains('mode-passager') && document.getElementById('pax-prix')) || document.getElementById('pa-prix')||{}).value) || null, // v9.382 + v9.422 carte passager
-    typeVehicule: _typeTaxi(t), // v9.390
-    created_at: new Date().toISOString(), vue: false, commission,
-    depart: (((document.body.classList.contains('mode-passager') && document.getElementById('pax-depart')) || document.getElementById('pa-depart')||{}).value||'').trim(),
-    arrivee: (((document.body.classList.contains('mode-passager') && document.getElementById('pax-arrivee')) || document.getElementById('pa-arrivee')||{}).value||'').trim(),
-    mode: 'auto', statutAttribution: 'en_attente'
-  };
-  DB.demandesCourse.unshift(demande);
-  sbSaveDemandeCourse(demande); // sinon le taxi sur un autre téléphone ne la voit jamais
-  envoyerNotifPush('taxi:' + demande.taxiId, '\ud83c\udfcd\ufe0f Nouvelle demande de course',
-    (demande.passagerNom || 'Un passager') + ' vous demande une course. Ouvrez l application pour proposer votre prix.');
-  rch.demandeId = demande.id;
-  rch.finA = Date.now() + 60000;
-
-  if(rch.intervalleCompteur) clearInterval(rch.intervalleCompteur);
-  rch.intervalleCompteur = setInterval(() => verifierStatutDemandeAuto(), 1000);
-  verifierStatutDemandeAuto();
+  _replanifier(5);
 }
 
 let _derniereLectureDemande = 0;
@@ -8825,6 +8888,9 @@ async function verifierStatutDemandeAuto() {
         demande.statutAttribution = frais.statutAttribution || demande.statutAttribution;
         if(frais.prixPropose != null) demande.prixPropose = frais.prixPropose;
         if(frais.pinConfirmation != null) demande.pinConfirmation = frais.pinConfirmation; // v9.420 : code genere cote chauffeur
+        // v9.579 : le SERVEUR deplace maintenant le chauffeur d'un appel a l'autre. Sans
+        // cette relecture, l'ecran du passager continuerait d'afficher le premier contacte.
+        if(frais.taxiId !== undefined) { demande.taxiId = frais.taxiId; demande.taxiNom = frais.taxiNom; demande.taxiPlaque = frais.taxiPlaque; }
       }
     } catch(e) { console.warn('lecture demande:', e && e.message); }
   }
@@ -8990,12 +9056,26 @@ async function verifierStatutDemandeAuto() {
       document.getElementById('ra-compteur').textContent = '';
       const _ba = document.getElementById('ra-btn-annuler'); if(_ba) _ba.style.display = ''; // annulation toujours possible
     } catch(e) {}
-    rch.index = (rch.index || 0) + 1;
-    rch.demandeId = null;
-    if(rch._minuteurSuivant) clearTimeout(rch._minuteurSuivant);
-    rch._minuteurSuivant = setTimeout(function () {
-      if(rechercheAutoEnCours === rch) contacterProchainTaxi();
-    }, 1500);
+    // ══ v9.579 — DEUX CORRECTIONS ICI, ET ELLES SONT GRAVES ══
+    //
+    // 1. « rch.demandeId = null » tuait la recherche en silence. C'etait juste tant que
+    //    chaque chauffeur avait sa propre ligne ; maintenant qu'il n'y en a qu'une, effacer
+    //    l'identifiant faisait sortir « contacterProchainTaxi » des sa premiere ligne. Le
+    //    passager serait reste devant un ecran qui tourne, pour toujours.
+    //
+    // 2. Un refus ferme la course aux yeux du serveur. Il faut donc la ROUVRIR en ecartant
+    //    ce chauffeur, sinon le tour suivant recevrait « course_fermee » et s'arreterait.
+    const _taxiEcarte = demande.taxiId;
+    supabaseClient.rpc('refuser_course', {
+      p_course_id: rch.demandeId, p_taxi_id: String(_taxiEcarte || '')
+    }).catch(() => {}).then(() => {
+      demande.taxiId = null;
+      demande.statutAttribution = 'en_attente';
+      if(rch._minuteurSuivant) clearTimeout(rch._minuteurSuivant);
+      rch._minuteurSuivant = setTimeout(function () {
+        if(rechercheAutoEnCours === rch) contacterProchainTaxi();
+      }, 1200);
+    });
     return;
   }
 }
@@ -9897,8 +9977,20 @@ function repondreCourseEntrante(accepte) {
         if(ok) toast('💰 Prix proposé : ' + fmt(prix) + ' — en attente de l\'accord du passager');
       });
     } else {
-      demande.statutAttribution = 'refusee';
-      sbMajStatutDemande(demande.id, {statut_attribution:'refusee'}).then(ok => { if(ok) toast('❌ Course refusée'); });
+      // ══ v9.579 — LE REFUS LIBERE LA COURSE, IL NE LA FERME PLUS ══
+      //
+      // Avant, refuser marquait la course « refusee » — donc morte. C'etait cohérent quand
+      // chaque chauffeur avait SA propre ligne ; ça ne l'est plus : il n'y a qu'une course,
+      // et la refuser pour tout le monde parce qu'un seul a dit non serait absurde.
+      //
+      // « refuser_course » ecarte ce chauffeur de CETTE course et rend la main : le passager
+      // passe au suivant tout de suite, sans attendre les vingt-cinq secondes du delai.
+      supabaseClient.rpc('refuser_course', {
+        p_course_id: demande.id, p_taxi_id: String(demande.taxiId || '')
+      }).then(({ data }) => {
+        if(data && data.ok === true) { demande.taxiId = null; toast('❌ Course refusée'); }
+        else if(data && data.raison === 'deja_prise') toast('Cette course vient d\'être prise.');
+      }).catch(() => {});
     }
   }
   if(intervalleCompteurEntrant) clearInterval(intervalleCompteurEntrant);
