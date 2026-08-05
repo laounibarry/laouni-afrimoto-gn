@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.581';
+window.AFRIMOTO_VERSION = 'v9.582';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2462,7 +2462,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn" onclick="setGestTab('recherche-unifiee')" id="gt-recherche-unifiee" style="font-size:12px;padding:7px 13px;background:#EAB308;color:#111;font-weight:900">🔎 Recherche compte</button>
     <button class="btn" onclick="setGestTab('agents')" id="gt-agents" style="font-size:12px;padding:7px 11px">📍 Agents</button>
     <button class="btn-ghost" onclick="setGestTab('vehs')" id="gt-vehs" style="font-size:12px;padding:7px 11px">🏍️ Véhicules</button>
-    <button class="btn-ghost" onclick="setGestTab('taxis')" id="gt-taxis" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto / VTC</button>
+    <!-- v9.582 : deux metiers, deux onglets. Les melanger obligeait a trier a l'oeil, et
+         sur l'ecran de suppression en masse cela devenait dangereux. -->
+    <button class="btn-ghost" onclick="setGestTab('taxis')" id="gt-taxis" style="font-size:12px;padding:7px 11px">🏍️ Taxi moto</button>
+    <button class="btn-ghost" onclick="setGestTab('vtc')" id="gt-vtc" style="font-size:12px;padding:7px 11px">🚗 Taxi VTC</button>
     <button class="btn-ghost" onclick="setGestTab('clients')" id="gt-clients" style="font-size:12px;padding:7px 11px">👤 Clients</button>
     <button class="btn-ghost" onclick="setGestTab('sas')" id="gt-sas" style="font-size:12px;padding:7px 11px">👥 S.Agents</button>
     <button class="btn-ghost" onclick="setGestTab('trajets')" id="gt-trajets" style="font-size:12px;padding:7px 11px">🚙 Voyager</button>
@@ -15652,6 +15655,10 @@ function _rTaxisAffichage() {
   let base;
   if(estStaff) {
     base = isAdmin() ? DB.taxis : DB.taxis.filter(t=>t.agId===DB.user.agId);
+    // v9.582 : l'agent voit les deux metiers separement, comme l'administration. Sans cela
+    // il devait reconnaitre un VTC a son absence de gilet — ce n'est pas un critere.
+    if(typeof window.filtreTaxiMetier === 'undefined') window.filtreTaxiMetier = 'moto';
+    base = base.filter(t => (_typeTaxi(t) === 'voiture' ? 'voiture' : 'moto') === window.filtreTaxiMetier);
   } else {
     // Vue publique : uniquement les taxis actifs, en service, ET validés par l'administration
     base = DB.taxis.filter(t => t.statut==='actif' && t.enService && t.valide!==false);
@@ -15659,6 +15666,29 @@ function _rTaxisAffichage() {
     if(zoneTxtN) base = base.filter(t => nrm(t.zone||'').includes(zoneTxtN));
   }
   const list = q ? base.filter(t=>[t.nom,t.plaque,t.gilet,t.zone].some(x=>nrm(x).includes(qn))) : base;
+
+  // v9.582 : la barre de choix du metier, reservee au personnel.
+  try {
+    const _z = document.getElementById('taxis-list');
+    let _bar = document.getElementById('taxis-metier-bar');
+    if(estStaff && _z) {
+      if(!_bar) {
+        _bar = document.createElement('div');
+        _bar.id = 'taxis-metier-bar';
+        _bar.style.cssText = 'display:flex;gap:8px;margin-bottom:10px';
+        _z.parentNode.insertBefore(_bar, _z);
+      }
+      const _nb = m => DB.taxis.filter(t => (isAdmin() || t.agId === DB.user.agId) &&
+        (_typeTaxi(t) === 'voiture' ? 'voiture' : 'moto') === m).length;
+      _bar.innerHTML =
+        ['moto','voiture'].map(m => {
+          const on = window.filtreTaxiMetier === m;
+          const lib = m === 'moto' ? '🏍️ Taxi moto' : '🚗 Taxi VTC';
+          return '<button class="' + (on ? 'btn' : 'btn-ghost') + '" style="flex:1;padding:11px;font-weight:800;font-size:13px" ' +
+                 'onclick="window.filtreTaxiMetier=' + AP + m + AP + ';_rTaxisAffichage()">' + lib + ' (' + _nb(m) + ')</button>';
+        }).join('');
+    } else if(_bar) { _bar.remove(); }
+  } catch(e) {}
 
   document.getElementById('taxis-list').innerHTML = list.length ? list.map(t => {
     const ag = DB.agents.find(a=>a.id===t.agId);
@@ -20223,7 +20253,7 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression'].forEach(x=>{
+  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
@@ -20701,8 +20731,14 @@ function rGestion() {
     html += `<button class="btn" style="width:100%;padding:12px;margin-top:8px" onclick="openAddMoto()">➕ Enregistrer un véhicule</button>`;
 
   // ─── TAXIS ───
-  } else if(gestTab==='taxis') {
-    const list = q ? taxisActifs().filter(t=>[t.nom,t.plaque,t.gilet].some(x=>nrm(x||'').includes(q))) : taxisActifs();
+  } else if(gestTab==='taxis' || gestTab==='vtc') {
+    // v9.582 : le meme rendu sert aux deux onglets, seul le type change. Dupliquer cent
+    // lignes de mise en forme pour une difference d'un mot aurait cree deux ecrans a
+    // maintenir — et un seul serait corrige le jour ou il faudra changer quelque chose.
+    const _voulu = (gestTab === 'vtc') ? 'voiture' : 'moto';
+    const _ceType = t => (_typeTaxi(t) === 'voiture' ? 'voiture' : 'moto') === _voulu;
+    const _basePar = taxisActifs().filter(_ceType);
+    const list = q ? _basePar.filter(t=>[t.nom,t.plaque,t.gilet].some(x=>nrm(x||'').includes(q))) : _basePar;
     html = mkSelBar(list) + list.map(t=>`
       <div class="card" style="margin-bottom:7px;${t.statut==='suspendu'?'opacity:.65;border-style:dashed':''}">
         <div style="display:flex;gap:8px;align-items:center">
