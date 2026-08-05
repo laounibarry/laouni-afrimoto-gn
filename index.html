@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.587';
+window.AFRIMOTO_VERSION = 'v9.588';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9038,7 +9038,23 @@ async function verifierStatutDemandeAuto() {
 
   if(demande.statutAttribution === 'annulee_chauffeur') {
     clearInterval(rch.intervalleCompteur);
-    alarmeCourseDemarrer(sonReservationActif()); // alerte forte : événement grave et récent
+    // ══ v9.588 — LE PASSAGER RECEVAIT L'ALARME DU CHAUFFEUR ══
+    //
+    // « alarmeCourseDemarrer » est la sonnerie d'une COURSE ENTRANTE : elle est faite pour un
+    // chauffeur au volant, donc longue et insistante — elle sonne et vibre CHAQUE SECONDE
+    // pendant trente secondes, en creant un nouveau contexte audio a chaque fois. Trente
+    // contextes, cent vingt oscillateurs.
+    //
+    // Cote chauffeur, « alarmeCourseStop » l'arrete des qu'il repond. Cote PASSAGER, personne
+    // ne l'arrete : elle allait au bout, et le telephone finissait par ne plus repondre.
+    //
+    // Le passager doit entendre une ANNULATION : deux bips graves, une fois. La fonction
+    // existait deja, elle n'etait simplement pas appelee ici.
+    if(!window._annulAlertee) window._annulAlertee = {};
+    if(!window._annulAlertee[demande.id]) {
+      window._annulAlertee[demande.id] = true;
+      try { alarmeAnnulationJouer(); } catch(e) {}
+    }
     // v9.486 : la carte de suivi ne doit pas rester ouverte par-dessus l'annonce d'annulation.
     try { if(typeof fermerSuiviTaxi === 'function' && document.getElementById('m-suivi-taxi') &&
       document.getElementById('m-suivi-taxi').classList.contains('on')) fermerSuiviTaxi(); } catch(e) {}
@@ -9772,6 +9788,10 @@ function alarmePrixProposeDemarrer(avecSon) {
           g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.3);
           o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.32);
         });
+        // v9.588 : on referme. Cette alarme-ci sonne CHEZ LE PASSAGER a chaque proposition de
+        // prix, trente cycles de suite — c'est en fonctionnement normal qu'elle saturait le
+        // telephone, pas seulement dans un cas rare.
+        setTimeout(function(){ try { ctx.close(); } catch(e) {} }, 1400);
       } catch(e) {}
     }
     try { if(navigator.vibrate) navigator.vibrate([400, 100, 400]); } catch(e) {}
@@ -9805,6 +9825,10 @@ function alarmeCourseDemarrer(avecSon) {
           g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.28);
           o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.3);
         });
+        // v9.588 : on referme. Sans cela chaque cycle laissait un contexte audio ouvert —
+        // trente par alerte, et le navigateur en limite le nombre. C'est ce qui figeait
+        // l'application au bout de quelques alertes.
+        setTimeout(function(){ try { ctx.close(); } catch(e) {} }, 1400);
       } catch(e) {}
     }
     try { if(navigator.vibrate) navigator.vibrate([850, 150]); } catch(e) {} // la vibration reste TOUJOURS active
@@ -9831,6 +9855,7 @@ function alarmeAnnulationJouer() {
       g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.35);
       o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.37);
     });
+    setTimeout(function(){ try { ctx.close(); } catch(e) {} }, 1400);   // v9.588
   } catch(e) {}
   try { if(navigator.vibrate) navigator.vibrate([300,100,300]); } catch(e) {}
 }
