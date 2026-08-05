@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.589';
+window.AFRIMOTO_VERSION = 'v9.590';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9885,6 +9885,29 @@ function _fermerCourseEntrante() {
   try { if(intervalleCompteurEntrant) clearInterval(intervalleCompteurEntrant); } catch(e) {}
   try { closeModal('m-course-entrante'); } catch(e) {}
   demandeEntranteActuelle = null;
+}
+
+let _derniereLectureEntrantes = 0;
+async function _lireMesCoursesEntrantes() {
+  if(!DB.user || DB.user.role !== 'client') return;
+  if(Date.now() - _derniereLectureEntrantes < 3000) return;
+  _derniereLectureEntrantes = Date.now();
+  const cl = DB.clients.find(c => c.id === DB.user.id);
+  if(!cl) return;
+  const ids = DB.taxis.filter(t => t.tel === cl.tel).map(t => t.id);
+  if(!ids.length) return;
+  try {
+    const { data } = await supabaseClient.from('demandes_course')
+      .select('*').in('taxi_id', ids)
+      .in('statut_attribution', ['en_attente','prix_propose','acceptee'])
+      .order('date', { ascending: false }).limit(5);
+    if(!data) return;
+    data.forEach(function(r) {
+      const m = mapDemandeCourse(r);
+      const i = DB.demandesCourse.findIndex(x => x.id === m.id);
+      if(i >= 0) DB.demandesCourse[i] = m; else DB.demandesCourse.unshift(m);
+    });
+  } catch(e) { }
 }
 
 function verifierDemandeEntrante() {
@@ -25467,6 +25490,18 @@ async function _verifierNouveautesTempsReel() {
         if(window._sigClient !== _sigC) { window._sigClient = _sigC; rClientContent(); }
       } catch(e) { try { rClientContent(); } catch(e2) {} }
     }
+    // ══ v9.590 — LE CHAUFFEUR DEMANDE, IL N'ATTEND PLUS QU'ON LUI DISE ══
+    //
+    // Le second chauffeur ne recevait rien tant qu'on n'actualisait pas la page. Sa
+    // souscription temps reel filtre sur « taxi_id » : au moment ou la course est creee,
+    // elle est vide — la course ne le concerne pas. Quand le serveur la lui attribue,
+    // l'evenement aurait du lui parvenir. Il n'arrive pas.
+    //
+    // Je ne cherche pas a plier ce filtre : je ne veux pas que la reception d'une course —
+    // ce qui fait vivre un chauffeur — dépende d'un comportement que je ne maitrise pas.
+    // Le telephone demande donc lui-meme, toutes les trois secondes : « une course pour
+    // moi ? ». Une requete sur index, minuscule, et qui ne peut pas rater.
+    try { _lireMesCoursesEntrantes(); } catch(e) {}
     // Ouvrir le modal de course entrante (prix à proposer) si une demande attend
     try { verifierDemandeEntrante(); } catch(e) {}
     // v9.420 : une course CONFIRMÉE doit s'afficher sur la CARTE du chauffeur (façon Bolt).
@@ -25496,6 +25531,32 @@ function demarrerSurveillanceTempsReel() {
   _survInterval = setInterval(_verifierNouveautesTempsReel, 10000); // toutes les 10 secondes
 }
 demarrerSurveillanceTempsReel();
+
+// ══ v9.590 — LA BOUCLE RAPIDE DU CHAUFFEUR EN SERVICE ══
+//
+// La surveillance ci-dessus tourne toutes les DIX secondes. C'est bien pour des
+// reservations de trajet ; c'est beaucoup trop lent pour une course : l'offre ne dure que
+// vingt-cinq secondes, et le chauffeur en perdait jusqu'a dix avant meme de la voir.
+//
+// Celle-ci tourne toutes les trois secondes, mais UNIQUEMENT quand un de ses vehicules est
+// EN SERVICE. Un chauffeur hors service, un passager, un visiteur : aucune requete. C'est ce
+// qui la rend supportable le jour ou des milliers de chauffeurs travailleront en meme temps.
+let _survCourseInterval = null;
+function demarrerSurveillanceCourses() {
+  if(_survCourseInterval) clearInterval(_survCourseInterval);
+  _survCourseInterval = setInterval(function () {
+    try {
+      if(!DB.user || DB.user.role !== 'client') return;
+      const cl = DB.clients.find(c => c.id === DB.user.id);
+      if(!cl) return;
+      // Le controle qui evite toute requete inutile : suis-je en service ?
+      if(!DB.taxis.some(t => t.tel === cl.tel && t.enService)) return;
+      _lireMesCoursesEntrantes();
+      verifierDemandeEntrante();
+    } catch(e) {}
+  }, 3000);
+}
+demarrerSurveillanceCourses();
 
 // ════ FILTRES D'EXPIRATION — appliqués dans tous les espaces ════
 function alertesValides() {
