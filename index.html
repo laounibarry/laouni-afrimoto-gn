@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.576';
+window.AFRIMOTO_VERSION = 'v9.577';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9820,28 +9820,59 @@ function accepterPrixPassager() {
   const _sdp = _soldeTaxiSuffisant(demande.taxiId);
   if(!_sdp.ok) { toast('\u26d4 Solde insuffisant pour la commission. Il vous manque ' + fmt(_sdp.manque) + '. Rechargez aupr\u00e8s d\'un agent.', true); return; }
   _demandesDejaTraitees.add(demande.id);
-  demande.statutAttribution = 'acceptee';
-  demande.prixPropose = p;
-  const patch = { statut_attribution:'acceptee', prix_propose:p };
-  if(_commissionAuTaxi()) debiterTaxiCommission(demande); // affaire conclue : le chauffeur paie sa commission
-  // Code a 4 chiffres genere ici (comme lorsque le passager accepte) : le passager le donnera au chauffeur
-  demande.pinConfirmation = String(Math.floor(1000 + Math.random() * 9000));
-  patch.pin_confirmation = demande.pinConfirmation;
-  sbMajStatutDemande(demande.id, patch).then(ok => {
-    if(ok) { toast('\u2705 Prix de ' + fmt(p) + ' accept\u00e9 \u2014 course confirm\u00e9e !');
+  // \u2550\u2550 v9.577 \u2014 C'EST LE SERVEUR QUI TRANCHE, ET LUI SEUL \u2550\u2550
+  //
+  // Avant, ce code faisait trois choses dans le mauvais ordre :
+  //   1. il verifiait \u00ab statut = en_attente \u00bb DANS SA PROPRE COPIE \u2014 deux chauffeurs dont
+  //      les copies disaient toutes deux \u00ab en attente \u00bb passaient tous les deux ;
+  //   2. il PRELEVAIT LA COMMISSION avant de savoir s'il avait gagne la course. Le
+  //      chauffeur qui perdait payait quand meme ;
+  //   3. il ecrivait \u00ab acceptee \u00bb sans condition \u2014 le dernier arrive ecrasait le premier.
+  //
+  // Desormais : on demande au serveur. Il verrouille la ligne, tranche, et repond. On ne
+  // prend l'argent QUE si l'on a reellement gagne.
+  const _pin = String(Math.floor(1000 + Math.random() * 9000));
+  supabaseClient.rpc('accepter_course', {
+    p_course_id: demande.id, p_taxi_id: String(demande.taxiId || ''),
+    p_prix: p, p_pin: _pin
+  }).then(({ data, error }) => {
+    if(error || !data || data.ok !== true) {
+      const r = (data && data.raison) || '';
+      toast(r === 'deja_prise'
+        ? '\u26d4 Trop tard \u2014 cette course vient d\'\u00eatre prise par ' + ((data && data.par) || 'un autre chauffeur') + '.'
+        : r === 'course_fermee' ? '\u26d4 Cette course n\'est plus disponible.'
+        : '\u274c Impossible d\'accepter \u2014 r\u00e9essayez.', true);
+      _demandesDejaTraitees.delete(demande.id);
+      try { closeModal('m-course-entrante'); } catch(e) {}
+      demandeEntranteActuelle = null;
+      return;
+    }
+    // Gagne. C'est seulement maintenant que l'affaire est conclue.
+    demande.statutAttribution = 'acceptee';
+    demande.prixPropose = p;
+    demande.pinConfirmation = _pin;
+    // \u00ab deja \u00bb = c'est nous qui l'avions deja acceptee (double appui, reseau lent). On ne
+    // represente surtout pas la commission une seconde fois.
+    if(data.deja !== true && _commissionAuTaxi()) debiterTaxiCommission(demande);
+    {
+      toast('\u2705 Prix de ' + fmt(p) + ' accept\u00e9 \u2014 course confirm\u00e9e !');
       try { logMvt('accept', '\u2705 Chauffeur a accept\u00e9 le prix du passager \u2014 PIN g\u00e9n\u00e9r\u00e9', 0, DB.user?DB.user.name:'Chauffeur', '', {cibleType:'demande_course',cibleId:demande.id}); } catch(e){} }
+    // v9.577 : tout ce qui suit une acceptation REUSSIE — fermer la fenetre, arreter la
+    // sonnerie, amener le chauffeur sur la carte — ne doit se produire QUE si le serveur
+    // nous a donne la course. Sinon on fermait l'ecran et on lancait la carte pour une
+    // course qu'un autre venait de prendre.
+    if(intervalleCompteurEntrant) clearInterval(intervalleCompteurEntrant);
+    alarmeCourseStop();
+    closeModal('m-course-entrante');
+    demandeEntranteActuelle = null;
+    try { rClientContent(); } catch(e){}
+    // Amener le chauffeur sur la carte avec la course (facon Bolt)
+    try {
+      if(typeof _coursesAmeneesCarte !== 'undefined') _coursesAmeneesCarte.add(demande.id);
+      if(!document.body.classList.contains('mode-service') && typeof entrerModeService === 'function') entrerModeService(demande.taxiId);
+      else if(typeof majCourseSurCarte === 'function') majCourseSurCarte();
+    } catch(e){}
   });
-  if(intervalleCompteurEntrant) clearInterval(intervalleCompteurEntrant);
-  alarmeCourseStop();
-  closeModal('m-course-entrante');
-  demandeEntranteActuelle = null;
-  try { rClientContent(); } catch(e){}
-  // Amener le chauffeur sur la carte avec la course (facon Bolt)
-  try {
-    if(typeof _coursesAmeneesCarte !== 'undefined') _coursesAmeneesCarte.add(demande.id);
-    if(!document.body.classList.contains('mode-service') && typeof entrerModeService === 'function') entrerModeService(demande.taxiId);
-    else if(typeof majCourseSurCarte === 'function') majCourseSurCarte();
-  } catch(e){}
 }
 
 function repondreCourseEntrante(accepte) {
@@ -10945,9 +10976,34 @@ function terminerCourse(demandeId) {
   askConfirm(_msg, () => _terminerCourseConfirmee(demandeId));
 }
 
-function _terminerCourseConfirmee(demandeId) {
+async function _terminerCourseConfirmee(demandeId) {
   const demande = DB.demandesCourse.find(d => d.id === demandeId);
   if(!demande) return;
+  // ══ v9.577 — TERMINER UNE COURSE NE PEUT PLUS SE FAIRE DEUX FOIS ══
+  //
+  // C'était une écriture simple : rien ne vérifiait que ce n'était pas déjà fait. D'où la
+  // même course terminée deux fois — et, quand la commission est prélevée à la fin, prise
+  // deux fois aussi. Le serveur tranche maintenant, sur la ligne verrouillée.
+  try {
+    const { data, error } = await supabaseClient.rpc('terminer_course', {
+      p_course_id: demandeId, p_taxi_id: String(demande.taxiId || '')
+    });
+    if(error || !data || data.ok !== true) {
+      toast('❌ La fin de course n\'a pas pu être enregistrée. Réessayez.', true);
+      return;
+    }
+    if(data.deja === true) {
+      // Déjà terminée — ailleurs, ou par un premier appui. On remet l'écran d'aplomb sans
+      // refaire ce qui suit une fin de course.
+      demande.enCours = false; demande.statutAttribution = 'terminee';
+      toast('✅ Cette course était déjà terminée.');
+      try { rClient(); } catch(e) {}
+      return;
+    }
+  } catch(e) {
+    toast('❌ La fin de course n\'a pas pu être enregistrée. Réessayez.', true);
+    return;
+  }
   demande.enCours = false;
   demande.statutAttribution = 'terminee';
   demande.heureFin = new Date().toISOString();
