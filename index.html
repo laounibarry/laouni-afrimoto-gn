@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.584';
+window.AFRIMOTO_VERSION = 'v9.585';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -7124,9 +7124,18 @@ async function reprendreDemandeEnAttente() {
     if(data && data[0]) {
       const d = mapDemandeCourse(data[0]);
 
-      // Une demande en_attente/prix_propose vieille de plus de 2 minutes est abandonnée :
-      // on ne relance JAMAIS un suivi/recherche dessus après un simple rafraîchissement de page.
-      if((d.statutAttribution === 'en_attente' || d.statutAttribution === 'prix_propose') && !estEncoreActuel(d.date)) {
+      // ══ v9.585 — DEUX MINUTES, C'ETAIT LA DUREE D'UNE TENTATIVE, PAS D'UNE RECHERCHE ══
+      //
+      // Ce controle abandonnait toute demande de plus de deux minutes. Juste quand chaque
+      // tentative avait sa propre ligne : au-dela, elle etait bien perimee.
+      //
+      // Avec UNE SEULE course qui passe de chauffeur en chauffeur, une recherche normale
+      // depasse deux minutes des le troisieme appel — et la course etait tuee en pleine
+      // recherche, sans que rien ne l'annonce.
+      //
+      // On s'aligne sur la regle du serveur : un quart d'heure. Une seule regle, un seul
+      // endroit qui decide — sinon les deux finissent par se contredire.
+      if((d.statutAttribution === 'en_attente' || d.statutAttribution === 'prix_propose') && !estEncoreActuel(d.date, 900000)) {
         d.statutAttribution = 'expiree';
         sbMajStatutDemande(d.id, {statut_attribution: 'expiree'});
         return;
@@ -9047,10 +9056,20 @@ async function verifierStatutDemandeAuto() {
   if(demande.statutAttribution === 'refusee' || demande.statutAttribution === 'refusee_passager' || secondesRestantes <= 0) {
     clearInterval(rch.intervalleCompteur);
     rch.intervalleCompteur = null;
-    if(demande.statutAttribution !== 'refusee' && demande.statutAttribution !== 'refusee_passager') {
-      demande.statutAttribution = 'expiree';
-      sbSaveDemandeCourse(demande);
-    }
+    // ══ v9.585 — ON NE TUE PLUS LA COURSE AU BOUT DE 25 SECONDES ══
+    //
+    // Ces trois lignes ecrivaient « expiree » EN BASE sur la course des que le delai d'un
+    // chauffeur s'ecoulait. C'etait juste tant que chaque tentative avait sa propre ligne :
+    // cette tentative-la etait morte, la suivante naissait ailleurs.
+    //
+    // Avec UNE SEULE course, cela la tuait entierement. Le serveur repondait ensuite
+    // « course_fermee » et la recherche s'arretait — plus aucun chauffeur n'etait contacte.
+    // C'est la cause de « il a refuse, et personne d'autre n'a ete appele ».
+    //
+    // Ce qui expire, ce n'est pas la course : c'est L'OFFRE faite a ce chauffeur. Le serveur
+    // s'en charge (« refuser_course » l'ecarte et rouvre la course). La demande du passager,
+    // elle, ne meurt qu'a son annulation ou au bout du quart d'heure.
+    demande.statutAttribution = 'en_attente';
     // ════════════════════════════════════════════════
     // v9.490 — ON ENCHAINE TOUT SEUL SUR LE CHAUFFEUR SUIVANT
     // Avant : un refus du chauffeur, un refus de prix, ou une absence de reponse arretaient la
