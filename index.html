@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.582';
+window.AFRIMOTO_VERSION = 'v9.583';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1505,7 +1505,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     };
   }
   function mapDemandeCourse(r) {
-    return { id:r.id,
+    // v9.583 : le moment ou la course a ete proposee A CE CHAUFFEUR. Il ne faut plus
+    // juger de sa fraicheur sur la date de CREATION : avec une seule course qui passe
+    // de chauffeur en chauffeur, elle vieillit pendant toute la recherche.
+    return { id:r.id, offreFaiteLe:r.offre_faite_le||null,
       passagerId:r.passager_id||r.passagerId||'',
       passagerNom:r.passager_nom||r.passagerNom||'',
       passagerTel:r.passager_tel||r.passagerTel||'',
@@ -8763,7 +8766,7 @@ async function demarrerRechercheAutomatique(commissionDejaPayee) {
   }
 
   rechercheAutoEnCours = { liste, index: 0, demandeId: _nouvelleCourse.id, intervalleCompteur: null,
-                           finA: null, ref: _ref, tour: 0,
+                           finA: Date.now() + 25000, ref: _ref, tour: 0,
                            commissionPayee: dejaPayee ? commissionDejaPayee : commission };
   openModal('m-recherche-auto');
   contacterProchainTaxi();
@@ -8833,6 +8836,11 @@ async function contacterProchainTaxi() {
     document.getElementById('ra-detail').innerHTML =
       esc(r.nom || 'Chauffeur') + _dist +
       '<br><span style="font-size:11px">Appel n°' + (r.appel_no || 1) + '</span>';
+    // v9.583 : LE COMPTE A REBOURS. Je l'avais laisse a null dans le nouvel etat : il
+    // partait donc DEJA EXPIRE, et chaque chauffeur etait declare « sans reponse » en une
+    // seconde. La recherche defilait trop vite pour qu'un seul telephone ait le temps de
+    // sonner. C'est le serveur qui dit combien de temps il reste : on le suit.
+    rch.finA = Date.now() + (r.reste_s || 25) * 1000;
     if(rch.intervalleCompteur) clearInterval(rch.intervalleCompteur);
     rch.intervalleCompteur = setInterval(() => verifierStatutDemandeAuto(), 1000);
     verifierStatutDemandeAuto();
@@ -8841,7 +8849,12 @@ async function contacterProchainTaxi() {
   }
 
   // — Une offre est deja en cours : on attend, on ne double personne.
-  if(r.ok === true && r.etat === 'offre_en_cours') { _replanifier((r.reste_s || 5) + 1); return; }
+  if(r.ok === true && r.etat === 'offre_en_cours') {
+    // On se recale sur le serveur : lui seul sait depuis quand l'offre court.
+    rch.finA = Date.now() + (r.reste_s || 5) * 1000;
+    _replanifier((r.reste_s || 5) + 1);
+    return;
+  }
 
   // — Personne de libre pour l'instant. La recherche NE S'ARRETE PAS : un chauffeur peut
   //   se liberer ou se remettre en service d'une seconde a l'autre.
@@ -9763,7 +9776,10 @@ function verifierDemandeEntrante() {
     return true;
   });
   if(!demande) return;
-  if(!estEncoreActuel(demande.date)) { _demandesDejaTraitees.add(demande.id); return; } // plus d'actualité : le passager a déjà abandonné
+  // v9.583 : on juge sur le moment de L'OFFRE. Sur la date de creation, toute recherche
+  // depassant deux minutes devenait invisible pour les chauffeurs suivants — et plus
+  // personne ne sonnait, sans le moindre message.
+  if(!estEncoreActuel(demande.offreFaiteLe || demande.date)) { return; } // plus d'actualité
 
   demandeEntranteActuelle = demande;
   const ps = DB.passagers.find(p => p.id === demande.passagerId);
