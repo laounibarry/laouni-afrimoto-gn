@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.577';
+window.AFRIMOTO_VERSION = 'v9.578';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1408,6 +1408,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     return { id:r.id, num:r.num||'', plaque:r.plaque||'', nom:r.nom_chauffeur||r.nom||'',
       tel:r.telephone||r.tel||'', photo:_photoValable(r.photo_url||r.photo), gilet:r.gilet||false,
       statut:r.statut||'actif', position:_pos,
+      rayonKm:Number(r.rayon_km) || 5,   // v9.578 : perimetre d'appel choisi par le chauffeur
       enService:(r.en_service!==undefined&&r.en_service!==null)?r.en_service:(r.enService||false),
       lat:(_pos&&_pos.lat!=null)?_pos.lat:(r.lat!=null?r.lat:null),
       lng:(_pos&&_pos.lng!=null)?_pos.lng:(r.lng!=null?r.lng:null),
@@ -10360,6 +10361,25 @@ function rClientContent() {
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
                 <button class="btn" style="flex:1;font-size:13px;font-weight:800;padding:12px 11px;background:#16A34A;color:#fff" onclick="entrerModeService('${t.id}')">${t.enService ? '🗺️ Retour au service' : '🗺️ Ouvrir la carte'}</button>
                 <button class="btn-blue" style="flex:1;font-size:11px;padding:9px 11px" onclick="openChangerZoneTaxi('${t.id}')">📍 Changer de zone</button>
+              </div>
+              <!-- v9.578 : LE PERIMETRE D'APPEL, REGLE PAR LE CHAUFFEUR LUI-MEME.
+                   Jusqu'ici le systeme appelait par ZONE — le quartier declare. Un chauffeur
+                   au bout de sa zone etait appele pour une course a l'autre extremite, et un
+                   chauffeur a 400 metres mais de l'autre cote d'une limite ne l'etait jamais.
+                   Une distance reelle vaut mieux qu'un nom de quartier. -->
+              <div class="card" style="margin-top:8px;background:rgba(0,0,0,.04)">
+                <div style="font-weight:700;font-size:13px;margin-bottom:2px">🎯 Jusqu'où j'accepte d'aller chercher</div>
+                <div style="font-size:11px;color:var(--text2);margin-bottom:8px">
+                  Vous ne recevrez que les courses dont le passager est à moins de
+                  <b>${Number(t.rayonKm) || 5} km</b> de vous.
+                </div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap">
+                  ${[3,4,5,6,7,10,15].map(km => {
+                    const actif = (Number(t.rayonKm) || 5) === km;
+                    return '<button class="' + (actif ? 'btn' : 'btn-ghost') + '" style="flex:1;min-width:52px;font-size:12px;padding:9px 4px" ' +
+                           'onclick="reglerRayonTaxi(\'' + t.id + '\',' + km + ')">' + km + ' km</button>';
+                  }).join('')}
+                </div>
               </div>
               <!-- v9.520 : le chauffeur ajoute ou remplace SA photo depuis son espace. C'est
                    elle que le passager voit avant de monter, et l'administration peut l'exiger
@@ -22808,6 +22828,32 @@ function decalerPeriodeRevenus(pas) {
 }
 
 // v9.532 : le chauffeur ajoute ou retire une categorie depuis la fiche de son vehicule.
+// ══ v9.578 — LE CHAUFFEUR REGLE SON PROPRE PERIMETRE ══
+//
+// C'est le serveur qui enregistre et qui applique : la valeur ne sert a rien si elle ne
+// vit que dans le telephone, puisque c'est le serveur qui choisit a qui proposer.
+async function reglerRayonTaxi(taxiId, km) {
+  try {
+    const t = DB.taxis.find(x => x.id === taxiId);
+    if(!t) return;
+    // Meme controle que pour les categories : on ne regle que SON propre vehicule.
+    if(DB.user && DB.user.role === 'client') {
+      const cl = DB.clients.find(c => c.id === DB.user.id);
+      if(!cl || cl.tel !== t.tel) { toast('⛔ Action non autorisée', true); return; }
+    }
+    const { data, error } = await supabaseClient.rpc('regler_rayon_taxi', {
+      p_taxi_id: String(taxiId), p_rayon: Number(km)
+    });
+    if(error || !data || data.ok !== true) {
+      toast('❌ Le périmètre n\'a pas pu être enregistré. Réessayez.', true);
+      return;
+    }
+    t.rayonKm = Number(km);
+    toast('🎯 Vous recevrez les courses jusqu\'à ' + km + ' km de vous.');
+    try { rClient(); } catch(e) {}
+  } catch(e) { toast('❌ Le périmètre n\'a pas pu être enregistré.', true); }
+}
+
 async function basculerCategorieTaxi(taxiId, cat) {
   try {
     const t = DB.taxis.find(x => x.id === taxiId);
