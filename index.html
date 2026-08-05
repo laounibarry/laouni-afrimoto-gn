@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.583';
+window.AFRIMOTO_VERSION = 'v9.584';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9084,13 +9084,24 @@ async function verifierStatutDemandeAuto() {
     const _taxiEcarte = demande.taxiId;
     supabaseClient.rpc('refuser_course', {
       p_course_id: rch.demandeId, p_taxi_id: String(_taxiEcarte || '')
-    }).catch(() => {}).then(() => {
+    // v9.584 : « .catch » etait appele DIRECTEMENT sur la requete Supabase. Cet objet n'a
+    // pas de « .catch », seulement « .then » : la ligne levait donc une erreur chaque
+    // seconde, et la relance n'etait JAMAIS programmee. La recherche mourait en silence
+    // apres le premier refus — aucun autre chauffeur n'etait contacte.
+    // « .then » d'abord, « .catch » ensuite : c'est le seul ordre valable ici.
+    }).then(() => {
       demande.taxiId = null;
       demande.statutAttribution = 'en_attente';
       if(rch._minuteurSuivant) clearTimeout(rch._minuteurSuivant);
       rch._minuteurSuivant = setTimeout(function () {
         if(rechercheAutoEnCours === rch) contacterProchainTaxi();
       }, 1200);
+    }).catch(() => {
+      // Meme en cas d'echec reseau, on doit relancer : sinon le passager attend pour rien.
+      if(rch._minuteurSuivant) clearTimeout(rch._minuteurSuivant);
+      rch._minuteurSuivant = setTimeout(function () {
+        if(rechercheAutoEnCours === rch) contacterProchainTaxi();
+      }, 2000);
     });
     return;
   }
