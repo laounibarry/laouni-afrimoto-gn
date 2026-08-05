@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.586';
+window.AFRIMOTO_VERSION = 'v9.587';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -971,8 +971,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         { data: listeNoireData },
         { data: configRows },
       ] = await Promise.all([
-        supabaseClient.from('agents').select('*'),
-        supabaseClient.from('sous_agents').select('*'),
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         // v9.541 : LA TABLE DES CLIENTS N'EST PLUS TELECHARGEE PAR TOUT LE MONDE.
         // Un « client » est un proprietaire ou un chauffeur. La liste servait a trois choses
         // hors du personnel : lire SA PROPRE fiche, prelever la commission du chauffeur, et
@@ -1009,9 +1009,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
                        .eq('client_id', _idEnregistre()).limit(PLAFOND_LIGNES)
                    : Promise.resolve({ data: [] })),
         supabaseClient.from('taxis').select('*'),
-        supabaseClient.from('trajets').select('*'),
-        supabaseClient.from('annonces').select('*'),
-        supabaseClient.from('alertes').select('*'),
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         // v9.515 : L'HISTORIQUE DES MOUVEMENTS NE PART PLUS SUR TOUS LES TELEPHONES.
         // C'est la table qui grossit le plus vite — une ligne par recharge, par commission,
         // par enregistrement — et elle n'est lue QUE par les ecrans du personnel (historique,
@@ -1019,7 +1019,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // entierement a chaque ouverture sans jamais s'en servir.
         // v9.546 : plus de coupure au hasard. Voir _chargerMouvements() plus bas — le
         // chargement se fait page par page, sur une fenetre de temps que l'on peut expliquer.
-        _perso ? _chargerMouvements() : Promise.resolve({ data: [] }),
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         // v9.515 : la corbeille entiere n'est utile qu'a l'ecran du personnel. Mais deux
         // controles de CONNEXION la consultent (compte supprime, vehicule supprime) : on garde
         // donc ces deux categories pour tout le monde, et rien d'autre.
@@ -1027,14 +1027,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
                : supabaseClient.from('corbeille').select('*')
                    .in('liste_origine', ['clients', 'vehicules']).limit(PLAFOND_LIGNES),
         supabaseClient.from('demandes_course').select('*'),
-        supabaseClient.from('avis_chauffeurs').select('*').order('created_at', {ascending: false}),
-        supabaseClient.from('avis_courses').select('*').order('created_at', {ascending: false}),
-        supabaseClient.from('chauffeurs_bloques_par_nom').select('*'),
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         // v9.510 : ce journal grossit a chaque consultation sensible et ne sert qu'a
         // l'administration. Un passager n'a aucune raison de le telecharger.
-        _perso ? supabaseClient.from('journal_acces_sensibles').select('*').limit(PLAFOND_LIGNES)
-               : Promise.resolve({ data: [] }),
-        supabaseClient.from('liste_noire_reservations').select('*'),
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
+        Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         supabaseClient.from('config_admin').select('*').limit(1),
       ]);
 
@@ -1177,6 +1176,64 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           }
         } catch(e) { try { addDebugLog('RECHARGEMENT compte : ' + ((e && e.message) || e)); } catch(er) {} }
       };
+
+      // ══ v9.587 — LE SITE S'OUVRE D'ABORD, LE RESTE ARRIVE ENSUITE ══
+      //
+      // Avant, RIEN ne s'affichait tant que les dix-huit tables n'etaient pas arrivees. Sur
+      // un reseau faible, le chauffeur qui voulait se mettre en service attendait le
+      // telechargement de la liste noire des reservations, des avis et du journal d'acces —
+      // dont son ecran n'a aucun besoin.
+      //
+      // Restent bloquantes : sa fiche, ses vehicules, les taxis, la course en cours, la
+      // configuration, et la corbeille — celle-ci parce que deux controles de CONNEXION la
+      // consultent (compte supprime, vehicule supprime) et qu'on ne peut pas laisser entrer
+      // quelqu'un dont le compte a ete supprime.
+      //
+      // Les onze autres arrivent apres, et l'ecran se remplit tout seul.
+      window._chargerLeReste = async function() {
+        if(window._resteEnCours) return; window._resteEnCours = true;
+        try {
+          const [ ag, sa, tj, an, al, mv, av1, av2, cb, jr, ln ] = await Promise.all([
+            supabaseClient.from('agents').select('*'),
+            supabaseClient.from('sous_agents').select('*'),
+            supabaseClient.from('trajets').select('*'),
+            supabaseClient.from('annonces').select('*'),
+            supabaseClient.from('alertes').select('*'),
+            _perso ? _chargerMouvements() : Promise.resolve({ data: [] }),
+            supabaseClient.from('avis_chauffeurs').select('*').order('created_at', {ascending: false}),
+            supabaseClient.from('avis_courses').select('*').order('created_at', {ascending: false}),
+            supabaseClient.from('chauffeurs_bloques_par_nom').select('*'),
+            _perso ? supabaseClient.from('journal_acces_sensibles').select('*').limit(PLAFOND_LIGNES)
+                   : Promise.resolve({ data: [] }),
+            supabaseClient.from('liste_noire_reservations').select('*')
+          ]);
+          DB.agents      = (ag.data||[]).map(mapAgent);
+          DB.sousAgents  = (sa.data||[]).map(mapSousAgent);
+          DB.trajets     = (tj.data||[]).map(mapTrajet);
+          DB.trajets.forEach(t => { if(!t.tel && t.clientId) {
+            const _c = DB.clients.find(c => c.id === t.clientId); if(_c) t.tel = _c.tel || ''; } });
+          DB.annonces    = (an.data||[]).map(mapAnnonce);
+          DB.alertes     = (al.data||[]).map(mapAlerte);
+          DB.mouvements  = (mv.data||[]).map(mapMouvement);
+          DB.avisChauffeurs = (av1.data||[]).map(mapAvis);
+          DB.avisCourses    = (av2.data||[]).map(x=>({...x}));
+          DB.chauffeursBloquesParNom = (cb.data||[]).map(x=>x.nom||x.name||x);
+          DB.journalAccesSensibles = (jr.data||[]).map(x=>({
+            ...x, consultePar:x.consulte_par||'', date:x.created_at||null,
+            typeDocument:x.type_document||'', cibleId:x.cible_id||null }));
+          DB.listeNoireReservations = (ln.data||[]).map(r => ({
+            id:r.id, telephone:r.telephone||'', email:r.email||'',
+            date_blocage:r.date_blocage, raison:r.raison||'Fraude: 3+ réservations non confirmées',
+            count:r.count||3 }));
+          // L'ecran se remplit tout seul : on redessine celui qui est affiche.
+          try { if(typeof rAll === 'function') rAll(); } catch(e) {}
+          try { addDebugLog('CHARGEMENT : deuxieme vague arrivee'); } catch(e) {}
+        } catch(e) {
+          try { addDebugLog('CHARGEMENT deuxieme vague : ' + ((e && e.message) || e)); } catch(er) {}
+        } finally { window._resteEnCours = false; }
+      };
+      // Apres le premier dessin, jamais avant : c'est tout l'interet.
+      setTimeout(function(){ try { window._chargerLeReste(); } catch(e) {} }, 0);
 
       // Tri côté client (le tri serveur échouait silencieusement quand created_at manquait)
       const _triDate = (arr, champ) => (arr||[]).sort((a,b) => new Date(b[champ]||0) - new Date(a[champ]||0));
