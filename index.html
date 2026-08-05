@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.585';
+window.AFRIMOTO_VERSION = 'v9.586';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -8904,7 +8904,10 @@ async function verifierStatutDemandeAuto() {
   if(!demande) return;
 
   // Lecture fraîche depuis Supabase (toutes les 3 s) : AWAIT pour que le statut soit à jour AVANT le check
-  if(Date.now() - _derniereLectureDemande > 3000) {
+  // v9.586 : pendant une recherche, on relit plus souvent. Le passager regarde son ecran
+  // et attend ; trois secondes d'ignorance sont longues a ce moment-la.
+  const _cadence = (demande.statutAttribution === 'en_attente') ? 1500 : 3000;
+  if(Date.now() - _derniereLectureDemande > _cadence) {
     _derniereLectureDemande = Date.now();
     try {
       const {data} = await supabaseClient.from('demandes_course').select('*').eq('id', rch.demandeId);
@@ -8916,6 +8919,15 @@ async function verifierStatutDemandeAuto() {
         // v9.579 : le SERVEUR deplace maintenant le chauffeur d'un appel a l'autre. Sans
         // cette relecture, l'ecran du passager continuerait d'afficher le premier contacte.
         if(frais.taxiId !== undefined) { demande.taxiId = frais.taxiId; demande.taxiNom = frais.taxiNom; demande.taxiPlaque = frais.taxiPlaque; }
+        // v9.586 : filet. Si le temps reel n'a rien apporte (reseau, onglet en veille), cette
+        // relecture voit elle aussi la place liberee, et enchaine sans attendre le delai.
+        if(frais.statutAttribution === 'en_attente' && !frais.taxiId && rch.demandeId === demande.id) {
+          if(rch._minuteurTour) clearTimeout(rch._minuteurTour);
+          if(rch._minuteurSuivant) clearTimeout(rch._minuteurSuivant);
+          rch._minuteurSuivant = setTimeout(function(){
+            if(rechercheAutoEnCours === rch) contacterProchainTaxi();
+          }, 200);
+        }
       }
     } catch(e) { console.warn('lecture demande:', e && e.message); }
   }
@@ -27047,6 +27059,24 @@ body.mode-service .nav-inner{display:none!important}
             if(p.eventType==='DELETE'){ if(i>=0) DB.demandesCourse.splice(i,1); }
             else { var m=mapDemandeCourse(r); if(i>=0) DB.demandesCourse[i]=m; else DB.demandesCourse.unshift(m); }
             battement(); // reaction immediate sur la carte (chauffeur)
+            // ══ v9.586 — LE REFUS SE VOIT A LA SECONDE ══
+            //
+            // Quand un chauffeur refuse, le serveur l'ecarte et vide « taxi_id ». Le passager
+            // attendait pourtant la fin des vingt-cinq secondes avant de redemander : jusqu'a
+            // vingt-cinq secondes perdues alors que la reponse etait deja arrivee.
+            //
+            // Ici on le voit arriver par le temps reel, et on enchaine immediatement.
+            try {
+              if(rechercheAutoEnCours && rechercheAutoEnCours.demandeId === r.id &&
+                 !r.taxi_id && r.statut_attribution === 'en_attente') {
+                var _rch = rechercheAutoEnCours;
+                if(_rch._minuteurTour) clearTimeout(_rch._minuteurTour);
+                if(_rch._minuteurSuivant) clearTimeout(_rch._minuteurSuivant);
+                _rch._minuteurSuivant = setTimeout(function(){
+                  if(rechercheAutoEnCours === _rch) contacterProchainTaxi();
+                }, 200);
+              }
+            } catch(e) {}
             // v9.465 : le TEMPS REEL profite aussi au passager (statut de sa course, suivi
             // du chauffeur) — avant, seul le chauffeur en beneficiait, le passager restait
             // au sondage (1-10 s). Chaque fonction ne fait rien si elle n'est pas concernee.
