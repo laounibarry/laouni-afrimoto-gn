@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.588';
+window.AFRIMOTO_VERSION = 'v9.589';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9879,8 +9879,38 @@ function alarmeCourseStop() {
   if(_alarmeCourseInterval) { clearInterval(_alarmeCourseInterval); _alarmeCourseInterval = null; }
   try { if(navigator.vibrate) navigator.vibrate(0); } catch(e) {}
 }
+// v9.589 : referme proprement la fenetre d'une course entrante.
+function _fermerCourseEntrante() {
+  try { alarmeCourseStop(); } catch(e) {}
+  try { if(intervalleCompteurEntrant) clearInterval(intervalleCompteurEntrant); } catch(e) {}
+  try { closeModal('m-course-entrante'); } catch(e) {}
+  demandeEntranteActuelle = null;
+}
+
 function verifierDemandeEntrante() {
   if(!DB.user || DB.user.role !== 'client') return;
+  // ══ v9.589 — LA FENETRE NE RESTE PLUS OUVERTE POUR RIEN ══
+  //
+  // Quand le delai expirait, le serveur passait la course au chauffeur suivant — mais RIEN
+  // ne retirait la fenetre du premier. Il l'avait toujours sous les yeux et pouvait proposer
+  // son prix trente secondes plus tard, alors qu'elle etait deja chez un autre. D'ou la meme
+  // course en attente sur deux telephones, avec deux prix.
+  //
+  // On verifie donc a chaque tour que la course affichee est TOUJOURS la sienne.
+  if(demandeEntranteActuelle) {
+    try {
+      const _cl = DB.clients.find(c => c.id === DB.user.id);
+      const _miens = _cl ? DB.taxis.filter(t => t.tel === _cl.tel).map(t => t.id) : [];
+      const _d = DB.demandesCourse.find(x => x.id === demandeEntranteActuelle.id);
+      const _plusAMoi = !_d || !_miens.includes(_d.taxiId) ||
+                        (_d.statutAttribution !== 'en_attente' && _d.statutAttribution !== 'prix_propose');
+      if(_plusAMoi) {
+        _fermerCourseEntrante();
+        if(_d && _d.statutAttribution === 'acceptee') toast('Cette course a été prise par un autre chauffeur.');
+        else toast('⏱️ Le délai est écoulé — la course est passée au chauffeur suivant.');
+      }
+    } catch(e) {}
+  }
   if(document.getElementById('m-course-entrante').classList.contains('open')) return; // déjà en train d'en traiter une
   const cl = DB.clients.find(c => c.id === DB.user.id);
   if(!cl) return;
@@ -10114,10 +10144,29 @@ function repondreCourseEntrante(accepte) {
         toast('\u26d4 Solde insuffisant pour la commission. Il vous manque ' + fmt(_sdp.manque) + '. Rechargez aupr\u00e8s d\'un agent.', true);
         return;
       }
-      demande.statutAttribution = 'prix_propose';
-      demande.prixPropose = prix;
-      sbMajStatutDemande(demande.id, {statut_attribution:'prix_propose', prix_propose:prix}).then(ok => {
-        if(ok) toast('💰 Prix proposé : ' + fmt(prix) + ' — en attente de l\'accord du passager');
+      // ══ v9.589 — LE PRIX AUSSI PASSE PAR LE SERVEUR ══
+      //
+      // C'etait le troisieme chemin d'ecriture, et le seul que j'avais laisse sans
+      // condition. Un chauffeur dont le delai avait expire gardait la fenetre a l'ecran et
+      // pouvait proposer son prix alors que la course etait deja chez un autre : deux
+      // chauffeurs en attente sur la meme course, avec deux prix differents.
+      supabaseClient.rpc('proposer_prix', {
+        p_course_id: demande.id, p_taxi_id: String(demande.taxiId || ''), p_prix: prix
+      }).then(function(rep) {
+        var data = rep && rep.data, err = rep && rep.error;
+        if(err || !data || data.ok !== true) {
+          var r = (data && data.raison) || '';
+          toast(r === 'plus_a_vous'
+              ? '⏱️ Trop tard — cette course est passée à ' + ((data && data.maintenant_chez) || 'un autre chauffeur') + '.'
+            : r === 'deja_prise'   ? '⛔ Cette course vient d' + AP + 'être prise.'
+            : r === 'course_fermee' ? '⛔ Cette course n' + AP + 'est plus active.'
+            : '❌ Votre prix n' + AP + 'a pas pu être envoyé. Réessayez.', true);
+          try { _fermerCourseEntrante(); } catch(e) {}
+          return;
+        }
+        demande.statutAttribution = 'prix_propose';
+        demande.prixPropose = prix;
+        toast('💰 Prix proposé : ' + fmt(prix) + ' — en attente de l' + AP + 'accord du passager');
       });
     } else {
       // ══ v9.579 — LE REFUS LIBERE LA COURSE, IL NE LA FERME PLUS ══
