@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.579';
+window.AFRIMOTO_VERSION = 'v9.580';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -26193,6 +26193,10 @@ body.mode-service .nav-inner{display:none!important}
   <div id="svc-sousmenu">
     <button class="svc-sm-item" onclick="basculerSousMenuService();demanderMenuService()">&#128194; <span>Menu AfriMoto</span></button>
     <button class="svc-sm-item" onclick="basculerSousMenuService();recentrerService()">&#127919; <span>Ma position</span></button>
+    <!-- v9.580 : le perimetre etait reglable dans l'espace du chauffeur, mais lui passe sa
+         journee sur CETTE carte. Un reglage qu'il faut aller chercher ailleurs n'est pas
+         un reglage : c'est un reglage que personne ne touche. -->
+    <button class="svc-sm-item" onclick="basculerSousMenuService();ouvrirPerimetreService()">&#127919; <span id="svc-sm-perimetre">Mon p&eacute;rim&egrave;tre</span></button>
   </div>
   <div class="svc-pill" onclick="basculerRevenu()"><div class="amt"><span id="svc-revenu">0 GNF</span> <span id="svc-eye" style="font-size:13px">&#128065;&#65039;</span></div><div class="lbl" id="svc-etat" style="cursor:pointer;padding:3px 0 1px" onclick="basculerServiceDepuisPill(event)">&#128994; En service</div></div>
   <div class="svc-slide" id="svc-slide">
@@ -26634,6 +26638,67 @@ body.mode-service .nav-inner{display:none!important}
   };
   window.preparerModeService=function(taxiId){ if(taxiId) vehiculeChoisi=taxiId; if(window.AfriMotoNative&&AfriMotoNative.setRefresh){ try{ AfriMotoNative.setRefresh(true); }catch(e){} } };
   window.afficherModeService=function(){ entrerModeService(vehiculeChoisi); };
+
+  // ══ v9.580 — LE PERIMETRE, REGLABLE DEPUIS LA CARTE ══
+  //
+  // Defini ICI et pas ailleurs : « vehiculeChoisi » — le vehicule reellement en service —
+  // n'existe que dans cette portee. Le lire de l'exterieur aurait demande de le recopier
+  // quelque part, et deux copies d'une meme verite finissent toujours par diverger.
+  window.ouvrirPerimetreService = function() {
+    var id = vehiculeChoisi || (typeof taxiEnLigne === 'function' && taxiEnLigne() ? taxiEnLigne().id : null);
+    if(!id) { try { toast('Aucun v\u00e9hicule en service.', true); } catch(e) {} return; }
+    var t = (DB.taxis || []).find(function(x){ return x.id === id; }) || {};
+    var actuel = Number(t.rayonKm) || 5;
+
+    var fond = document.createElement('div');
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;' +
+      'display:flex;align-items:flex-end;justify-content:center';
+    var boite = document.createElement('div');
+    boite.style.cssText = 'background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 26px;' +
+      'width:100%;max-width:520px;box-shadow:0 -8px 30px rgba(0,0,0,.35)';
+    boite.innerHTML =
+      '<div style="font-weight:900;font-size:17px;color:#111;margin-bottom:4px">\uD83C\uDFAF Mon p\u00e9rim\u00e8tre</div>' +
+      '<div style="font-size:13px;color:#666;line-height:1.45;margin-bottom:14px">' +
+        'Vous ne recevrez que les courses dont le passager est \u00e0 moins de ' +
+        '<b id="per-val">' + actuel + ' km</b> de vous.<br>' +
+        '<span style="font-size:11px">Plus large = plus de courses, mais plus de route \u00e0 faire pour aller chercher.</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        [3,4,5,6,7,10,15].map(function(km){
+          var a = (km === actuel);
+          return '<button data-km="' + km + '" style="flex:1;min-width:56px;padding:14px 4px;border-radius:12px;' +
+                 'font-weight:900;font-size:14px;cursor:pointer;border:2px solid ' + (a ? '#16a34a' : '#ddd') + ';' +
+                 'background:' + (a ? '#16a34a' : '#fff') + ';color:' + (a ? '#fff' : '#111') + '">' + km + ' km</button>';
+        }).join('') +
+      '</div>' +
+      '<button data-fermer style="width:100%;margin-top:16px;padding:13px;border-radius:12px;border:0;' +
+        'background:#eee;color:#333;font-weight:800;font-size:14px;cursor:pointer">Fermer</button>';
+    fond.appendChild(boite);
+    document.body.appendChild(fond);
+
+    var finir = function(){ try { fond.remove(); } catch(e) {} };
+    boite.querySelector('[data-fermer]').onclick = finir;
+    fond.onclick = function(e){ if(e.target === fond) finir(); };
+    Array.prototype.forEach.call(boite.querySelectorAll('[data-km]'), function(b){
+      b.onclick = function(){
+        var km = Number(b.getAttribute('data-km'));
+        finir();
+        if(typeof reglerRayonTaxi === 'function') reglerRayonTaxi(id, km);
+        majEtiquettePerimetre();
+      };
+    });
+  };
+
+  // L'etiquette du menu porte la valeur : le chauffeur voit son reglage sans ouvrir.
+  window.majEtiquettePerimetre = function() {
+    try {
+      var e = document.getElementById('svc-sm-perimetre');
+      if(!e) return;
+      var id = vehiculeChoisi;
+      var t = id ? (DB.taxis || []).find(function(x){ return x.id === id; }) : null;
+      e.textContent = 'Mon p\u00e9rim\u00e8tre \u2014 ' + ((t && Number(t.rayonKm)) || 5) + ' km';
+    } catch(e) {}
+  };
   window.basculerMenuService=function(){
     if(window.AfriMotoNative && AfriMotoNative.setRefresh){ try{ AfriMotoNative.setRefresh(true); }catch(e){} }
     document.body.classList.remove('mode-service');
@@ -26656,7 +26721,12 @@ body.mode-service .nav-inner{display:none!important}
   window.demanderMenuService=function(){ var c=_el('svc-confirm'); if(c) c.classList.add('on'); };
   window.fermerConfirmMenu=function(){ var c=_el('svc-confirm'); if(c) c.classList.remove('on'); };
   window.ouvrirMenuDepuisConfirm=function(){ fermerConfirmMenu(); basculerMenuService(); };
-  window.basculerSousMenuService=function(){ var m=_el('svc-sousmenu'); if(m) m.classList.toggle('on'); };
+  window.basculerSousMenuService=function(){
+    var m=_el('svc-sousmenu');
+    if(m) m.classList.toggle('on');
+    // v9.580 : l'etiquette porte le perimetre actuel, mise a jour a chaque ouverture.
+    try { if(window.majEtiquettePerimetre) majEtiquettePerimetre(); } catch(e) {}
+  };
 
   // ── PASSER EN LIGNE (fenetre -> liste verte du menu) / S'ARRETER (confirmation) ──
   window.reprendreServiceDepuisCarte=function(){
