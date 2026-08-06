@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.593';
+window.AFRIMOTO_VERSION = 'v9.594';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -26961,6 +26961,10 @@ body.mode-service .nav-inner{display:none!important}
   // ── OUVERTURE / FERMETURE DE L'ECRAN ──
   window.entrerModeService=function(taxiId){
     if(taxiId) vehiculeChoisi=taxiId;
+    // v9.594 : cet appareil retient LE taxi qu'il conduit. Sans cela, un compte
+    // proprietaire possedant plusieurs motos faisait sonner la meme course sur tous
+    // ses telephones a la fois.
+    try { if(window.marquerTaxiDeCetAppareil) marquerTaxiDeCetAppareil(taxiId || vehiculeChoisi); } catch(e) {}
     // v9.496 : RETOUR A L'ACCUEIL WEB DU CHAUFFEUR.
     // L'accueil natif (v9.494) avait fait DISPARAITRE deux choses indispensables : la liste des
     // motos pour choisir laquelle passe en service, et l'oeil qui masque les revenus. Plutot que
@@ -28111,7 +28115,18 @@ body.mode-passager .nav-inner{display:none!important}
     _txt('ra-titre', (e.statut === 'terminee') ? 'Course termin\u00e9e' : 'Course arr\u00eat\u00e9e');
     _html('ra-detail', motif);
     _txt('ra-compteur', '');
-    if (e.statut === 'annulee_chauffeur') { try { alarmeAnnulationJouer(); } catch (x) {} }
+    // ══ v9.594 — UNE ANNULATION DU CHAUFFEUR NE LAISSE PLUS LE PASSAGER EN PLAN ══
+    //
+    // Il etait prevenu, puis plus rien : il devait tout recommencer a la main. Ce n'est pas
+    // ce qu'on attend d'une application de course — l'annulation vient du chauffeur, pas
+    // de lui. On repart donc tout seul, apres deux secondes et demie, le temps de lire.
+    if (e.statut === 'annulee_chauffeur') {
+      try { alarmeAnnulationJouer(); } catch (x) {}
+      _html('ra-detail', 'Le chauffeur a annul\u00e9 cette course. <b>Nous cherchons un autre taxi</b> \u2014 vous n' + "'" + 'avez rien \u00e0 faire.');
+      _arreterPassager();
+      setTimeout(function () { try { window.demarrerRechercheAutomatique(); } catch (x) {} }, 2500);
+      return;
+    }
     setTimeout(function () { try { closeModal('m-recherche-auto'); } catch (x) {} }, 2500);
     _arreterPassager();
   }
@@ -28203,11 +28218,55 @@ body.mode-passager .nav-inner{display:none!important}
      COTE CHAUFFEUR
      ══════════════════════════════════════════════════════════════════════ */
 
+  /* ══ v9.594 — UN TELEPHONE NE CONDUIT QU'UN SEUL TAXI ══
+
+     LE DEFAUT DE FOND, ET IL EXPLIQUE VOS DEUX TELEPHONES QUI SONNENT.
+
+     Un chauffeur ne se connecte pas avec un TAXI : il se connecte avec un compte
+     PROPRIETAIRE, qui peut posseder plusieurs motos. Mon code affichait la course des
+     qu'elle concernait UN des taxis du compte — donc sur TOUS les telephones connectes a
+     ce compte, en meme temps, pour la meme course.
+
+     Le serveur avait raison du debut a la fin : il n'attribue qu'un seul taxi, il n'y a
+     qu'une seule case. C'est l'application qui ne savait pas QUI tient le guidon.
+
+     Desormais chaque telephone retient LE taxi qu'il conduit, et ne regarde que celui-la.
+     Deux telephones, deux motos : chacun sa course. Deux telephones, la meme moto : les
+     deux sonnent — et c'est normal, c'est le meme chauffeur. */
+  var CLE_TAXI = 'afrimoto_taxi_de_cet_appareil';
+
+  function _taxiDeCetAppareil() {
+    var cl = (DB.user && DB.user.role === 'client')
+      ? DB.clients.find(function (c) { return c.id === DB.user.id; }) : null;
+    if (!cl) return null;
+    var miens = DB.taxis.filter(function (t) { return t.tel === cl.tel; });
+    if (!miens.length) return null;
+
+    // Le choix de cet appareil, s'il est encore valable.
+    var id = null;
+    try { id = localStorage.getItem(CLE_TAXI); } catch (e) {}
+    var choisi = id ? miens.find(function (t) { return t.id === id; }) : null;
+
+    // Sinon : celui qui est en service depuis cet appareil (mode carte), sinon le seul
+    // qu'il possede. On ne devine JAMAIS quand il y en a plusieurs — mieux vaut ne rien
+    // faire sonner que faire sonner le mauvais.
+    if (!choisi && typeof vehiculeChoisi !== 'undefined' && vehiculeChoisi)
+      choisi = miens.find(function (t) { return t.id === vehiculeChoisi; });
+    if (!choisi && miens.length === 1) choisi = miens[0];
+
+    if (choisi) { try { localStorage.setItem(CLE_TAXI, choisi.id); } catch (e) {} }
+    return choisi || null;
+  }
+
+  // Quand le chauffeur passe en service depuis cet appareil, c'est CE taxi qu'il conduit.
+  window.marquerTaxiDeCetAppareil = function (id) {
+    if (!id) return;
+    try { localStorage.setItem(CLE_TAXI, String(id)); } catch (e) {}
+  };
+
   function _mesTaxis() {
-    if (!DB.user || DB.user.role !== 'client') return [];
-    var cl = DB.clients.find(function (c) { return c.id === DB.user.id; });
-    if (!cl) return [];
-    return DB.taxis.filter(function (t) { return t.tel === cl.tel; });
+    var t = _taxiDeCetAppareil();
+    return t ? [t] : [];
   }
 
   function _fermerEntrante() {
@@ -28323,6 +28382,20 @@ body.mode-passager .nav-inner{display:none!important}
      Elles etaient appelees depuis des dizaines d'endroits. Plutot que de courir apres
      chaque appel, on les vide : elles ne peuvent plus ni ecrire, ni decider.
      ══════════════════════════════════════════════════════════════════════ */
+  // v9.594 : l'annulation par le chauffeur passe par le serveur, et lui confirme a l'ecran.
+  // Elle ecrivait le statut directement — c'est ainsi qu'une course annulee pouvait
+  // resonner quelques minutes plus tard sans que personne ne comprenne.
+  window.annulerCourseParTaxi = async function (idCourse) {
+    var t = _taxiDeCetAppareil();
+    var r = await _rpc('annuler_course', {
+      p_course_id: idCourse, p_qui: 'chauffeur', p_acteur: t ? String(t.id) : null
+    });
+    _fermerEntrante();
+    if (!r || r.ok !== true) { toast('\u274c Annulation impossible.', true); return; }
+    toast('Course annul\u00e9e. Le passager est pr\u00e9venu et un autre chauffeur est cherch\u00e9.');
+    try { if (typeof sortirModeService === 'function') sortirModeService(); } catch (x) {}
+  };
+
   window.contacterProchainTaxi     = function () { /* le serveur s'en charge */ };
   window.verifierStatutDemandeAuto = function () { /* remplace par _tickPassager */ };
   window.verifierDemandeEntrante   = function () { /* remplace par _tickChauffeur */ };
