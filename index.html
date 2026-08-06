@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.599';
+window.AFRIMOTO_VERSION = 'v9.600';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -26701,9 +26701,42 @@ body.mode-service .nav-inner{display:none!important}
       });
     }).catch(function(){});
     var pD=supabaseClient.from('demandes_course').select('*').in('taxi_id', ids).order('date',{ascending:false}).limit(8).then(function(res){
+      var recues = {};
       ((res&&res.data)||[]).forEach(function(r){
-        try{ var m=mapDemandeCourse(r); var i=DB.demandesCourse.findIndex(function(x){ return x.id===m.id; }); if(i>=0) DB.demandesCourse[i]=m; else DB.demandesCourse.unshift(m); }catch(e){}
+        try{ var m=mapDemandeCourse(r); recues[m.id]=true;
+             var i=DB.demandesCourse.findIndex(function(x){ return x.id===m.id; });
+             if(i>=0) DB.demandesCourse[i]=m; else DB.demandesCourse.unshift(m); }catch(e){}
       });
+      // ══════════════════════════════════════════════════════════════════════
+      // v9.600 — CE QUI FAISAIT VOIR AU DEUXIEME CHAUFFEUR LA COURSE DU PREMIER.
+      //
+      // Cette lecture AJOUTAIT et METTAIT A JOUR, mais ne RETIRAIT jamais rien.
+      //
+      // Quand une course change de chauffeur — refus, delai depasse, annulation — le
+      // serveur la donne au suivant : « taxi_id » ne vaut plus le mien. Ma requete ne me
+      // la renvoie donc plus... et l'ancienne copie restait en memoire de la page,
+      // toujours marquee « acceptee », toujours a mon nom.
+      //
+      // « courseActive() » la retrouvait la, et l'ecran de course s'ouvrait chez le
+      // mauvais chauffeur, avec une course que le premier etait en train de faire.
+      // C'est exactement ce que vous avez vu : la meme course affichee comme demarree
+      // sur le deuxieme telephone, et la sonnerie qui repart.
+      //
+      // On retire donc de la memoire toute course qui porte encore mon nom mais que le
+      // serveur ne me reconnait plus. On ne touche qu'aux courses VIVANTES : une course
+      // terminee de la journee doit rester, le revenu du jour se calcule dessus, et la
+      // requete ci-dessus n'en ramene que huit.
+      // ══════════════════════════════════════════════════════════════════════
+      try {
+        DB.demandesCourse = DB.demandesCourse.filter(function(x){
+          if(recues[x.id]) return true;                         // le serveur me la confirme
+          if(ids.indexOf(x.taxiId) === -1) return true;          // elle n'a jamais ete a moi
+          var vivante = (x.statutAttribution==='acceptee' || x.statutAttribution==='effectuee' ||
+                         x.statutAttribution==='en_attente' || x.statutAttribution==='prix_propose' ||
+                         x.enCours);
+          return !vivante;                                      // vivante et reniee : on l'oublie
+        });
+      } catch(e){}
     }).catch(function(){});
     Promise.all([pT,pD]).then(function(){ syncBusy=false; }, function(){ syncBusy=false; });
   }
