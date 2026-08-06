@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.598';
+window.AFRIMOTO_VERSION = 'v9.599';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28375,6 +28375,15 @@ body.mode-passager .nav-inner{display:none!important}
   function _fermerEntrante() {
     try { alarmeCourseStop(); } catch (x) {}
     try { closeModal('m-course-entrante'); } catch (x) {}
+    // v9.599 : on remet le bloc de prix a zero. Sinon la fenetre suivante s'ouvrirait un
+    // instant avec le prix de la course precedente — et un chauffeur presse accepterait
+    // un montant qui n'est plus celui du passager qui l'appelle.
+    try {
+      var _b = document.getElementById('ce-prix-passager');
+      if (_b) _b.style.display = 'none';
+      var _i = document.getElementById('ce-prix');
+      if (_i) _i.value = '';
+    } catch (x) {}
     _entranteId = null;
   }
 
@@ -28405,7 +28414,46 @@ body.mode-passager .nav-inner{display:none!important}
       (e.depart ? '<br>\uD83D\uDFE2 D\u00e9part : <b>' + esc(e.depart) + '</b>' : '') +
       (e.arrivee ? '<br>\uD83D\uDD34 Arriv\u00e9e : <b>' + esc(e.arrivee) + '</b>' : '') +
       (e.prix_passager ? '<br>\uD83D\uDCB0 Il propose : <b style="color:#EAB308;font-size:16px">' + fmt(e.prix_passager) + '</b>' : ''));
+    // ══════════════════════════════════════════════════════════════════════════
+    // v9.599 — CE QUI EST PARTI AVEC L'ANCIEN MOTEUR, ET QUE JE REMETS ICI.
+    //
+    // En v9.598 j'ai eteint l'ancien moteur, a juste titre : il faisait sonner la meme
+    // course sur trois telephones. Mais trois choses utiles ne vivaient QUE chez lui, et
+    // sont parties avec :
+    //
+    //   1. Le bloc « Accepter ce prix ». Il est cache par defaut dans la page ; seul
+    //      l'ancien moteur le montrait. Le chauffeur ne pouvait donc plus accepter le prix
+    //      du passager d'un seul geste — c'est exactement ce que vous venez de constater.
+    //   2. La carte du trajet dans la fenetre d'appel.
+    //   3. Le reveil de l'ecran sur l'application Android (alertCourse).
+    //
+    // Lecon retenue : quand je remplace un moteur, je dois d'abord lister tout ce qu'il
+    // faisait, pas seulement ce qu'il faisait mal.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // 1. Le prix propose par le passager, acceptable d'un seul geste.
+    var _pp  = Number(e.prix_passager) || 0;
+    var _bp  = document.getElementById('ce-prix-passager');
+    var _bpv = document.getElementById('ce-prix-passager-val');
+    if (_bp) _bp.style.display = _pp > 0 ? 'block' : 'none';
+    if (_bpv && _pp > 0) _bpv.textContent = fmt(_pp);
+    var _inp = document.getElementById('ce-prix');
+    if (_inp) _inp.value = _pp > 0 ? _pp : '';
+
+    // 2. La carte. Le serveur nomme ses colonnes autrement que l'ancien ecran :
+    //    on traduit ici plutot que de toucher a une fonction qui marche.
+    try {
+      _preparerCarteAppel({
+        lat: e.lat, lng: e.lng,
+        latArrivee: (e.lat_arrivee != null ? e.lat_arrivee : null),
+        lngArrivee: (e.lng_arrivee != null ? e.lng_arrivee : null),
+        depart: e.depart, arrivee: e.arrivee
+      });
+    } catch (x) {}
+
     try { openModal('m-course-entrante'); } catch (x) {}
+    // 3. Le reveil de l'ecran, meme telephone verrouille.
+    try { if (window.AfriMotoNative && AfriMotoNative.alertCourse) AfriMotoNative.alertCourse(); } catch (x) {}
     try { alarmeCourseDemarrer(sonReservationActif()); } catch (x) {}
   }
 
