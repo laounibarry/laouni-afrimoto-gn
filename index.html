@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.600';
+window.AFRIMOTO_VERSION = 'v9.601';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1641,6 +1641,43 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   // Mise à jour minimale et directe (statut/prix uniquement) : plus fiable que l'upsert complet
   // pour les changements critiques temps réel (négociation de prix) — erreur toujours visible.
   async function sbMajStatutDemande(id, patch) {
+    // ══════════════════════════════════════════════════════════════════════════
+    // v9.601 — LE VERROU UNIQUE. LA PAGE N'ECRIT PLUS L'ETAT D'UNE COURSE.
+    //
+    // Voila la maladie de fond de la demande de course, et la raison pour laquelle mes
+    // deux « remises a zero » precedentes n'ont pas tenu : le serveur tient la machine
+    // d'etats — qui a la course, qui l'a refusee, a qui elle passe — mais DIX endroits
+    // de la page ecrivaient encore directement dans la table, derriere son dos.
+    //
+    // Constate dans vos donnees : la course « b83461ae » porte le statut
+    // « annulee_chauffeur » avec une liste de refus VIDE. Ce n'est pas le serveur qui
+    // l'a ecrit — il n'ecrit jamais ce statut, il repasse la course au suivant. C'est la
+    // page. Resultat : la course est morte au lieu d'aller au chauffeur suivant, et le
+    // passager n'a plus jamais ete rappele.
+    //
+    // Desormais tout passe par ce point unique. Les etats qui appartiennent a la machine
+    // d'attribution sont REFUSES ici, et l'annulation par le chauffeur est REDIRIGEE vers
+    // la bonne fonction du serveur. Un chemin oublie ne peut plus rien casser en silence :
+    // il est bloque et ecrit dans la console.
+    // ══════════════════════════════════════════════════════════════════════════
+    try {
+      var _st = patch && patch.statut_attribution;
+      if (_st === 'annulee_chauffeur') {
+        // On ne tue pas la course : on la rend au serveur, qui appelle le suivant.
+        var _t = (typeof window.taxiDeCetAppareil === 'function') ? window.taxiDeCetAppareil() : null;
+        console.warn('[v9.601] annulation chauffeur redirigee vers le serveur');
+        var _r = await supabaseClient.rpc('annuler_course', {
+          p_course_id: id, p_qui: 'chauffeur', p_acteur: _t ? String(_t.id) : null
+        });
+        return !(_r && _r.error);
+      }
+      // Ces etats-la n'appartiennent qu'au serveur : ils decident QUI a la course.
+      if (_st === 'en_attente' || _st === 'prix_propose' || _st === 'acceptee' || _st === 'expiree') {
+        console.warn('[v9.601] ecriture directe refusee — le serveur decide de « ' + _st + ' »');
+        return true;   // on repond « c'est bon » : l'appelant ne doit pas croire a une panne reseau
+      }
+    } catch(e) { console.warn('[v9.601] verrou etat course :', e && e.message); }
+
     try {
       const {error} = await supabaseClient.from('demandes_course').update(patch).eq('id', id);
       if(error) {
@@ -26669,6 +26706,25 @@ body.mode-service .nav-inner{display:none!important}
   function taxiEnLigne(){ return mesTaxis().find(function(t){ return t.enService; })||null; }
   function courseActive(){
     var ids=mesIds();
+    // ══════════════════════════════════════════════════════════════════════════
+    // v9.601 — UN APPAREIL, UNE MOTO. C'EST ICI QUE LA COURSE CHANGEAIT D'ECRAN.
+    //
+    // « mesIds() » rend TOUTES les motos qui portent le meme numero de telephone que le
+    // compte connecte. Or il existe dans vos donnees deux fiches « OUMOU SOW » avec le
+    // meme numero (662154569). Sur cet appareil, les DEUX etaient donc considerees comme
+    // « les miennes » : une course confiee a l'une s'affichait aussi chez l'autre, avec
+    // son statut « en route vers la destination », pendant qu'une nouvelle demande sonnait
+    // en bas pour la seconde. C'est exactement ce que vous avez decrit.
+    //
+    // Le serveur, lui, est irreprochable : j'ai verifie qu'il ne donne jamais la course
+    // d'un chauffeur a un autre. Le melange se faisait uniquement dans la page.
+    //
+    // Desormais l'ecran de course ne connait qu'UNE moto : celle de cet appareil.
+    // ══════════════════════════════════════════════════════════════════════════
+    try {
+      var _seule = (typeof window.taxiDeCetAppareil === 'function') ? window.taxiDeCetAppareil() : null;
+      if (_seule && _seule.id) ids = [_seule.id];
+    } catch(e){}
     return ((DB&&DB.demandesCourse)||[]).find(function(x){
       // v9.523 : une course que CE chauffeur vient de terminer ne peut plus etre « active »,
       // quoi qu'en dise la memoire de la page. Marquer le statut ne suffisait pas : la
@@ -26745,7 +26801,26 @@ body.mode-service .nav-inner{display:none!important}
   function _revenuJour(taxiId){
     try{
       var t=DB.taxis.find(function(x){ return x.id===taxiId; }); if(!t) return 0;
-      var ids=DB.taxis.filter(function(x){ return x.tel===t.tel; }).map(function(x){ return x.id; });
+      // ══════════════════════════════════════════════════════════════════════
+      // v9.601 — « LE CHAUFFEUR A TERMINE UNE COURSE, LE REVENU DE B AUGMENTE ».
+      //
+      // Le revenu etait la somme des courses de TOUTES les motos portant le meme numero
+      // de telephone. C'est la troisieme fois que la meme ligne fait des degats :
+      //
+      //     DB.taxis.filter(x => x.tel === t.tel)
+      //
+      // On la trouve dans « mesIds() » (quelles courses sont les miennes), dans
+      // « courseActive() » (quelle course s'affiche a l'ecran) et ici (mon revenu du jour).
+      // Partout, elle confond deux motos des qu'elles partagent un numero — et il existe
+      // bien deux fiches « OUMOU SOW » avec le numero 662154569 dans vos donnees.
+      //
+      // Un appareil, une moto, un revenu. Plus de melange possible.
+      // ══════════════════════════════════════════════════════════════════════
+      var ids=[t.id];
+      try {
+        var _s=(typeof window.taxiDeCetAppareil==='function') ? window.taxiDeCetAppareil() : null;
+        if(_s && _s.id) ids=[_s.id];
+      } catch(e){}
       var n=new Date(); var debutJour=new Date(n.getFullYear(),n.getMonth(),n.getDate()).getTime();
       return (DB.demandesCourse||[]).filter(function(d){
         return d.statutAttribution==='terminee' && ids.indexOf(d.taxiId)!==-1 &&
@@ -28369,6 +28444,11 @@ body.mode-passager .nav-inner{display:none!important}
   }
 
   // Quand le chauffeur passe en service depuis cet appareil, c'est CE taxi qu'il conduit.
+  // v9.601 : le reste de la page en a besoin (voir courseActive), et il vit dans une
+  // autre fermeture. Sans cette ligne, seule la fenetre d'appel savait a quelle moto
+  // cet appareil appartient — l'ecran de course, lui, l'ignorait.
+  window.taxiDeCetAppareil = _taxiDeCetAppareil;
+
   window.marquerTaxiDeCetAppareil = function (id) {
     if (!id) return;
     try { localStorage.setItem(CLE_TAXI, String(id)); } catch (e) {}
