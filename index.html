@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.591';
+window.AFRIMOTO_VERSION = 'v9.592';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -25566,8 +25566,12 @@ function demarrerSurveillanceCourses() {
       if(!cl) return;
       // Le controle qui evite toute requete inutile : suis-je en service ?
       if(!DB.taxis.some(t => t.tel === cl.tel && t.enService)) return;
-      _lireMesCoursesEntrantes();
-      verifierDemandeEntrante();
+      // v9.592 : la machine d'etats a pris le relais. Cette boucle-ci ferait double emploi
+      // — deux lectures pour la meme chose, et deux fois la consommation. On la laisse en
+      // place mais muette : si l'on doit revenir en arriere, il suffit de retirer le bloc
+      // de fin de page et de decommenter ces deux lignes.
+      // _lireMesCoursesEntrantes();
+      // verifierDemandeEntrante();
     } catch(e) {}
   }, 3000);
 }
@@ -27967,5 +27971,373 @@ body.mode-passager .nav-inner{display:none!important}
   });
 })();
 </script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   AfriMoto GN — v9.592 — LA COURSE, REPRISE A ZERO. ETAPE 2 : LE SITE.
+
+   ══ CE QUE CE BLOC REMPLACE ══
+
+   Six fonctions decidaient chacune de leur cote et s'ecrivaient dessus :
+
+       demarrerRechercheAutomatique · contacterProchainTaxi · verifierStatutDemandeAuto
+       verifierDemandeEntrante      · repondreCourseEntrante · accepterPrixPassager
+
+   Chaque correction en decouvrait une autre parce que le probleme n'etait jamais celui
+   qu'on corrigeait : c'est le PARTAGE DE LA DECISION qui etait fautif.
+
+   ══ CE QUI LES REMPLACE ══
+
+   DEUX boucles, et elles ne decident rien :
+
+       cote passager   : avancer_course(id)          -> affiche ce qu'on lui repond
+       cote chauffeur  : ma_course('chauffeur', id)  -> affiche ce qu'on lui repond
+
+   Le serveur seul change l'etat. Le telephone n'ecrit plus jamais un statut.
+
+   ══ POURQUOI JE REMPLACE AU LIEU D'EFFACER ══
+
+   Les anciennes fonctions restent dans le fichier ; ce bloc pose les nouvelles par-dessus
+   au chargement. Si quelque chose ne va pas, on revient en arriere en supprimant ce seul
+   bloc — sans toucher a deux mille lignes qu'on ne pourrait pas relire cette nuit.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function () {
+
+  var _boucleP = null;      // minuteur du passager
+  var _boucleC = null;      // minuteur du chauffeur
+  var _courseId = null;     // la course suivie par le passager
+  var _sigAffiche = '';     // derniere signature dessinee : evite de reconstruire pour rien
+  var _sonPrix = false;     // le bip du prix ne se joue qu'une fois par proposition
+  var _entranteId = null;   // la course affichee au chauffeur
+
+  function _el(id) { return document.getElementById(id); }
+  function _txt(id, v) { var e = _el(id); if (e) e.textContent = v; }
+  function _html(id, v) { var e = _el(id); if (e) e.innerHTML = v; }
+
+  /* ── Appel serveur, toujours de la meme facon ─────────────────────────── */
+  async function _rpc(nom, args) {
+    try {
+      var r = await supabaseClient.rpc(nom, args);
+      if (r.error) { try { addDebugLog('COURSE ' + nom + ' : ' + r.error.message); } catch (e) {} return null; }
+      return r.data;
+    } catch (e) {
+      try { addDebugLog('COURSE ' + nom + ' injoignable'); } catch (er) {}
+      return null;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     COTE PASSAGER
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function _arreterPassager() {
+    if (_boucleP) { clearInterval(_boucleP); _boucleP = null; }
+    _courseId = null; _sigAffiche = ''; _sonPrix = false;
+  }
+
+  function _dessinerPassager(e) {
+    // Une signature : tant qu'elle ne change pas, on ne reconstruit pas l'ecran. C'est ce
+    // qui empechait de saisir quoi que ce soit — l'ancien code redessinait chaque seconde.
+    var sig = [e.statut, (e.taxi && e.taxi.id) || '', e.prix_propose || '', e.pin || ''].join('|');
+    var compteur = (e.secondes_restantes != null) ? (e.secondes_restantes + 's') : '';
+
+    if (sig === _sigAffiche) { _txt('ra-compteur', compteur); return; }
+    _sigAffiche = sig;
+
+    var b = _el('ra-btn-annuler'); if (b) b.style.display = '';
+
+    if (e.statut === 'en_attente' && e.taxi) {
+      _txt('ra-icone', '\uD83D\uDCE1');
+      _txt('ra-titre', 'Contact en cours...');
+      _html('ra-detail', esc(e.taxi.nom || 'Chauffeur') +
+        '<br><span style="font-size:11px">Appel n\u00b0' + (e.appel_no || 1) + '</span>');
+      _sonPrix = false;
+      return;
+    }
+
+    if (e.statut === 'en_attente') {
+      _txt('ra-icone', '\uD83D\uDD04');
+      _txt('ra-titre', 'Recherche en cours...');
+      _html('ra-detail', 'Nous contactons les chauffeurs un par un \u2014 vous n' + "'" +
+        'avez rien \u00e0 faire.');
+      _sonPrix = false;
+      return;
+    }
+
+    if (e.statut === 'prix_propose') {
+      if (!_sonPrix) { _sonPrix = true; try { alarmePrixProposeDemarrer(sonReservationActif()); } catch (x) {} }
+      _txt('ra-icone', '\uD83D\uDCB0');
+      _txt('ra-titre', 'Prix propos\u00e9 : ' + fmt(e.prix_propose || 0));
+      _html('ra-detail',
+        esc((e.taxi && e.taxi.nom) || 'Le chauffeur') + ' propose <b style="color:#EAB308;font-size:16px">' +
+        fmt(e.prix_propose || 0) + '</b> pour cette course.' +
+        '<div style="display:flex;gap:8px;margin-top:12px">' +
+          '<button class="btn-red" style="flex:1;padding:12px" onclick="window.repondrePrixPassager(false)">\u274c Refuser</button>' +
+          '<button class="btn" style="flex:1;padding:12px;background:#16A34A" onclick="window.repondrePrixPassager(true)">\u2705 J' + "'" + 'accepte</button>' +
+        '</div>');
+      return;
+    }
+
+    if (e.statut === 'acceptee') {
+      try { alarmePrixProposeStop(); } catch (x) {}
+      _txt('ra-icone', '\u2705');
+      _txt('ra-titre', 'Course confirm\u00e9e !');
+      _html('ra-detail',
+        '<b>' + esc((e.taxi && e.taxi.nom) || '') + '</b> ' +
+        ((e.taxi && e.taxi.plaque) ? '(' + esc(e.taxi.plaque) + ')' : '') + ' arrive vers vous.' +
+        (e.prix_propose ? '<br>\uD83D\uDCB0 Prix convenu : <b style="color:#EAB308">' + fmt(e.prix_propose) + '</b>' : '') +
+        ((e.taxi && e.taxi.tel) ? '<br><a href="tel:' + esc(e.taxi.tel) + '" style="color:#60A5FA;font-weight:700">\uD83D\uDCDE ' + esc(e.taxi.tel) + '</a>' : '') +
+        (e.pin ? '<div style="margin-top:10px;font-size:13px">Votre code : <b style="font-size:22px;letter-spacing:3px;color:#EAB308">' + esc(e.pin) + '</b><br><span style="font-size:11px">Donnez-le au chauffeur au moment de monter.</span></div>' : ''));
+      _txt('ra-compteur', '');
+      try { ouvrirSuiviTaxi(e.id); } catch (x) {}
+      return;
+    }
+
+    // Course close : on le dit, on arrete tout.
+    try { alarmePrixProposeStop(); } catch (x) {}
+    var motif = (e.statut === 'annulee_chauffeur') ? 'Le chauffeur a annul\u00e9 cette course.'
+              : (e.statut === 'annulee_passager') ? 'Course annul\u00e9e.'
+              : (e.statut === 'terminee') ? 'Course termin\u00e9e.'
+              : 'Aucun chauffeur n' + "'" + 'a pu prendre cette course.';
+    _txt('ra-icone', (e.statut === 'terminee') ? '\u2705' : '\uD83D\uDEA8');
+    _txt('ra-titre', (e.statut === 'terminee') ? 'Course termin\u00e9e' : 'Course arr\u00eat\u00e9e');
+    _html('ra-detail', motif);
+    _txt('ra-compteur', '');
+    if (e.statut === 'annulee_chauffeur') { try { alarmeAnnulationJouer(); } catch (x) {} }
+    setTimeout(function () { try { closeModal('m-recherche-auto'); } catch (x) {} }, 2500);
+    _arreterPassager();
+  }
+
+  async function _tickPassager() {
+    if (!_courseId) return;
+    var e = await _rpc('avancer_course', { p_course_id: _courseId });
+    if (!e) return;                      // reseau : on retentera au prochain tour
+    if (e.ok === false) { _arreterPassager(); try { closeModal('m-recherche-auto'); } catch (x) {} return; }
+    _dessinerPassager(e);
+  }
+
+  window.repondrePrixPassager = async function (accepte) {
+    if (!_courseId) return;
+    try { alarmePrixProposeStop(); } catch (x) {}
+    var r = await _rpc('repondre_prix', {
+      p_course_id: _courseId, p_passager: String((DB.user && DB.user.id) || ''), p_accepte: !!accepte
+    });
+    if (!r || r.ok !== true) { toast('\u274c R\u00e9ponse non enregistr\u00e9e. R\u00e9essayez.', true); return; }
+    _sigAffiche = '';                    // on force le redessin immediat
+    _tickPassager();
+  };
+
+  window.annulerRechercheAutomatique = async function () {
+    if (_courseId) {
+      await _rpc('annuler_course', {
+        p_course_id: _courseId, p_qui: 'passager', p_acteur: String((DB.user && DB.user.id) || '')
+      });
+    }
+    try { alarmePrixProposeStop(); } catch (x) {}
+    _arreterPassager();
+    try { closeModal('m-recherche-auto'); } catch (x) {}
+    toast('Recherche annul\u00e9e.');
+  };
+
+  /* ── Le lancement d'une recherche ─────────────────────────────────────── */
+  window.demarrerRechercheAutomatique = async function () {
+    var paxOn = document.body.classList.contains('mode-passager');
+    var dep = ((paxOn && _el('pax-depart')) || _el('pa-depart') || {}).value || '';
+    var arr = ((paxOn && _el('pax-arrivee')) || _el('pa-arrivee') || {}).value || '';
+    dep = String(dep).trim(); arr = String(arr).trim();
+    if (!dep && window._dernierDepartSaisi) dep = String(window._dernierDepartSaisi).trim();
+    if (!arr && window._derniereArriveeSaisie) arr = String(window._derniereArriveeSaisie).trim();
+    if (!dep || !arr) { toast('\u26a0\ufe0f Indiquez votre d\u00e9part et votre destination.', true); return; }
+    window._dernierDepartSaisi = dep; window._derniereArriveeSaisie = arr;
+
+    var ref = (typeof _positionDeReference === 'function') ? _positionDeReference() : null;
+    if (!ref) { toast('\u26a0\ufe0f Position requise. Autorisez la g\u00e9olocalisation.', true);
+                try { obtenirPositionPassager(); } catch (x) {} return; }
+
+    var ps = DB.passagers.find(function (x) { return x.id === DB.user.id; });
+    if (!ps) { toast('\u26d4 Compte passager introuvable.', true); return; }
+
+    var prix = parseInt(((paxOn && _el('pax-prix')) || _el('pa-prix') || {}).value) || 0;
+    var arrivee = (typeof _pointArrivee !== 'undefined' && _pointArrivee) ? _pointArrivee : null;
+
+    var r = await _rpc('creer_course', { p_donnees: {
+      passager_id: ps.id, passager_nom: (ps.prenom || '') + ' ' + (ps.nom || ''), passager_tel: ps.tel || '',
+      lat: ref.lat, lng: ref.lng,
+      lat_arrivee: arrivee ? arrivee.lat : null, lng_arrivee: arrivee ? arrivee.lng : null,
+      depart: dep, arrivee: arr, prix_passager: prix,
+      type_vehicule: (typeof filtrePassagerType !== 'undefined' && filtrePassagerType) ? filtrePassagerType : 'moto'
+    }});
+    if (!r || r.ok !== true) { toast('\u274c Votre demande n' + "'" + 'a pas pu \u00eatre enregistr\u00e9e.', true); return; }
+
+    _courseId = r.id; _sigAffiche = ''; _sonPrix = false;
+    try { openModal('m-recherche-auto'); } catch (x) {}
+    _txt('ra-icone', '\uD83D\uDD04'); _txt('ra-titre', 'Recherche en cours...');
+    _html('ra-detail', 'Nous cherchons un chauffeur...'); _txt('ra-compteur', '');
+    if (_boucleP) clearInterval(_boucleP);
+    _boucleP = setInterval(_tickPassager, 2000);
+    _tickPassager();
+  };
+
+  // Reprise apres un rechargement de page : si une course est en vie, on la retrouve.
+  window.reprendreCoursePassager = async function () {
+    if (!DB.user || DB.user.role !== 'passager') return;
+    if (_courseId) return;
+    var e = await _rpc('ma_course', { p_role: 'passager', p_id: String(DB.user.id) });
+    if (!e || e.aucune === true || e.ok === false || e.fermee === true) return;
+    _courseId = e.id; _sigAffiche = '';
+    try { openModal('m-recherche-auto'); } catch (x) {}
+    if (_boucleP) clearInterval(_boucleP);
+    _boucleP = setInterval(_tickPassager, 2000);
+    _dessinerPassager(e);
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════
+     COTE CHAUFFEUR
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function _mesTaxis() {
+    if (!DB.user || DB.user.role !== 'client') return [];
+    var cl = DB.clients.find(function (c) { return c.id === DB.user.id; });
+    if (!cl) return [];
+    return DB.taxis.filter(function (t) { return t.tel === cl.tel; });
+  }
+
+  function _fermerEntrante() {
+    try { alarmeCourseStop(); } catch (x) {}
+    try { closeModal('m-course-entrante'); } catch (x) {}
+    _entranteId = null;
+  }
+
+  function _dessinerEntrante(e) {
+    if (_entranteId === e.id) {                       // deja affichee : on n'ecrase pas la saisie
+      _txt('ce-compteur', (e.secondes_restantes != null) ? (e.secondes_restantes + 's') : '');
+      return;
+    }
+    _entranteId = e.id;
+    _html('ce-detail',
+      '\uD83E\uDDCD ' + esc((e.passager && e.passager.nom) || 'Passager') +
+      (e.depart ? '<br>\uD83D\uDFE2 D\u00e9part : <b>' + esc(e.depart) + '</b>' : '') +
+      (e.arrivee ? '<br>\uD83D\uDD34 Arriv\u00e9e : <b>' + esc(e.arrivee) + '</b>' : '') +
+      (e.prix_passager ? '<br>\uD83D\uDCB0 Il propose : <b style="color:#EAB308;font-size:16px">' + fmt(e.prix_passager) + '</b>' : ''));
+    try { openModal('m-course-entrante'); } catch (x) {}
+    try { alarmeCourseDemarrer(sonReservationActif()); } catch (x) {}
+  }
+
+  async function _tickChauffeur() {
+    var taxis = _mesTaxis();
+    if (!taxis.length) { if (_entranteId) _fermerEntrante(); return; }
+    var enService = taxis.filter(function (t) { return t.enService; });
+    if (!enService.length) { if (_entranteId) _fermerEntrante(); return; }
+
+    for (var i = 0; i < enService.length; i++) {
+      var e = await _rpc('ma_course', { p_role: 'chauffeur', p_id: String(enService[i].id) });
+      if (!e || e.aucune === true || e.ok === false) continue;
+
+      // Une course qui m'est offerte : on la montre.
+      if (e.statut === 'en_attente' && e.taxi && String(e.taxi.id) === String(enService[i].id)) {
+        window._taxiCourant = enService[i].id;
+        _dessinerEntrante(e);
+        return;
+      }
+      // Elle n'est plus a moi, ou elle est conclue : la fenetre n'a plus lieu d'etre.
+      if (_entranteId === e.id) {
+        _fermerEntrante();
+        if (e.statut === 'acceptee' && e.taxi && String(e.taxi.id) !== String(enService[i].id))
+          toast('Cette course a \u00e9t\u00e9 prise par un autre chauffeur.');
+      }
+    }
+    if (_entranteId) _fermerEntrante();
+  }
+
+  window.repondreCourseEntrante = async function (accepte) {
+    if (!_entranteId) return;
+    var idCourse = _entranteId, idTaxi = String(window._taxiCourant || '');
+    try { alarmeCourseStop(); } catch (x) {}
+
+    if (!accepte) {
+      _fermerEntrante();
+      await _rpc('refuser_course', { p_course_id: idCourse, p_taxi_id: idTaxi });
+      toast('\u274c Course refus\u00e9e');
+      return;
+    }
+
+    var prix = parseInt((_el('ce-prix') || {}).value) || 0;
+    if (prix < 500) { toast('\u26a0\ufe0f Indiquez votre prix (500 GNF minimum).', true); return; }
+    var sd = (typeof _soldeTaxiSuffisant === 'function') ? _soldeTaxiSuffisant(idTaxi) : { ok: true };
+    if (!sd.ok) { toast('\u26d4 Solde insuffisant : il vous manque ' + fmt(sd.manque) + '.', true); return; }
+
+    var r = await _rpc('proposer_prix', { p_course_id: idCourse, p_taxi_id: idTaxi, p_prix: prix });
+    if (!r || r.ok !== true) {
+      toast((r && r.raison === 'plus_a_vous')
+        ? '\u23f1\ufe0f Trop tard \u2014 la course est pass\u00e9e \u00e0 ' + (r.maintenant_chez || 'un autre chauffeur') + '.'
+        : '\u274c Votre prix n' + "'" + 'a pas pu \u00eatre envoy\u00e9.', true);
+      _fermerEntrante();
+      return;
+    }
+    _fermerEntrante();
+    toast('\uD83D\uDCB0 Prix propos\u00e9 : ' + fmt(prix) + ' \u2014 en attente du passager');
+  };
+
+  // Le chauffeur accepte le prix du passager, sans contre-proposition.
+  window.accepterPrixPassager = async function () {
+    if (!_entranteId) return;
+    var idCourse = _entranteId, idTaxi = String(window._taxiCourant || '');
+    try { alarmeCourseStop(); } catch (x) {}
+    var e = await _rpc('etat_course', { p_course_id: idCourse });
+    var prix = (e && e.prix_passager) || 0;
+    if (prix <= 0) { toast('\u26a0\ufe0f Le passager n' + "'" + 'a propos\u00e9 aucun prix.', true); return; }
+    var sd = (typeof _soldeTaxiSuffisant === 'function') ? _soldeTaxiSuffisant(idTaxi) : { ok: true };
+    if (!sd.ok) { toast('\u26d4 Solde insuffisant : il vous manque ' + fmt(sd.manque) + '.', true); return; }
+
+    var r = await _rpc('accepter_course', { p_course_id: idCourse, p_taxi_id: idTaxi, p_prix: prix });
+    if (!r || r.ok !== true) {
+      toast((r && (r.raison === 'plus_a_vous' || r.raison === 'deja_prise'))
+        ? '\u23f1\ufe0f Trop tard \u2014 cette course n' + "'" + 'est plus disponible.'
+        : '\u274c Impossible d' + "'" + 'accepter.', true);
+      _fermerEntrante();
+      return;
+    }
+    _fermerEntrante();
+    // La commission n'est prelevee QU'APRES un succes reel. C'etait l'inverse avant.
+    if (r.deja !== true) {
+      try {
+        var d = DB.demandesCourse.find(function (x) { return x.id === idCourse; });
+        if (d && typeof _commissionAuTaxi === 'function' && _commissionAuTaxi() && typeof debiterTaxiCommission === 'function')
+          debiterTaxiCommission(d);
+      } catch (x) {}
+    }
+    toast('\u2705 Course accept\u00e9e \u00e0 ' + fmt(prix));
+    try { if (typeof entrerModeService === 'function') entrerModeService(idTaxi); } catch (x) {}
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LES ANCIENNES FONCTIONS SONT NEUTRALISEES
+     Elles etaient appelees depuis des dizaines d'endroits. Plutot que de courir apres
+     chaque appel, on les vide : elles ne peuvent plus ni ecrire, ni decider.
+     ══════════════════════════════════════════════════════════════════════ */
+  window.contacterProchainTaxi     = function () { /* le serveur s'en charge */ };
+  window.verifierStatutDemandeAuto = function () { /* remplace par _tickPassager */ };
+  window.verifierDemandeEntrante   = function () { /* remplace par _tickChauffeur */ };
+  window.relancerRechercheSansFrais = function () { window.demarrerRechercheAutomatique(); };
+
+  /* ══ LES DEUX BOUCLES ══
+     Deux secondes cote passager : il regarde son ecran et attend.
+     Trois secondes cote chauffeur, et UNIQUEMENT en service : un chauffeur hors service,
+     un passager, un visiteur ne declenchent aucune requete. C'est ce qui rend l'ensemble
+     tenable le jour ou des milliers de personnes travailleront en meme temps. */
+  setInterval(function () {
+    try {
+      if (!DB.user) return;
+      if (DB.user.role === 'client') _tickChauffeur();
+    } catch (e) {}
+  }, 3000);
+
+  // Au demarrage : le passager retrouve sa course si elle est encore vivante.
+  setTimeout(function () { try { window.reprendreCoursePassager(); } catch (e) {} }, 3000);
+
+  try { addDebugLog('COURSE v9.592 : machine d' + "'" + '\u00e9tats active'); } catch (e) {}
+})();
+</script>
+
 </body>
 </html>
