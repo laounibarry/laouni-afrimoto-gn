@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.594';
+window.AFRIMOTO_VERSION = 'v9.595';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -27921,6 +27921,26 @@ body.mode-passager .nav-inner{display:none!important}
     return false;
   }
 
+  // v9.595 : le bandeau de mise a jour. Visible, en haut, impossible a manquer — et il
+  // n'interrompt rien : c'est l'utilisateur qui decide quand recharger.
+  function _bandeauMaj(v){
+    if(document.getElementById('bandeau-maj')) return;
+    var d = document.createElement('div');
+    d.id = 'bandeau-maj';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#16A34A;' +
+      'color:#fff;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;' +
+      'gap:10px;font-weight:800;font-size:13px;box-shadow:0 3px 12px rgba(0,0,0,.35)';
+    d.innerHTML =
+      '<span>⬆️ Nouvelle version disponible (' + String(v).replace(/[<>]/g,'') + ')</span>' +
+      '<button id="bandeau-maj-btn" style="background:#fff;color:#16A34A;border:0;border-radius:8px;' +
+      'padding:7px 14px;font-weight:900;font-size:13px;cursor:pointer">Mettre à jour</button>';
+    document.body.appendChild(d);
+    document.getElementById('bandeau-maj-btn').onclick = function(){
+      try{ localStorage.setItem('afrimoto_dernier_reload', String(Date.now())); }catch(e){}
+      location.reload();
+    };
+  }
+
   function verifierMaj(){
     try {
       fetch('version.txt?_=' + Date.now(), { cache: 'no-store' })
@@ -27939,7 +27959,23 @@ body.mode-passager .nav-inner{display:none!important}
             return;
           }
           if(++_majEcarts < 2) return;           // un seul ecart ne suffit pas
-          if(document.querySelector('.modal.open, .modal-bot.open')) return;
+
+          // ══ v9.595 — UNE NOUVELLE VERSION NE PEUT PLUS PASSER INAPERCUE ══
+          //
+          // Ce controle refusait de recharger des qu'UNE FENETRE ETAIT OUVERTE. Pendant un
+          // essai de course, la fenetre de recherche ou celle de la course entrante est
+          // ouverte en permanence : l'application ne prenait donc JAMAIS les corrections.
+          //
+          // Trois jours durant, chaque essai a porte sur la meme vieille version — et
+          // chaque correction a semble sans effet, des deux cotes.
+          //
+          // On ne force pas le rechargement par-dessus une saisie en cours : ce serait
+          // perdre ce que l'utilisateur est en train d'ecrire. On le lui DIT, en haut de
+          // l'ecran, et il choisit le moment.
+          if(document.querySelector('.modal.open, .modal-bot.open')) {
+            try { _bandeauMaj(v); } catch(e) {}
+            return;
+          }
           if(_courseEnCoursIci()){
             try{ addDebugLog('MAJ : nouvelle version disponible, differee — course en cours'); }catch(e){}
             return;
@@ -27977,6 +28013,9 @@ body.mode-passager .nav-inner{display:none!important}
     verifierMaj();
   }
   setTimeout(function(){ _dernierControle = Date.now(); verifierMaj(); }, 15000);
+  // v9.595 : et on continue de regarder. Une version deployee pendant qu'on travaille
+  // ne doit pas attendre le lendemain pour etre proposee.
+  setInterval(function(){ try { verifierMaj(); } catch(e) {} }, 60000);
   setInterval(_controlerSiUtile, 900000);      // puis tous les quarts d'heure
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) setTimeout(_controlerSiUtile, 1500);
