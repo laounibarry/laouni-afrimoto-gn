@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.596';
+window.AFRIMOTO_VERSION = 'v9.597';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28312,6 +28312,32 @@ body.mode-passager .nav-inner{display:none!important}
     return t ? [t] : [];
   }
 
+  /* ══ v9.597 — CE QUE J'AI REFUSE NE REVIENT PLUS, MEME SI LE SERVEUR SE TROMPE ══
+
+     Vous l'avez dit mot pour mot : « la course quitte definitivement de son compte, ni en
+     copie ni en cache ». Le serveur ne la renverra plus — mais je ne veux pas que ce soit
+     la SEULE protection. Ce telephone-ci retient ce qu'il a refuse, et refusera de
+     l'afficher quoi qu'on lui envoie. La liste survit a un rechargement de page. */
+  var CLE_REFUS = 'afrimoto_courses_refusees';
+
+  function _refusees() {
+    try { return JSON.parse(localStorage.getItem(CLE_REFUS) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function _marquerRefusee(id) {
+    if (!id) return;
+    try {
+      var m = _refusees();
+      m[id] = Date.now();
+      // On ne garde que deux heures : au-dela la course n'existe plus de toute facon,
+      // et cette liste ne doit pas grossir indefiniment sur le telephone.
+      var limite = Date.now() - 2 * 3600 * 1000;
+      Object.keys(m).forEach(function (k) { if (m[k] < limite) delete m[k]; });
+      localStorage.setItem(CLE_REFUS, JSON.stringify(m));
+    } catch (e) {}
+  }
+  function _estRefusee(id) { return !!_refusees()[id]; }
+
   function _fermerEntrante() {
     try { alarmeCourseStop(); } catch (x) {}
     try { closeModal('m-course-entrante'); } catch (x) {}
@@ -28319,6 +28345,8 @@ body.mode-passager .nav-inner{display:none!important}
   }
 
   function _dessinerEntrante(e) {
+    // Le verrou local : refusee ici, elle ne se rouvre pas. Meme si le serveur la renvoyait.
+    if (_estRefusee(e.id)) { if (_entranteId === e.id) _fermerEntrante(); return; }
     if (_entranteId === e.id) {                       // deja affichee : on n'ecrase pas la saisie
       _txt('ce-compteur', (e.secondes_restantes != null) ? (e.secondes_restantes + 's') : '');
       return;
@@ -28379,6 +28407,9 @@ body.mode-passager .nav-inner{display:none!important}
     try { alarmeCourseStop(); } catch (x) {}
 
     if (!accepte) {
+      // v9.597 : on marque D'ABORD, on previent le serveur ENSUITE. Si le reseau coupe au
+      // mauvais moment, la course ne doit pas resonner ici pour autant.
+      _marquerRefusee(idCourse);
       _fermerEntrante();
       await _rpc('refuser_course', { p_course_id: idCourse, p_taxi_id: idTaxi });
       toast('\u274c Course refus\u00e9e');
@@ -28444,6 +28475,7 @@ body.mode-passager .nav-inner{display:none!important}
   // resonner quelques minutes plus tard sans que personne ne comprenne.
   window.annulerCourseParTaxi = async function (idCourse) {
     var t = _taxiDeCetAppareil();
+    _marquerRefusee(idCourse);   // v9.597 : il s'est retire, elle ne lui revient plus
     var r = await _rpc('annuler_course', {
       p_course_id: idCourse, p_qui: 'chauffeur', p_acteur: t ? String(t.id) : null
     });
