@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.595';
+window.AFRIMOTO_VERSION = 'v9.596';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28101,7 +28101,11 @@ body.mode-passager .nav-inner{display:none!important}
       _txt('ra-icone', '\uD83D\uDCE1');
       _txt('ra-titre', 'Contact en cours...');
       _html('ra-detail', esc(e.taxi.nom || 'Chauffeur') +
-        '<br><span style="font-size:11px">Appel n\u00b0' + (e.appel_no || 1) + '</span>');
+        '<br><span style="font-size:11px">Appel n\u00b0' + (e.appel_no || 1) + '</span>' +
+        // v9.596 : la version et le numero de course. Une capture d'ecran suffit desormais
+        // a savoir ce qui tourne — c'est ce qui nous a manque pendant trois jours.
+        '<br><span style="font-size:10px;color:#9CA3AF">' + esc(String(window.AFRIMOTO_VERSION || '?')) +
+        ' \u00b7 ' + esc(String(e.id).slice(0, 8)) + '</span>');
       _sonPrix = false;
       return;
     }
@@ -28320,7 +28324,21 @@ body.mode-passager .nav-inner{display:none!important}
       return;
     }
     _entranteId = e.id;
+    // ══ v9.596 — CHAQUE FENETRE DIT A QUI ELLE S'ADRESSE ══
+    //
+    // Depuis trois jours, trois telephones sonnent pour la meme course et je n'arrive pas a
+    // savoir s'ils sont trois chauffeurs differents ou le meme compte ouvert trois fois.
+    // Les captures ne le montrent pas, et je vous ai fait tester dans le vide.
+    //
+    // Desormais la fenetre porte le nom du vehicule concerne, et la version du site. Une
+    // seule photo suffira a trancher — trois noms differents, ou trois fois le meme.
+    var _moi = _taxiDeCetAppareil();
     _html('ce-detail',
+      '<div style="background:rgba(0,0,0,.25);border-radius:8px;padding:6px 9px;margin-bottom:8px;' +
+      'font-size:11px;font-weight:800;color:#EAB308;text-align:center">' +
+      'Pour : ' + esc((_moi && _moi.nom) || '?') + ' · ' + esc((_moi && _moi.plaque) || '?') +
+      '<br><span style="font-weight:400;color:#9CA3AF">' + esc(String(window.AFRIMOTO_VERSION || '?')) +
+      ' · course ' + esc(String(e.id).slice(0, 8)) + '</span></div>' +
       '\uD83E\uDDCD ' + esc((e.passager && e.passager.nom) || 'Passager') +
       (e.depart ? '<br>\uD83D\uDFE2 D\u00e9part : <b>' + esc(e.depart) + '</b>' : '') +
       (e.arrivee ? '<br>\uD83D\uDD34 Arriv\u00e9e : <b>' + esc(e.arrivee) + '</b>' : '') +
