@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.597';
+window.AFRIMOTO_VERSION = 'v9.598';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -9918,6 +9918,40 @@ async function _lireMesCoursesEntrantes() {
 }
 
 function verifierDemandeEntrante() {
+  // ══════════════════════════════════════════════════════════════════════════
+  // v9.598 — CET ANCIEN MOTEUR EST MORT. VOICI POURQUOI IL TOURNAIT ENCORE.
+  //
+  // Depuis la v9.592 j'ai ecrit un nouveau moteur de course, et je croyais avoir eteint
+  // celui-ci en ecrivant, tout en bas du fichier :
+  //
+  //     window.verifierDemandeEntrante = function () { /* remplace */ };
+  //
+  // Cela ne remplace qu'une ETIQUETTE. Or, bien plus haut, il y a :
+  //
+  //     setInterval(verifierDemandeEntrante, 3 * 1000);       (ligne 25807)
+  //
+  // A cette ligne-la, JavaScript ne retient pas le nom : il retient LA FONCTION ELLE-MEME.
+  // Changer l'etiquette ensuite ne change rien pour la minuterie, qui a garde l'ancienne
+  // fonction dans sa poche et continuait de l'appeler toutes les trois secondes.
+  //
+  // LES DEUX MOTEURS TOURNAIENT DONC EN MEME TEMPS. Consequences, une par une :
+  //
+  //   · Trois telephones sonnent. L'ancien moteur choisit les motos par NUMERO DE
+  //     TELEPHONE (t.tel === cl.tel), pas par vehicule. Le nouveau, lui, en designe
+  //     un seul. Les trois jours passes a soupconner vos comptes venaient de la.
+  //
+  //   · Les boutons Refuser et Accepter ne repondent plus. C'est l'ancien moteur qui
+  //     ouvre la fenetre, sans prevenir le nouveau ; les boutons appellent le nouveau,
+  //     qui ne connait aucune course en cours et s'arrete aussitot.
+  //
+  //   · La course sonne encore apres l'annulation du passager. L'ancien moteur ne
+  //     consulte pas le serveur de la meme facon et ne voit pas la course fermee.
+  //
+  // On ne rature plus l'etiquette : on vide la fonction. Quiconque la garde en poche
+  // n'appellera plus rien du tout.
+  // ══════════════════════════════════════════════════════════════════════════
+  return;
+  /* eslint-disable no-unreachable */
   // v9.591 : FILET. Quelle que soit la raison — statut manque, fenetre fermee a la main,
   // course disparue — une alarme ne doit JAMAIS survivre a la course qui l'a declenchee.
   try {
