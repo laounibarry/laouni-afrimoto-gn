@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.601';
+window.AFRIMOTO_VERSION = 'v9.602';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28437,6 +28437,19 @@ body.mode-passager .nav-inner{display:none!important}
     // faire sonner que faire sonner le mauvais.
     if (!choisi && typeof vehiculeChoisi !== 'undefined' && vehiculeChoisi)
       choisi = miens.find(function (t) { return t.id === vehiculeChoisi; });
+    // ══ v9.602 — LE TROU QUI RESTAIT QUAND UN CHAUFFEUR A PLUSIEURS MOTOS ══
+    //
+    // OUMOU SOW possede DEUX motos, bien reelles, avec deux plaques differentes
+    // (FD-6445-GU et CX-8787-MF) sous le meme numero. Tant que cet appareil n'avait rien
+    // choisi, cette fonction rendait « rien » — et l'ecran de course retombait alors sur
+    // les DEUX motos a la fois. C'est ce qui melangeait les courses et les revenus.
+    //
+    // Si une seule des motos du compte est en service, c'est forcement celle-ci qui
+    // travaille depuis cet appareil. On tranche donc, au lieu de ne rien decider.
+    if (!choisi && miens.length > 1) {
+      var _svc = miens.filter(function (t) { return t.enService; });
+      if (_svc.length === 1) choisi = _svc[0];
+    }
     if (!choisi && miens.length === 1) choisi = miens[0];
 
     if (choisi) { try { localStorage.setItem(CLE_TAXI, choisi.id); } catch (e) {} }
