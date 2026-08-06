@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.592';
+window.AFRIMOTO_VERSION = 'v9.593';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -12893,7 +12893,15 @@ function processSearch(qn) {
     if(showAddr)   html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">Adresse : ' + v.addr + '</div>';
     if(showVin)    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px">VIN : <span style="font-family:monospace">' + v.vin + '</span></div>';
     if(!v.stolen) {
-      const m = [!vis.phone,!vis.addr,!vis.vin,!vis.photo,!vis.photoP].filter(Boolean).length;
+      // ══ v9.593 — LE COMPTEUR DECRIT CE QUE VOUS VOYEZ, PLUS CE QUI EST REGLE ══
+      //
+      // Il additionnait les reglages du proprietaire sans jamais regarder QUI consulte la
+      // fiche. Or juste au-dessus, l'affichage fait « staffView || v.stolen || vis.phone » :
+      // un administrateur ou un agent voit TOUT — et lisait quand meme « 5 infos masquees ».
+      //
+      // On compte desormais ce qui est reellement absent de l'ecran de celui qui regarde.
+      // Pour le personnel, ce sera zero — et le message disparaitra, ce qui est la verite.
+      const m = [!showPhone,!showAddr,!showVin,!showPhoto,!showPhotoP].filter(Boolean).length;
       if(m>0) html += '<div style="font-size:11px;color:var(--text2);margin-top:6px;font-style:italic">🔒 '+m+' info(s) masquée(s) par le propriétaire</div>';
     }
     if(v.stolen) html += '<div style="margin-top:10px;padding:10px;background:rgba(239,68,68,.1);border-radius:8px;font-size:13px;font-weight:700;color:#EF4444;text-align:center">⛔ NE PAS ACHETER · Police : 117 · Gendarmerie : 122</div>' +
