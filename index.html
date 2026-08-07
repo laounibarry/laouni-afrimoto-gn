@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.607';
+window.AFRIMOTO_VERSION = 'v9.608';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -16638,13 +16638,40 @@ function _sonService(enLigne){
 // ════════════════════════════════════════════════════════════════════════════
 function _motifSuspension(t) {
   if(!t) return '';
-  if(t.statut === 'vole' || t.stolen) return 'Ce véhicule est déclaré volé.';
-  if(t.statut === 'suspendu') {
-    return t.suspenduAuto
+  var m = _motifDeCetteFiche(t);
+  if(m) return m;
+  // ══════════════════════════════════════════════════════════════════════════
+  // v9.608 — LA FICHE TAXI ET LA MOTO DU REGISTRE SONT DEUX LIGNES DIFFERENTES.
+  //
+  // C'est pour cela que mon verrou de la v9.606 n'a rien bloque. En base :
+  //
+  //     vehicules   FD-6445-GU   statut = suspendu      <- la suspension
+  //     taxis       OUMOU SOW    statut = actif , en service
+  //
+  // Le registre decrit la MOTO ; la fiche taxi decrit le CHAUFFEUR qui travaille avec.
+  // Suspendre l'une ne touchait pas l'autre, et je ne regardais que la fiche taxi.
+  //
+  // Une moto suspendue n'a plus le droit de rouler — peu importe la ligne ou c'est ecrit.
+  // ══════════════════════════════════════════════════════════════════════════
+  try {
+    var v = (DB.vehs || []).find(function(x){ return x.id === t.motoId; });
+    if(v) {
+      var mv = _motifDeCetteFiche(v);
+      if(mv) return mv;
+    }
+  } catch(e) {}
+  return '';
+}
+
+function _motifDeCetteFiche(x) {
+  if(!x) return '';
+  if(x.statut === 'vole' || x.stolen) return 'Ce véhicule est déclaré volé.';
+  if(x.statut === 'suspendu') {
+    return x.suspenduAuto
       ? 'Ce véhicule est suspendu : la mise à jour de son enregistrement n\'a pas été payée.'
       : 'Ce véhicule est suspendu par l\'administration.';
   }
-  if(t.horsService === true || t.hors_service === true) return 'Ce véhicule a été retiré du service.';
+  if(x.horsService === true || x.hors_service === true) return 'Ce véhicule a été retiré du service.';
   return '';
 }
 
