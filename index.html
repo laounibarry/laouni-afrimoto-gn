@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.608';
+window.AFRIMOTO_VERSION = 'v9.609';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -7053,6 +7053,22 @@ function _commissionVtcFixe() {
   return (c > 0 || c === 0) ? c : (Number(DB.commissionCourseTaxi) || 0);
 }
 function _vtcEnPourcent() { return DB.commissionVtcMode === 'pourcent'; }
+
+// v9.609 : la meme regle, mais a partir du TYPE seul. A la creation d'une course, aucun
+// chauffeur n'est encore designe — c'est le serveur qui choisira. On ne peut donc pas
+// passer par « _commissionPourTaxi », qui exige une fiche taxi.
+function _commissionPourType(type, prix) {
+  if(type === 'voiture') {
+    if(_vtcEnPourcent()) {
+      const p = Number(DB.commissionVtcPourcent) || 0;
+      const base = Number(prix) || 0;
+      if(p > 0 && base > 0) return Math.round(base * p / 100 / 100) * 100;
+      return _commissionVtcFixe();
+    }
+    return _commissionVtcFixe();
+  }
+  return Number(DB.commissionCourseTaxi) || 0;
+}
 
 function _commissionPourTaxi(t, prix) {
   const type = _typeTaxi(t);
@@ -28852,14 +28868,65 @@ body.mode-passager .nav-inner{display:none!important}
     var prix = parseInt(((paxOn && _el('pax-prix')) || _el('pa-prix') || {}).value) || 0;
     var arrivee = (typeof _pointArrivee !== 'undefined' && _pointArrivee) ? _pointArrivee : null;
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // v9.609 — LA COMMISSION N'ETAIT PLUS PRELEVEE DU TOUT. DEPUIS LA v9.592.
+    //
+    // En reecrivant la demande de course, j'ai remplace l'ancienne fonction par celle-ci,
+    // qui envoie tout au serveur. Mais l'ancienne faisait AUSSI trois choses que je n'ai
+    // pas reportees : calculer la commission, verifier que le passager peut la payer, et
+    // la prelever. Rien ne l'a signale — aucune erreur, aucun message : simplement, plus
+    // aucune commission n'est entree depuis.
+    //
+    // Verifie en base avant d'ecrire cette correction : les huit dernieres courses
+    // portent toutes « commission = 0 ». Cela cassait aussi le mode « a la charge du
+    // chauffeur », qui prelevait fidelement... zero.
+    //
+    // C'est la meme erreur que pour l'ancien moteur de course : j'ai remplace sans lister
+    // d'abord tout ce que l'ancien faisait de bien.
+    // ══════════════════════════════════════════════════════════════════════════
+    var _type = (typeof filtrePassagerType !== 'undefined' && filtrePassagerType) ? filtrePassagerType : 'moto';
+    var _commission = 0;
+    try { _commission = _commissionPourType(_type, prix) || 0; } catch (x) { _commission = 0; }
+
+    // Quand la commission est a la charge du passager, il faut qu'il puisse la payer.
+    // On le lui dit AVANT de creer la course : sinon il attendrait un chauffeur pour rien.
+    if (_commission > 0 && typeof _commissionAuTaxi === 'function' && !_commissionAuTaxi()) {
+      if ((Number(ps.solde) || 0) < _commission) {
+        toast('⛔ Solde insuffisant : ' + fmt(_commission) + ' sont nécessaires pour cette course. ' +
+              'Votre solde : ' + fmt(ps.solde || 0) + '. Rechargez auprès d' + "'" + 'un agent.', true);
+        return;
+      }
+    }
+
     var r = await _rpc('creer_course', { p_donnees: {
       passager_id: ps.id, passager_nom: (ps.prenom || '') + ' ' + (ps.nom || ''), passager_tel: ps.tel || '',
       lat: ref.lat, lng: ref.lng,
       lat_arrivee: arrivee ? arrivee.lat : null, lng_arrivee: arrivee ? arrivee.lng : null,
       depart: dep, arrivee: arr, prix_passager: prix,
-      type_vehicule: (typeof filtrePassagerType !== 'undefined' && filtrePassagerType) ? filtrePassagerType : 'moto'
+      commission: _commission,
+      type_vehicule: _type
     }});
     if (!r || r.ok !== true) { toast('\u274c Votre demande n' + "'" + 'a pas pu \u00eatre enregistr\u00e9e.', true); return; }
+
+    // \u00ab deja \u00bb signifie que cette course existait deja : le passager a rappuye, ou la page
+    // a ete rechargee. On ne preleve pas deux fois pour une seule course.
+    if (r.deja !== true && _commission > 0) {
+      // On l'inscrit sur la course, quel que soit le payeur : le telephone du chauffeur
+      // s'en sert pour prelever a l'acceptation, et le dossier de litige pour justifier.
+      try { await sbMajStatutDemande(r.id, { commission: _commission }); } catch (x) {}
+
+      if (typeof _commissionAuTaxi === 'function' && !_commissionAuTaxi()) {
+        try {
+          var _f = await mouvementSolde('passager', ps.id, 'societe', 'societe', _commission, 'Commission course');
+          if (_f !== true) { ps.solde = (Number(ps.solde) || 0) - _commission; sbSavePassager(ps); }
+          logMvt('rech', '\ud83c\udfcd\ufe0f Commission course \u2014 ' + ((ps.prenom || '') + ' ' + (ps.nom || '')).trim(),
+                 _commission, ((ps.prenom || '') + ' ' + (ps.nom || '')).trim(), 'Soci\u00e9t\u00e9 (commission)',
+                 { sourceType: 'passager', sourceId: ps.id, cibleType: 'societe' });
+          toast('\ud83d\udcb0 Commission de ' + fmt(_commission) + ' d\u00e9duite \u2014 nouveau solde : ' + fmt(ps.solde || 0));
+          try { updateNav(); } catch (x) {}
+        } catch (x) { try { addDebugLog('COMMISSION passager : ' + (x && x.message)); } catch (e) {} }
+      }
+    }
 
     _courseId = r.id; _sigAffiche = ''; _sonPrix = false;
     try { openModal('m-recherche-auto'); } catch (x) {}
