@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.606';
+window.AFRIMOTO_VERSION = 'v9.607';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -10871,13 +10871,10 @@ function rClientContent() {
                   Vous ne recevrez que les courses dont le passager est à moins de
                   <b>${Number(t.rayonKm) || 5} km</b> de vous.
                 </div>
-                <div style="display:flex;gap:5px;flex-wrap:wrap">
-                  ${[1,2,3,4,5,6,7,8,9,10,15,20,30,50].map(km => {
-                    const actif = (Number(t.rayonKm) || 5) === km;
-                    return '<button class="' + (actif ? 'btn' : 'btn-ghost') + '" style="flex:1 0 auto;min-width:46px;font-size:12px;padding:9px 3px" ' +
-                           'onclick="reglerRayonTaxi(\'' + t.id + '\',' + km + ')">' + km + ' km</button>';
-                  }).join('')}
-                </div>
+                <!-- v9.607 : les quatorze boutons prenaient une demi-page et ne couvraient
+                     pas tous les cas. Un seul bouton ouvre la fenetre de saisie. -->
+                <button class="btn" style="width:100%;padding:11px;font-size:13px;font-weight:800"
+                        onclick="ouvrirSaisiePerimetre('${t.id}')">🎯 Modifier — actuellement ${Number(t.rayonKm) || 5} km</button>
               </div>
               <!-- v9.520 : le chauffeur ajoute ou remplace SA photo depuis son espace. C'est
                    elle que le passager voit avant de monter, et l'administration peut l'exiger
@@ -23707,6 +23704,80 @@ async function reglerRayonTaxi(taxiId, km) {
   } catch(e) { toast('❌ Le périmètre n\'a pas pu être enregistré.', true); }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// v9.607 — LE PERIMETRE SE SAISIT, IL NE SE CHOISIT PLUS DANS UNE GRILLE.
+//
+// Quatorze boutons (1, 2, 3... 50 km) occupaient une demi-page dans l'espace du chauffeur
+// ET dans la fenetre de la carte, sans jamais couvrir tous les cas : celui qui veut 12 km
+// devait se rabattre sur 10 ou sur 15.
+//
+// Une seule fenetre, un seul champ : il ecrit son chiffre et valide. Moins de place, et
+// n'importe quelle valeur devient possible.
+//
+// Cette fenetre est definie ICI, au niveau global, pour servir aux deux endroits. En avoir
+// deux versions garantirait qu'un jour l'une des deux serait corrigee et pas l'autre.
+// ════════════════════════════════════════════════════════════════════════════
+window.ouvrirSaisiePerimetre = function(taxiId) {
+  var t = (DB.taxis || []).find(function(x){ return x.id === taxiId; });
+  if(!t) { try { toast('Véhicule introuvable.', true); } catch(e) {} return; }
+  var actuel = Number(t.rayonKm) || 5;
+
+  var fond = document.createElement('div');
+  fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;' +
+    'display:flex;align-items:center;justify-content:center;padding:18px';
+  var boite = document.createElement('div');
+  boite.style.cssText = 'background:#fff;border-radius:18px;padding:20px 18px;width:100%;' +
+    'max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.4)';
+  boite.innerHTML =
+    '<div style="font-weight:900;font-size:17px;color:#111;margin-bottom:6px">🎯 Mon périmètre</div>' +
+    '<div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:14px">' +
+      'Jusqu\'à quelle distance acceptez-vous d\'aller chercher un passager ?' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+      '<input id="per-saisie" type="number" inputmode="numeric" min="1" max="50" step="1" value="' + actuel + '" ' +
+        'style="flex:1;min-width:0;padding:14px;border:2px solid #ddd;border-radius:12px;font-size:26px;' +
+        'font-weight:900;text-align:center;color:#111;background:#fff"/>' +
+      '<span style="font-size:17px;font-weight:900;color:#111">km</span>' +
+    '</div>' +
+    '<div id="per-err" style="display:none;font-size:12px;color:#DC2626;font-weight:700;margin-top:8px"></div>' +
+    '<div style="font-size:11px;color:#888;margin-top:9px;line-height:1.45">' +
+      'Entre 1 et 50 km. Plus large = plus de courses, mais plus de route pour aller chercher.' +
+    '</div>' +
+    '<div style="display:flex;gap:9px;margin-top:16px">' +
+      '<button data-annuler style="flex:1;padding:13px;border-radius:12px;border:0;background:#eee;' +
+        'color:#333;font-weight:800;font-size:14px;cursor:pointer">Annuler</button>' +
+      '<button data-valider style="flex:1;padding:13px;border-radius:12px;border:0;background:#16a34a;' +
+        'color:#fff;font-weight:900;font-size:14px;cursor:pointer">Valider</button>' +
+    '</div>';
+  fond.appendChild(boite);
+  document.body.appendChild(fond);
+
+  var champ = boite.querySelector('#per-saisie');
+  var err = boite.querySelector('#per-err');
+  var finir = function(){ try { fond.remove(); } catch(e) {} };
+
+  var valider = function(){
+    var km = parseInt(champ.value, 10);
+    // On explique le refus dans la fenetre, sans la fermer : le chauffeur corrige sur place
+    // au lieu de tout recommencer.
+    if(isNaN(km) || km < 1 || km > 50) {
+      err.textContent = '⚠️ Entrez un nombre entier entre 1 et 50.';
+      err.style.display = 'block';
+      champ.focus(); champ.select();
+      return;
+    }
+    finir();
+    if(typeof reglerRayonTaxi === 'function') reglerRayonTaxi(taxiId, km);
+    try { if(typeof majEtiquettePerimetre === 'function') majEtiquettePerimetre(); } catch(e) {}
+  };
+
+  boite.querySelector('[data-valider]').onclick = valider;
+  boite.querySelector('[data-annuler]').onclick = finir;
+  fond.onclick = function(e){ if(e.target === fond) finir(); };
+  champ.onkeydown = function(e){ if(e.key === 'Enter') { e.preventDefault(); valider(); } };
+  setTimeout(function(){ try { champ.focus(); champ.select(); } catch(e) {} }, 60);
+};
+
 async function basculerCategorieTaxi(taxiId, cat) {
   try {
     const t = DB.taxis.find(x => x.id === taxiId);
@@ -27569,46 +27640,9 @@ body.mode-service .nav-inner{display:none!important}
   window.ouvrirPerimetreService = function() {
     var id = vehiculeChoisi || (typeof taxiEnLigne === 'function' && taxiEnLigne() ? taxiEnLigne().id : null);
     if(!id) { try { toast('Aucun v\u00e9hicule en service.', true); } catch(e) {} return; }
-    var t = (DB.taxis || []).find(function(x){ return x.id === id; }) || {};
-    var actuel = Number(t.rayonKm) || 5;
-
-    var fond = document.createElement('div');
-    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;' +
-      'display:flex;align-items:flex-end;justify-content:center';
-    var boite = document.createElement('div');
-    boite.style.cssText = 'background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 26px;' +
-      'width:100%;max-width:520px;box-shadow:0 -8px 30px rgba(0,0,0,.35)';
-    boite.innerHTML =
-      '<div style="font-weight:900;font-size:17px;color:#111;margin-bottom:4px">\uD83C\uDFAF Mon p\u00e9rim\u00e8tre</div>' +
-      '<div style="font-size:13px;color:#666;line-height:1.45;margin-bottom:14px">' +
-        'Vous ne recevrez que les courses dont le passager est \u00e0 moins de ' +
-        '<b id="per-val">' + actuel + ' km</b> de vous.<br>' +
-        '<span style="font-size:11px">Plus large = plus de courses, mais plus de route \u00e0 faire pour aller chercher.</span>' +
-      '</div>' +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        [1,2,3,4,5,6,7,8,9,10,15,20,30,50].map(function(km){
-          var a = (km === actuel);
-          return '<button data-km="' + km + '" style="flex:1 0 auto;min-width:50px;padding:12px 3px;border-radius:12px;' +
-                 'font-weight:900;font-size:14px;cursor:pointer;border:2px solid ' + (a ? '#16a34a' : '#ddd') + ';' +
-                 'background:' + (a ? '#16a34a' : '#fff') + ';color:' + (a ? '#fff' : '#111') + '">' + km + ' km</button>';
-        }).join('') +
-      '</div>' +
-      '<button data-fermer style="width:100%;margin-top:16px;padding:13px;border-radius:12px;border:0;' +
-        'background:#eee;color:#333;font-weight:800;font-size:14px;cursor:pointer">Fermer</button>';
-    fond.appendChild(boite);
-    document.body.appendChild(fond);
-
-    var finir = function(){ try { fond.remove(); } catch(e) {} };
-    boite.querySelector('[data-fermer]').onclick = finir;
-    fond.onclick = function(e){ if(e.target === fond) finir(); };
-    Array.prototype.forEach.call(boite.querySelectorAll('[data-km]'), function(b){
-      b.onclick = function(){
-        var km = Number(b.getAttribute('data-km'));
-        finir();
-        if(typeof reglerRayonTaxi === 'function') reglerRayonTaxi(id, km);
-        majEtiquettePerimetre();
-      };
-    });
+    // v9.607 : la grille de quatorze boutons est remplacee par la fenetre de saisie, la
+    // meme qu'en dehors de la carte. Une seule fenetre a maintenir, un seul comportement.
+    if(typeof window.ouvrirSaisiePerimetre === 'function') window.ouvrirSaisiePerimetre(id);
   };
 
   // L'etiquette du menu porte la valeur : le chauffeur voit son reglage sans ouvrir.
