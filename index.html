@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.609';
+window.AFRIMOTO_VERSION = 'v9.610';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -3216,8 +3216,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       protections en continu et vous pr&eacute;viendrons sans d&eacute;lai en cas d'incident touchant vos donn&eacute;es.</p>
 
       <div class="sect">8. Services ext&eacute;rieurs</div>
-      <p>Les cartes proviennent d'OpenStreetMap et d'Esri, la recherche d'adresses de Nominatim, le calcul d'itin&eacute;raire
-      d'OSRM. Lorsque vous cherchez un lieu, le texte saisi est transmis &agrave; ces services. Les notifications transitent par
+      <p>Les cartes proviennent d'OpenStreetMap et d'Esri, la recherche d'adresses de Nominatim et de Photon,
+      le calcul d'itin&eacute;raire d'OSRM. Lorsque vous cherchez un lieu, le texte saisi est transmis &agrave; ces services,
+      ainsi que la position approximative autour de laquelle chercher. Les notifications transitent par
       Google ou Mozilla selon votre navigateur. Aucun de ces services ne re&ccedil;oit votre identit&eacute;.</p>
 
       <div class="sect">9. Mineurs</div>
@@ -8217,17 +8218,39 @@ function _positionDeReference() {
 }
 // v9.443 : transforme une position GPS en ADRESSE lisible (rue, quartier, ville) — le
 // chauffeur doit savoir precisement d'ou part le passager, pas juste "position actuelle".
+// ════════════════════════════════════════════════════════════════════════════
+// v9.610 — LE NUMERO DU BATIMENT, ET LE POINT DE REPERE LE PLUS PROCHE.
+//
+// L'adresse relevee s'arretait a la rue et a la ville. Deux ajouts :
+//
+//   · « zoom=18 » et le NUMERO : Nominatim ne rend le numero de rue que si on le lui
+//     demande au bon niveau de detail. Il est desormais place en tete quand il existe.
+//
+//   · le NOM DU LIEU (a.amenity, a.shop, a.building...) : en Guinee, presque aucune
+//     maison n'a de numero dans OpenStreetMap. En revanche les reperes y sont — station,
+//     pharmacie, marche, ecole, mosquee. « Pharmacie du Port, Route du Niger, Conakry »
+//     dit bien plus a un chauffeur que « Route du Niger, Conakry ».
+//
+// Ce que le code ne peut pas faire : inventer un numero qui n'existe nulle part. Quand
+// aucun numero n'est enregistre, aucun outil au monde ne le rendra.
+// ════════════════════════════════════════════════════════════════════════════
+function _libelleAdresse(j) {
+  const a = (j && j.address) || {};
+  const repere = a.amenity || a.shop || a.building || a.office || a.tourism || a.leisure ||
+                 ((j && j.type && j.name) ? j.name : null);
+  const rue = a.road ? ((a.house_number ? a.house_number + ' ' : '') + a.road) : null;
+  const morceaux = [repere, rue,
+                    a.neighbourhood || a.suburb || a.quarter || a.village || a.hamlet,
+                    a.city || a.town || a.county]
+    .filter(Boolean).filter((v, i, t) => t.indexOf(v) === i);
+  return morceaux.length ? morceaux.join(', ') : null;
+}
+
 function _adresseDepuisPosition(lat, lng, cb) {
   try {
-    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lng + '&accept-language=fr')
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=' + lat + '&lon=' + lng + '&accept-language=fr')
       .then(r => r.ok ? r.json() : null)
-      .then(j => {
-        if(!j) { cb(null); return; }
-        const a = j.address || {};
-        const morceaux = [a.road, a.neighbourhood || a.suburb || a.quarter || a.village || a.hamlet, a.city || a.town || a.county]
-          .filter(Boolean).filter((v, i, t) => t.indexOf(v) === i);
-        cb(morceaux.length ? morceaux.join(', ') : null);
-      })
+      .then(j => { cb(j ? _libelleAdresse(j) : null); })
       .catch(() => cb(null));
   } catch(e) { cb(null); }
 }
@@ -8240,13 +8263,11 @@ function _remplirAdresseDepart(lat, lng) {
   try {
     if(_adrDejaPour && typeof distanceMetres === 'function' && distanceMetres(_adrDejaPour.lat, _adrDejaPour.lng, lat, lng) < 60) return;
     _adrDejaPour = {lat: lat, lng: lng};
-    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lng + '&accept-language=fr')
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=' + lat + '&lon=' + lng + '&accept-language=fr')
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if(!j) return;
-        const a = j.address || {};
-        const nom = [a.road, a.neighbourhood || a.suburb || a.quarter || a.village || a.hamlet, a.city || a.town || a.county]
-          .filter(Boolean).join(', ');
+        const nom = _libelleAdresse(j);   // v9.610 : numero du batiment et point de repere
         if(!nom) return;
         if(_pointPriseEnCharge && _pointPriseEnCharge.source === 'gps') _pointPriseEnCharge.nom = nom;
         const dep = document.getElementById('pa-depart');
@@ -8691,8 +8712,47 @@ function _biaisRecherche() {
 // La premiere interroge la carte autour de soi, la seconde le monde entier.
 // En Guinee beaucoup de lieux ne sont connus que sous un nom approximatif :
 // chercher deux fois double les chances de tomber sur le bon.
+// ════════════════════════════════════════════════════════════════════════════
+// v9.610 — UNE SECONDE SOURCE D'ADRESSES : PHOTON.
+//
+// Nominatim cherche une correspondance quasi exacte. Ecrivez « Kipe centre emetteur »
+// au lieu de « Kipé Centre Émetteur », oubliez un accent, inversez deux mots : il ne
+// rend rien. C'est ce qui vous fait taper beaucoup d'adresses sans rien voir apparaitre.
+//
+// Photon interroge LES MEMES DONNEES OpenStreetMap, mais avec une recherche tolerante :
+// debut de mot, faute de frappe, accents ignores, et un classement par proximite du point
+// ou l'on se trouve. C'est exactement ce qui manque ici.
+//
+// Il n'est appele QU'EN RENFORT, quand Nominatim rend peu de choses : on ne remplace pas
+// ce qui fonctionne, on comble ce qui manque.
+// ════════════════════════════════════════════════════════════════════════════
+async function _viaPhoton(q) {
+  try {
+    let c = null;
+    try {
+      if(_clMap && _clMap.getCenter) { const k = _clMap.getCenter(); c = { lat: k.lat, lng: k.lng }; }
+      if(!c && _pointPriseEnCharge) c = _pointPriseEnCharge;
+      if(!c && positionPassager) c = positionPassager;
+    } catch(e) {}
+    const u = 'https://photon.komoot.io/api/?limit=8&lang=fr&q=' + encodeURIComponent(q) +
+              (c && c.lat != null ? '&lat=' + c.lat + '&lon=' + c.lng : '');
+    const j = await (await fetch(u)).json();
+    return ((j && j.features) || []).map(function (f) {
+      const p = f.properties || {};
+      const g = (f.geometry && f.geometry.coordinates) || [];
+      if(g.length < 2) return null;
+      const nom = [p.name, p.street, p.district || p.suburb, p.city || p.county, p.state]
+        .filter(Boolean).filter((v, i, t) => t.indexOf(v) === i).slice(0, 3).join(', ');
+      if(!nom) return null;
+      return { place_id: 'ph-' + (p.osm_id || (g[0] + '_' + g[1])), display_name: nom, lat: g[1], lon: g[0] };
+    }).filter(Boolean);
+  } catch(e) { return []; }
+}
+
 async function _chercherLieux(q) {
-  const base = 'https://nominatim.openstreetmap.org/search?format=json&limit=10&q=' + encodeURIComponent(q);
+  // v9.610 : « accept-language=fr » pour des libelles en francais, et « addressdetails »
+  // pour que le numero de rue soit rendu quand il existe.
+  const base = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&accept-language=fr&limit=10&q=' + encodeURIComponent(q);
   let res = [];
   try { res = (await (await fetch(base + _biaisRecherche())).json()) || []; } catch(e) { res = []; }
   if(res.length < 4) {
@@ -8701,6 +8761,14 @@ async function _chercherLieux(q) {
       const vus = new Set(res.map(x => x.place_id));
       autres.forEach(x => { if(!vus.has(x.place_id)) { vus.add(x.place_id); res.push(x); } });
     } catch(e) {}
+  }
+  // Renfort Photon. On ecarte les doublons par la position — les deux services decrivent
+  // souvent le meme lieu avec deux libelles differents.
+  if(res.length < 6) {
+    const ph = await _viaPhoton(q);
+    const cle = x => (Math.round(parseFloat(x.lat) * 2000) + '_' + Math.round(parseFloat(x.lon) * 2000));
+    const vus = new Set(res.map(cle));
+    ph.forEach(function (x) { if(!vus.has(cle(x))) { vus.add(cle(x)); res.push(x); } });
   }
   return res.slice(0, 10);
 }
