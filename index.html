@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.602';
+window.AFRIMOTO_VERSION = 'v9.603';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2245,6 +2245,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="tab" id="tab-sousagents" style="display:none" onclick="goPage('sousagents')">👥 Sous-agents</button>
     <button class="tab" id="tab-tarifs" style="display:none" onclick="goPage('tarifs')">💰 Tarifs</button>
     <button class="tab" id="tab-litiges" style="display:none" onclick="goPage('litiges')">⚖️ Litiges</button>
+    <!-- v9.603 : les vehicules suspendus etaient dispersés dans les listes, en gris et en
+         pointillés. Il fallait les chercher un par un pour savoir qui régulariser. -->
+    <button class="tab" id="tab-suspendus" style="display:none" onclick="goPage('suspendus')">⏸️ Suspendus</button>
   </div>
 </div>
 
@@ -2550,6 +2553,22 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   </div>
   <input id="rq" type="text" placeholder="Rechercher..." style="margin-bottom:11px" oninput="rRegistre()"/>
   <div id="registre-list"></div>
+</div>
+
+<!-- ══ SUSPENDUS (admin + agent) — v9.603 ══ -->
+<div id="page-suspendus" class="page">
+  <div class="h2">⏸️ Voitures et motos suspendues</div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn" id="sp-f-tous"    onclick="setFiltreSuspendus('tous')"    style="font-size:12px;padding:7px 12px">Tous</button>
+    <button class="btn-ghost" id="sp-f-moto"    onclick="setFiltreSuspendus('moto')"    style="font-size:12px;padding:7px 12px">🏍️ Motos</button>
+    <button class="btn-ghost" id="sp-f-voiture" onclick="setFiltreSuspendus('voiture')" style="font-size:12px;padding:7px 12px">🚗 Voitures</button>
+    <button class="btn-ghost" id="sp-f-maj"     onclick="setFiltreSuspendus('maj')"     style="font-size:12px;padding:7px 12px">🔄 Mise à jour en retard</button>
+    <button class="btn-ghost" id="sp-f-manuel"  onclick="setFiltreSuspendus('manuel')"  style="font-size:12px;padding:7px 12px">✋ Suspension manuelle</button>
+  </div>
+  <div class="fld" style="margin-bottom:12px">
+    <input type="text" id="sp-recherche" placeholder="🔎 Plaque, nom du propriétaire, téléphone…" oninput="rSuspendus()"/>
+  </div>
+  <div id="suspendus-contenu"></div>
 </div>
 
 <!-- GESTION -->
@@ -4704,7 +4723,9 @@ function goPage(id, skipHistory) {
     id = DB.user ? (isAgent() ? 'vehs' : (pagesPersonnelles[DB.user.role] || 'home')) : 'home';
   }
   // Pages réservées agent (recharge, sous-agents, gps) : admin a aussi accès (supervision)
-  const pagesAgentOnly = ['recherche-agent','recharge','sousagents','gps'];
+  // v9.603 : « suspendus » suit la meme regle que les autres pages de travail — agent ET
+  // administration. Un agent doit pouvoir regulariser sur place, c'est tout son metier.
+  const pagesAgentOnly = ['recherche-agent','recharge','sousagents','gps','suspendus'];
   if(pagesAgentOnly.includes(id) && !isAgent() && !isAdmin()) {
     id = DB.user ? (pagesPersonnelles[DB.user.role] || 'home') : 'home';
   }
@@ -4731,7 +4752,8 @@ function goPage(id, skipHistory) {
   const renders = {owner:rOwner,client:rClient,sousagent:rSousAgent,passager:rPassager,home:rHome,vehs:rVehs,taxis:rTaxis,gps:rGPS,trajets:()=>{rTrajets(); startTrajetAutoRefresh();},
     annonces:rAnnonces,alertes:rAlertes,agences:rAgences,registre:()=>rRegistre(),
     gestion:()=>rGestion(),'recherche-agent':renderRechercheAgent,recharge:()=>rRecharge(),
-    sousagents:rSA,historique:()=>rHistorique(),tarifs:rTarifs,litiges:()=>rLitiges()};
+    sousagents:rSA,historique:()=>rHistorique(),tarifs:rTarifs,litiges:()=>rLitiges(),
+    suspendus:()=>rSuspendus()};
   // v9.558 : on quitte la Gestion, on lache l'abonnement d'ecran. Sans cela il resterait
   // ouvert pour rien — c'est precisement ce qu'on cherche a eviter.
   if(id !== 'gestion' && window._canalEcran && window._canalEcran.nom) {
@@ -6896,6 +6918,9 @@ function updateNav() {
   // la vraie regle est dans la base, ou personne ne peut la contourner.
   const tabLitiges = document.getElementById('tab-litiges');
   if(tabLitiges) tabLitiges.style.display = (isAdmin() || isAgent()) ? '' : 'none';
+  // v9.603 : meme visibilite que les litiges — administration et agents agrees.
+  const tabSusp = document.getElementById('tab-suspendus');
+  if(tabSusp) tabSusp.style.display = (isAdmin() || isAgent()) ? '' : 'none';
   const gpsTabs = ['tab-gps'];
   // Onglet Accueil : masqué pour admin/agent (contenu réservé au public)
   const tabHome = document.getElementById('tab-home');
@@ -22556,6 +22581,158 @@ function appliquerMaj(x, estTaxi, prix, par) {
   const e = echeanceMaj(x, estTaxi);
   toast('✅ Mise à jour effectuée — prochaine échéance : ' + (e ? e.toLocaleDateString('fr-FR') : ''));
 }
+// ════════════════════════════════════════════════════════════════════════════
+// v9.603 — VOITURES ET MOTOS SUSPENDUES (administration + agents agrees)
+//
+// Jusqu'ici un vehicule suspendu restait noye dans la liste generale, en gris et en
+// pointilles : il fallait faire defiler des centaines de lignes pour savoir qui devait
+// regulariser. Cet ecran ne montre QUE les suspendus, et donne les deux gestes utiles.
+//
+// DEUX SUSPENSIONS QUI N'ONT RIEN A VOIR :
+//
+//   · AUTOMATIQUE (suspenduAuto) — la mise a jour annuelle n'a pas ete payee a l'echeance.
+//     Le seul geste qui la leve VRAIMENT est la mise a jour. Lever la suspension a la main
+//     ne tiendrait pas : la verification automatique la remettrait au tour suivant. On le
+//     dit clairement plutot que de laisser l'agent croire qu'il a regle le probleme.
+//
+//   · MANUELLE — quelqu'un a suspendu ce vehicule pour une autre raison (document douteux,
+//     litige, decision de l'administration). Celle-la se leve d'un bouton.
+// ════════════════════════════════════════════════════════════════════════════
+let filtreSuspendus = 'tous';
+function setFiltreSuspendus(f) {
+  filtreSuspendus = f;
+  ['tous','moto','voiture','maj','manuel'].forEach(function(x){
+    const b = document.getElementById('sp-f-' + x);
+    if(b) { b.className = (x === f) ? 'btn' : 'btn-ghost'; b.style.fontSize = '12px'; b.style.padding = '7px 12px'; }
+  });
+  rSuspendus();
+}
+
+function _suspEnRetard(x, estTaxi) {
+  const e = echeanceMaj(x, estTaxi);
+  return !!(e && new Date() > e);
+}
+
+function rSuspendus() {
+  const boite = document.getElementById('suspendus-contenu');
+  if(!boite) return;
+  const q = nrm((document.getElementById('sp-recherche') || {}).value || '');
+
+  // On rassemble les deux familles dans une seule liste : pour l'agent qui regularise,
+  // « une moto de taxi » et « une moto du registre » se traitent de la meme facon.
+  let liste = [];
+  (DB.taxis || []).forEach(function(t){
+    if(t.statut !== 'suspendu') return;
+    liste.push({ kind:'taxi', id:t.id, obj:t, estTaxi:true,
+                 type:(_typeTaxi(t) === 'voiture' ? 'voiture' : 'moto'),
+                 titre:(t.nom || 'Chauffeur') + ' · ' + (t.plaque || '—'),
+                 sous:'📞 ' + (t.tel || '—') + (t.gilet ? ' · Gilet n° ' + t.gilet : ''),
+                 famille:(_typeTaxi(t) === 'voiture' ? '🚗 Taxi VTC' : '🏍️ Taxi moto') });
+  });
+  (DB.vehs || []).forEach(function(v){
+    if(v.statut !== 'suspendu') return;
+    liste.push({ kind:'veh', id:v.id, obj:v, estTaxi:false,
+                 type:(v.type === 'voiture' ? 'voiture' : 'moto'),
+                 titre:(v.mat || v.vin || '—') + ' · ' + ((v.brand || '') + ' ' + (v.model || '')).trim(),
+                 sous:'👤 ' + (v.owner || '—') + ' · 📞 ' + (v.phone || '—'),
+                 famille:(v.type === 'voiture' ? '🚗 Voiture (registre)' : '🏍️ Moto (registre)') });
+  });
+
+  liste = liste.filter(function(it){
+    const auto = !!(it.obj.suspenduAuto);
+    if(filtreSuspendus === 'moto'    && it.type !== 'moto')    return false;
+    if(filtreSuspendus === 'voiture' && it.type !== 'voiture') return false;
+    if(filtreSuspendus === 'maj'     && !auto)                 return false;
+    if(filtreSuspendus === 'manuel'  && auto)                  return false;
+    if(!q) return true;
+    return [it.titre, it.sous].some(function(s){ return nrm(s || '').includes(q); });
+  });
+
+  const nbAuto = liste.filter(function(it){ return !!it.obj.suspenduAuto; }).length;
+
+  if(!liste.length) {
+    boite.innerHTML = '<div class="card" style="text-align:center;padding:26px">' +
+      '<div style="font-size:34px;margin-bottom:8px">✅</div>' +
+      '<div style="font-weight:800">Aucun véhicule suspendu' +
+      (filtreSuspendus !== 'tous' || q ? ' pour ce filtre' : '') + '</div></div>';
+    return;
+  }
+
+  let html = '<div class="card" style="margin-bottom:10px;padding:11px;border-left:3px solid #EAB308">' +
+    '<div style="font-weight:900">' + liste.length + ' véhicule' + (liste.length > 1 ? 's' : '') + ' suspendu' + (liste.length > 1 ? 's' : '') + '</div>' +
+    '<div style="font-size:12px;color:var(--text2)">🔄 ' + nbAuto + ' pour mise à jour en retard · ✋ ' + (liste.length - nbAuto) + ' suspension' + ((liste.length - nbAuto) > 1 ? 's' : '') + ' manuelle' + ((liste.length - nbAuto) > 1 ? 's' : '') + '</div></div>';
+
+  html += liste.map(function(it){
+    const auto = !!(it.obj.suspenduAuto);
+    const retard = _suspEnRetard(it.obj, it.estTaxi);
+    const ech = echeanceMaj(it.obj, it.estTaxi);
+    const prix = (typeof prixMajDe === 'function') ? prixMajDe(it.obj, it.estTaxi) : 0;
+    const motif = auto
+      ? '<div style="font-size:12px;color:#EAB308;font-weight:800;margin-top:4px">🔄 Mise à jour non payée' +
+        (ech ? ' — échéance du ' + ech.toLocaleDateString('fr-FR') : '') + '</div>'
+      : '<div style="font-size:12px;color:#EF4444;font-weight:800;margin-top:4px">✋ Suspension manuelle</div>';
+
+    let boutons = '';
+    // Le bouton de mise a jour n'apparait que s'il sert a quelque chose : payer avant
+    // l'echeance est refuse plus loin par « majClient », autant ne pas le proposer ici.
+    if(retard) {
+      boutons += '<button class="btn" style="flex:1;padding:10px;font-size:12px;background:#EAB308;color:#111;font-weight:900" ' +
+                 'onclick="majStaff(\'' + it.kind + '\',\'' + it.id + '\')">🔄 Mettre à jour' +
+                 (prix ? ' · ' + fmt(prix) : '') + '</button>';
+    }
+    boutons += '<button class="btn-ghost" style="flex:1;padding:10px;font-size:12px;border-color:rgba(34,197,94,.5);color:#22C55E" ' +
+               'onclick="leverSuspension(\'' + it.kind + '\',\'' + it.id + '\')">✅ Lever la suspension</button>';
+
+    return '<div class="card" style="margin-bottom:8px;border-left:3px solid ' + (auto ? '#EAB308' : '#EF4444') + '">' +
+      '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">' + esc(it.famille) + '</div>' +
+      '<div style="font-weight:900;margin-top:2px">' + esc(it.titre) + '</div>' +
+      '<div style="font-size:12px;color:var(--text2)">' + esc(it.sous) + '</div>' +
+      motif +
+      '<div style="display:flex;gap:8px;margin-top:10px">' + boutons + '</div>' +
+    '</div>';
+  }).join('');
+
+  boite.innerHTML = html;
+}
+
+function leverSuspension(kind, id) {
+  if(DB.user && DB.user.role === 'sousagent') { toast('Réservé aux agents et à l\'administration', true); return; }
+  if(!isAdmin() && !isAgent()) { toast('Réservé aux agents et à l\'administration', true); return; }
+  const estTaxi = kind === 'taxi';
+  const x = estTaxi ? DB.taxis.find(function(t){ return t.id === id; })
+                    : DB.vehs.find(function(v){ return v.id === id; });
+  if(!x) { toast('Élément introuvable', true); return; }
+
+  // ══ LE CAS QU'IL NE FAUT PAS LAISSER PASSER ══
+  // Une suspension automatique due a une mise a jour en retard ne se leve pas a la main :
+  // « verifierMisesAJour » repasse regulierement et la remettrait aussitot. L'agent croirait
+  // avoir regularise, le chauffeur repartirait travailler, et se retrouverait bloque en
+  // pleine journee sans comprendre pourquoi.
+  if(x.suspenduAuto && _suspEnRetard(x, estTaxi)) {
+    const ech = echeanceMaj(x, estTaxi);
+    toast('🔄 Cette suspension vient de la mise à jour non payée' +
+          (ech ? ' (échéance du ' + ech.toLocaleDateString('fr-FR') + ')' : '') +
+          '. La lever ne tiendrait pas — utilisez « Mettre à jour ».', true);
+    return;
+  }
+
+  const quoi = estTaxi ? ((x.nom || '') + ' · ' + (x.plaque || '')) : ((x.mat || x.vin || '') + ' ' + (x.brand || ''));
+  askConfirm('Lever la suspension de ' + quoi.trim() + ' ?\n\nCe véhicule pourra de nouveau circuler et travailler.', function(){
+    x.statut = 'actif';
+    x.suspenduAuto = false;
+    if(estTaxi) sbSaveTaxi(x); else sbSaveVehicule(x);
+    try {
+      logMvt('enreg', '▶️ Suspension levée — ' + quoi.trim(), 0,
+             (isAdmin() ? 'Admin' : 'Agent'), quoi.trim(),
+             { cibleType: (estTaxi ? 'taxi' : 'vehicule'), cibleId: x.id });
+    } catch(e) {}
+    toast('✅ Suspension levée');
+    rSuspendus();
+    if(typeof rGestion === 'function' && document.getElementById('page-gestion') &&
+       document.getElementById('page-gestion').classList.contains('act')) { try { rGestion(); } catch(e) {} }
+  });
+}
+
 function majStaff(kind, id) {
   const estTaxi = kind === 'taxi';
   const x = estTaxi ? DB.taxis.find(t => t.id === id) : DB.vehs.find(v => v.id === id);
@@ -22573,6 +22750,9 @@ function majStaff(kind, id) {
     if(ag && debit) { ag.solde -= debit; sbSaveAgent(ag); updateNav(); }
     appliquerMaj(x, estTaxi, prix, ag ? ag.name : 'Admin');
     if(typeof rGestion === 'function') try { rGestion(); } catch(e) {}
+    // v9.603 : la mise a jour vient de lever la suspension — l'ecran des suspendus doit
+    // le montrer tout de suite, sinon l'agent rappuie sur un bouton devenu inutile.
+    if(typeof rSuspendus === 'function') try { rSuspendus(); } catch(e) {}
   });
 }
 function majClient(kind, id) {
