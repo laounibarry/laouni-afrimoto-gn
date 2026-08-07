@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.605';
+window.AFRIMOTO_VERSION = 'v9.606';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -16621,6 +16621,68 @@ function _sonService(enLigne){
   }catch(e){}
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// v9.606 — UN VEHICULE SUSPENDU NE TRAVAILLE PAS. TROIS VERROUS.
+//
+// « taxis_disponibles » exigeait deja « statut = actif » : un suspendu ne RECEVAIT donc
+// aucune course. Mais rien ne l'empechait de se METTRE en service — il voyait la carte,
+// se croyait au travail, et attendait des courses qui ne viendraient jamais. Et surtout :
+// un chauffeur suspendu PENDANT son service y restait, jusqu'a ce qu'il en sorte lui-meme.
+//
+// Un vehicule est suspendu pour une raison : mise a jour non payee, document douteux,
+// litige, decision de l'administration. Aucune de ces raisons ne s'accommode d'un delai.
+//
+//   1. Se mettre en service : refuse.
+//   2. Deja en service et suspendu : sorti immediatement, sans rien avoir a faire.
+//   3. Publier un trajet avec une voiture suspendue : refuse.
+//
+// Le quatrieme verrou est dans la base (declencheur SQL) : il vaut aussi pour
+// l'application Android, qui ecrit directement dans la table.
+// ════════════════════════════════════════════════════════════════════════════
+function _motifSuspension(t) {
+  if(!t) return '';
+  if(t.statut === 'vole' || t.stolen) return 'Ce véhicule est déclaré volé.';
+  if(t.statut === 'suspendu') {
+    return t.suspenduAuto
+      ? 'Ce véhicule est suspendu : la mise à jour de son enregistrement n\'a pas été payée.'
+      : 'Ce véhicule est suspendu par l\'administration.';
+  }
+  if(t.horsService === true || t.hors_service === true) return 'Ce véhicule a été retiré du service.';
+  return '';
+}
+
+// Appelee a chaque relecture des vehicules : si CE telephone travaille avec un vehicule
+// qui vient d'etre suspendu, on le sort du service sur-le-champ.
+let _dejaPrevenuSuspension = null;
+async function _appliquerSuspensionImmediate() {
+  try {
+    if(!DB.user || DB.user.role !== 'client') return;
+    const cl = DB.clients.find(function(c){ return c.id === DB.user.id; });
+    if(!cl) return;
+    const miens = (DB.taxis || []).filter(function(t){ return t.tel === cl.tel && t.enService; });
+    for(let i = 0; i < miens.length; i++) {
+      const t = miens[i];
+      const motif = _motifSuspension(t);
+      if(!motif) continue;
+
+      t.enService = false;
+      try { await sbMajServiceTaxi(t.id, false); } catch(e) {}
+      try { arreterSuiviGpsTaxi(t.id); } catch(e) {}
+      try { fermerSessionService(t.id); } catch(e) {}
+      try { if(typeof sortirModeService === 'function') sortirModeService(); } catch(e) {}
+      try { if(window.AfriMotoNative && AfriMotoNative.stopTracking) AfriMotoNative.stopTracking(); } catch(e) {}
+
+      if(_dejaPrevenuSuspension !== t.id) {
+        _dejaPrevenuSuspension = t.id;
+        toast('⛔ ' + motif + ' Vous avez été mis hors service. Rendez-vous chez un agent agréé pour régulariser.', true);
+      }
+      try { addDebugLog('SUSPENSION : ' + (t.plaque || t.id) + ' mis hors service automatiquement'); } catch(e) {}
+      try { rClientContent(); } catch(e) {}
+    }
+    if(!miens.length) _dejaPrevenuSuspension = null;
+  } catch(e) {}
+}
+
 async function toggleTaxiEnService(id) {
   const t = DB.taxis.find(x=>x.id===id);
   // v9.512 : c'etait la SEULE sortie muette de toute cette fonction. Quand le vehicule
@@ -16640,6 +16702,15 @@ async function toggleTaxiEnService(id) {
   }
 
   if(!t.enService) {
+    // v9.606 : PREMIER CONTROLE, avant tous les autres. Inutile de verifier le solde, la
+    // photo ou le selfie d'un vehicule qui n'a pas le droit de rouler.
+    const _motif = _motifSuspension(t);
+    if(_motif) {
+      toast('⛔ ' + _motif + ' Impossible de passer en service — rendez-vous chez un agent agréé pour régulariser.', true);
+      try { addDebugLog('SERVICE refuse : ' + (t.plaque || t.id) + ' statut = ' + t.statut); } catch(e) {}
+      rClientContent();
+      return;
+    }
     // v9.397 : un seul vehicule en service a la fois pour ce chauffeur.
     // S'il a plusieurs taxis, il doit mettre l'autre hors service avant de changer.
     const _autreEnService = DB.taxis.find(x => x.tel === t.tel && x.id !== t.id && x.enService);
@@ -18131,6 +18202,35 @@ async function confirmerEtPublierTrajet() {
 }
 // Publie réellement le trajet après confirmation du chauffeur (ou direct pour le staff)
 async function _publierTrajetDefinitif() {
+  // ══ v9.606 — UNE VOITURE SUSPENDUE NE PUBLIE PAS DE TRAJET ══
+  //
+  // Jusqu'ici, une voiture suspendue empechait seulement l'affichage de sa photo et de sa
+  // plaque : le trajet partait quand meme, sans vehicule identifiable. Des passagers
+  // reservaient donc une place dans une voiture qui n'a pas le droit de rouler.
+  //
+  // On ne bloque QUE les proprietaires qui ont des voitures : celui qui n'en a aucune
+  // enregistree publie comme avant — il ne faut casser personne au passage.
+  if(DB.user && DB.user.role === 'client') {
+    const _clS = DB.clients.find(function(x){ return x.id === DB.user.id; });
+    if(_clS) {
+      const _miennes = (DB.vehs || []).filter(function(v){
+        return v.type === 'voiture' &&
+               (v.clientId === _clS.id || v.id === _clS.vid || (_clS.tel && v.phone === _clS.tel));
+      });
+      const _bonnes = _miennes.filter(function(v){ return v.statut !== 'suspendu' && v.statut !== 'vole' && !v.stolen; });
+      if(_miennes.length > 0 && _bonnes.length === 0) {
+        const _v = _miennes[0];
+        toast('⛔ ' + (_v.statut === 'vole' || _v.stolen
+                ? 'Votre voiture est déclarée volée.'
+                : (_v.suspenduAuto
+                    ? 'Votre voiture est suspendue : la mise à jour de son enregistrement n\'a pas été payée.'
+                    : 'Votre voiture est suspendue par l\'administration.')) +
+              ' Impossible de publier un trajet — rendez-vous chez un agent agréé pour régulariser.', true);
+        try { closeModal('m-trajet'); } catch(e) {}
+        return;
+      }
+    }
+  }
   const cond=document.getElementById('tr-cond').value.trim();
   let tel=document.getElementById('tr-tel').value.trim();
   const dep=document.getElementById('tr-dep').value.trim();
@@ -27074,6 +27174,10 @@ body.mode-service .nav-inner{display:none!important}
       ((res&&res.data)||[]).forEach(function(r){
         try{ var m=mapTaxi(r); var i=DB.taxis.findIndex(function(x){ return x.id===m.id; }); if(i>=0) DB.taxis[i]=m; }catch(e){}
       });
+      // v9.606 : les vehicules viennent d'etre relus. Si l'un des miens a ete suspendu
+      // pendant que je travaillais, je dois sortir du service MAINTENANT — pas au
+      // prochain redemarrage de l'application.
+      try { if(typeof _appliquerSuspensionImmediate === 'function') _appliquerSuspensionImmediate(); } catch(e){}
     }).catch(function(){});
     var pD=supabaseClient.from('demandes_course').select('*').in('taxi_id', ids).order('date',{ascending:false}).limit(8).then(function(res){
       var recues = {};
