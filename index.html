@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.603';
+window.AFRIMOTO_VERSION = 'v9.604';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1311,6 +1311,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // v9.341 : != null et non if(...) — sinon une commission reglee a 0 etait ignoree
         if(cfg.commission_course_taxi != null) DB.commissionCourseTaxi = cfg.commission_course_taxi;
         if(cfg.commission_course_vtc != null) DB.commissionCourseVtc = cfg.commission_course_vtc; // v9.389
+        // v9.604 : mode de commission VTC — montant fixe ou pourcentage du prix.
+        if(cfg.commission_vtc_mode != null) DB.commissionVtcMode = cfg.commission_vtc_mode;
+        if(cfg.commission_vtc_pourcent != null) DB.commissionVtcPourcent = cfg.commission_vtc_pourcent;
         if(cfg.renouvellement) DB.renouvellement = Object.assign({moto:'anniversaire', taxi:'mensuel'}, cfg.renouvellement);
         DB.motosRetrouvees = cfg.motos_retrouvees || cfg.motosRetrouvees || 0;
         if(cfg.tarifs_maj) DB.tarifsMaj = Object.assign({taxi:25000}, cfg.tarifs_maj);
@@ -2123,6 +2126,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       frais_trajet_defaut:DB.fraisTrajetDefaut, pourcentage_trajet_defaut:DB.pourcentageTrajetDefaut, bandeau_actif:DB.bandeauActif,
       bandeau_texte:DB.bandeauTexte, bandeau_vitesse:DB.bandeauVitesse,
       commission_course_taxi:DB.commissionCourseTaxi, commission_course_vtc:Number(DB.commissionCourseVtc)||0, // v9.389
+      commission_vtc_mode:(DB.commissionVtcMode === 'pourcent' ? 'pourcent' : 'fixe'), // v9.604
+      commission_vtc_pourcent:Number(DB.commissionVtcPourcent)||0,
       trajet_unique_desactive:DB.trajetUniqueDesactive,
       verrou_app_actif:DB.verrouAppActif!==false,
       tri_note_actif:DB.triNoteActif!==false,
@@ -4325,6 +4330,10 @@ const DB = {
   pourcentageTrajetDefaut: 0, // 0 = mode montant fixe ; >0 = mode pourcentage du prix (ex: 25 = 25%)
   trajetUniqueDesactive: false,
   commissionCourseVtc: 3000, // v9.389 : une course en voiture coute plus cher au client
+  // v9.604 : 'fixe' = le montant ci-dessus ; 'pourcent' = un pourcentage du prix convenu.
+  // On demarre sur 'fixe' : rien ne change tant que l'administration n'a pas choisi.
+  commissionVtcMode: 'fixe',
+  commissionVtcPourcent: 10,
   verrouAppActif: true, // v9.347 : l'admin peut ouvrir ou fermer cette possibilite pour tous
   triNoteActif: true, // v9.361 : a distance comparable, le mieux note passe devant
   triNoteRayon: 1000, // v9.362 : perimetre en metres, reglable par l'admin
@@ -7013,11 +7022,35 @@ function _couleurTaxi(t) {
   } catch(e) { return ''; }
 }
 
-function _commissionPourTaxi(t) {
+// ════════════════════════════════════════════════════════════════════════════
+// v9.604 — LA COMMISSION VTC PEUT ETRE UN POURCENTAGE DU PRIX DE LA COURSE
+//
+// La moto garde un montant fixe : ses courses se ressemblent, un forfait est juste.
+// La voiture non — cinq kilometres en ville et une course jusqu'a l'aeroport n'ont rien
+// a voir. Un montant fixe est alors trop cher pour l'une et derisoire pour l'autre.
+//
+// « prix » est le prix de la course. Quand il n'est pas encore connu — verification de
+// solde avant la mise en service, par exemple — on retombe sur le montant fixe : c'est
+// une ESTIMATION, et le vrai montant sera calcule au moment ou le prix existe.
+//
+// Arrondi aux 100 GNF : la commission se regle en especes, personne ne rend 37 francs.
+// ════════════════════════════════════════════════════════════════════════════
+function _commissionVtcFixe() {
+  const c = Number(DB.commissionCourseVtc);
+  return (c > 0 || c === 0) ? c : (Number(DB.commissionCourseTaxi) || 0);
+}
+function _vtcEnPourcent() { return DB.commissionVtcMode === 'pourcent'; }
+
+function _commissionPourTaxi(t, prix) {
   const type = _typeTaxi(t);
   if(type === 'voiture') {
-    const c = Number(DB.commissionCourseVtc);
-    return (c > 0 || c === 0) ? c : (Number(DB.commissionCourseTaxi) || 0);
+    if(_vtcEnPourcent()) {
+      const p = Number(DB.commissionVtcPourcent) || 0;
+      const base = Number(prix) || 0;
+      if(p > 0 && base > 0) return Math.round(base * p / 100 / 100) * 100;
+      return _commissionVtcFixe();   // prix inconnu : estimation
+    }
+    return _commissionVtcFixe();
   }
   return Number(DB.commissionCourseTaxi) || 0;
 }
@@ -7680,7 +7713,13 @@ function rPassager() {
     '</div>' +
     '<div id="bloc-solde" style="display:' + (window._blocsOuverts && _blocsOuverts['bloc-solde'] ? '' : 'none') + ';margin-bottom:10px">' +
       '<div class="card" style="display:flex;align-items:center;gap:10px">' +
-        '<div style="flex:1;font-size:11px;color:var(--text2)">Commission/course : ' + fmt(DB.commissionCourseTaxi||0) + '</div>' +
+        // v9.604 : ce bandeau annoncait la commission MOTO a tout le monde. Un passager qui
+        // commande une voiture y lisait un montant qui n'etait pas le sien. On annonce
+        // desormais les deux, et le pourcentage quand c'est le mode retenu pour le VTC.
+        '<div style="flex:1;font-size:11px;color:var(--text2)">Commission/course &mdash; 🏍️ ' + fmt(DB.commissionCourseTaxi||0) +
+          ' · 🚗 ' + (DB.commissionVtcMode === 'pourcent'
+                        ? ((Number(DB.commissionVtcPourcent)||0) + ' % du prix')
+                        : fmt(Number(DB.commissionCourseVtc)||0)) + '</div>' +
         '<button onclick="openRecharge()" class="btn" style="padding:10px 16px;font-size:13px;font-weight:800">💳 Recharger</button>' +
       '</div>' +
     '</div>' +
@@ -8711,7 +8750,10 @@ function confirmerDemandeCourse() {
   const lng = document.getElementById('dc-lng').value;
   if(!t || !ps) { err.textContent='⚠️ Erreur, réessayez.'; err.style.display='block'; return; }
   if(!lat || !lng) { err.textContent='⚠️ Veuillez partager votre position avant d\'envoyer la demande.'; err.style.display='block'; return; }
-  const commission = _commissionPourTaxi(t) || 0; // v9.389
+  // v9.604 : le prix voulu par le passager sert de base quand la commission VTC est un
+  // pourcentage. Pour la moto et pour le mode « montant fixe », il n'a aucun effet.
+  const _prixDemande = parseInt((document.getElementById('dc-prix')||{}).value) || 0;
+  const commission = _commissionPourTaxi(t, _prixDemande) || 0; // v9.389
   if(!_commissionAuTaxi() && (ps.solde||0) < commission) { // v9.367 : le passager ne paie pas si c'est le chauffeur
     err.textContent = '⛔ Solde insuffisant. Commission requise : ' + fmt(commission) + '. Votre solde : ' + fmt(ps.solde||0) + '. Rechargez auprès d\'un agent.';
     err.style.display = 'block';
@@ -8845,7 +8887,10 @@ async function demarrerRechercheAutomatique(commissionDejaPayee) {
 
   // v9.407 : commission calculee ICI, apres la construction de la liste (corrige un bug ou
   // 'liste' etait utilisee avant sa definition -> la recherche auto ne demarrait jamais).
-  const commission = _commissionPourTaxi(liste[0]) || 0;
+  // v9.604 : on relit le prix ICI. « _prixVoulu » n'est declare que plus bas dans cette
+  // fonction : s'en servir a cette ligne aurait plante la recherche automatique.
+  const _prixIci = parseInt(((document.body.classList.contains('mode-passager') && document.getElementById('pax-prix')) || document.getElementById('pa-prix') || {}).value) || 0;
+  const commission = _commissionPourTaxi(liste[0], _prixIci) || 0;
   if(!dejaPayee && !_commissionAuTaxi() && (ps.solde||0) < commission) {
     toast('⛔ Solde insuffisant (' + fmt(commission) + ' requis). Rechargez auprès d\'un agent.', true);
     return;
@@ -9646,7 +9691,29 @@ function _clientDuTaxi(taxiId) {
 }
 
 async function debiterTaxiCommission(demande) {
-  const m = Number(demande && demande.commission) || 0;
+  let m = Number(demande && demande.commission) || 0;
+  // ══ v9.604 — LE POURCENTAGE SUIT LE PRIX REELLEMENT CONVENU ══
+  //
+  // La commission a ete calculee a la creation, sur le prix ANNONCE par le passager. Mais
+  // le chauffeur peut proposer un autre prix, que le passager accepte : c'est le principe
+  // d'AfriMoto. Un pourcentage doit alors porter sur le prix FINAL, sinon la societe
+  // prelevrait sur un montant qui n'a jamais existe.
+  //
+  // On recalcule, on l'inscrit sur la course, PUIS on debite. Ainsi un eventuel
+  // remboursement rendra exactement ce qui a ete pris.
+  try {
+    const _t = DB.taxis.find(function(x){ return x.id === (demande && demande.taxiId); });
+    const _px = Number(demande && demande.prixPropose) || 0;
+    if(_t && _typeTaxi(_t) === 'voiture' && _vtcEnPourcent() && _px > 0) {
+      const _neuf = _commissionPourTaxi(_t, _px) || 0;
+      if(_neuf !== m) {
+        m = _neuf;
+        demande.commission = _neuf;
+        try { await sbMajStatutDemande(demande.id, { commission: _neuf }); } catch(e) {}
+        try { addDebugLog('COMMISSION VTC recalculee sur le prix convenu : ' + _neuf); } catch(e) {}
+      }
+    }
+  } catch(e) {}
   if(m <= 0) return;
   // v9.541 : LE PRELEVEMENT NE DEPEND PLUS DE LA TABLE DES CLIENTS.
   // Ce prelevement s'execute sur le telephone du PASSAGER : c'est lui qui conclut l'affaire.
@@ -20569,16 +20636,58 @@ function toggleTrajetUnique() {
     : '✅ Règle réactivée : un seul trajet actif par chauffeur');
   rGestion();
 }
+// v9.604 : bascule montant fixe / pourcentage pour le VTC. On ne change que l'affichage —
+// rien n'est enregistre tant que l'administration n'a pas appuye sur « Enregistrer ».
+function setModeCommissionVtc(mode) {
+  DB.commissionVtcMode = (mode === 'pourcent') ? 'pourcent' : 'fixe';
+  const bf = document.getElementById('zn-vtc-bloc-fixe');
+  const bp = document.getElementById('zn-vtc-bloc-pourcent');
+  const tf = document.getElementById('zn-vtc-mode-fixe');
+  const tp = document.getElementById('zn-vtc-mode-pourcent');
+  const pct = (mode === 'pourcent');
+  if(bf) bf.style.display = pct ? 'none' : 'block';
+  if(bp) bp.style.display = pct ? 'block' : 'none';
+  if(tf) tf.className = pct ? 'btn-ghost' : 'btn';
+  if(tp) tp.className = pct ? 'btn' : 'btn-ghost';
+  apercuCommissionVtc();
+}
+
+// Un pourcentage ne parle a personne tant qu'on ne l'a pas vu en francs.
+function apercuCommissionVtc() {
+  const el = document.getElementById('zn-vtc-apercu');
+  if(!el) return;
+  const p = parseFloat((document.getElementById('zn-commission-vtc-pct') || {}).value);
+  if(isNaN(p) || p < 0) { el.textContent = ''; return; }
+  const arrondi = function(x){ return Math.round(x * p / 100 / 100) * 100; };
+  el.innerHTML = 'Course à ' + fmt(20000) + ' → <b>' + fmt(arrondi(20000)) + '</b>' +
+                 ' · à ' + fmt(50000) + ' → <b>' + fmt(arrondi(50000)) + '</b>' +
+                 ' · à ' + fmt(150000) + ' → <b>' + fmt(arrondi(150000)) + '</b>';
+}
+
 function majCommissionTaxi() {
   const v = parseInt(document.getElementById('zn-commission-taxi').value);
   if(isNaN(v) || v < 0) { toast('Valeur invalide', true); return; }
   DB.commissionCourseTaxi = v;
   const _vtc = parseInt((document.getElementById('zn-commission-vtc') || {}).value); // v9.389
   if(!isNaN(_vtc) && _vtc >= 0) DB.commissionCourseVtc = _vtc;
+  // v9.604 : le pourcentage VTC. On refuse une valeur aberrante plutot que de l'enregistrer :
+  // une commission de 300 % passerait inapercue jusqu'a la premiere course.
+  const _pct = parseFloat((document.getElementById('zn-commission-vtc-pct') || {}).value);
+  if(!isNaN(_pct)) {
+    if(_pct < 0 || _pct > 100) { toast('⚠️ Le pourcentage VTC doit être compris entre 0 et 100', true); return; }
+    DB.commissionVtcPourcent = _pct;
+  }
+  if(DB.commissionVtcMode === 'pourcent' && !(Number(DB.commissionVtcPourcent) > 0)) {
+    toast('⚠️ Indiquez un pourcentage supérieur à 0, ou revenez au montant fixe', true); return;
+  }
   const _fa = parseInt((document.getElementById('zn-frais-annonce') || {}).value); // v9.432
   if(!isNaN(_fa) && _fa >= 0) DB.fraisAnnonce = _fa;
   sbSaveConfig();
-  toast('✅ Tarifs mis à jour — commission moto : ' + fmt(v) + (!isNaN(_fa) && _fa >= 0 ? ' · annonce : ' + (_fa > 0 ? fmt(_fa) : 'gratuite') : ''));
+  toast('✅ Tarifs mis à jour — moto : ' + fmt(v) +
+        ' · VTC : ' + (DB.commissionVtcMode === 'pourcent'
+                        ? (Number(DB.commissionVtcPourcent) + ' % du prix')
+                        : fmt(Number(DB.commissionCourseVtc)||0)) +
+        (!isNaN(_fa) && _fa >= 0 ? ' · annonce : ' + (_fa > 0 ? fmt(_fa) : 'gratuite') : ''));
   rGestion();
 }
 
@@ -21721,8 +21830,25 @@ function rGestion() {
         '<div class="sect" style="margin-top:0">🚕 Commission par course (tarif passager)</div>' +
         '<div class="qr-note-txt" style="font-size:11px;margin-bottom:10px">Montant déduit du solde du passager à chaque demande de course envoyée à un taxi. Le passager paie le trajet en cash directement au chauffeur ; cette commission rémunère la société.</div>' +
         '<div class="fld"><div class="lbl">\ud83c\udfcd\ufe0f Commission par course moto (GNF)</div><input type="number" id="zn-commission-taxi" value="' + DB.commissionCourseTaxi + '"/></div>' +
-        '<div class="fld"><div class="lbl">\ud83d\ude97 Commission par course VTC \u2014 voiture (GNF)</div><input type="number" id="zn-commission-vtc" value="' + (Number(DB.commissionCourseVtc)||0) + '"/>' +
-          '<div style="font-size:11px;color:var(--text2);margin-top:5px">Une course en voiture se facture plus cher au client : sa commission peut suivre.</div></div>' +
+        // v9.604 : la voiture a le choix entre un montant fixe et un pourcentage du prix.
+        '<div class="fld" style="border:1px solid rgba(96,165,250,.35);border-radius:10px;padding:11px">' +
+          '<div class="lbl">\ud83d\ude97 Commission par course VTC \u2014 voiture</div>' +
+          '<div style="display:flex;gap:8px;margin:8px 0 10px">' +
+            '<button class="' + (DB.commissionVtcMode === 'pourcent' ? 'btn-ghost' : 'btn') + '" id="zn-vtc-mode-fixe" style="flex:1;padding:9px;font-size:12px" onclick="setModeCommissionVtc(\'fixe\')">\ud83d\udcb5 Montant fixe</button>' +
+            '<button class="' + (DB.commissionVtcMode === 'pourcent' ? 'btn' : 'btn-ghost') + '" id="zn-vtc-mode-pourcent" style="flex:1;padding:9px;font-size:12px" onclick="setModeCommissionVtc(\'pourcent\')">\ud83d\udcca Pourcentage</button>' +
+          '</div>' +
+          '<div id="zn-vtc-bloc-fixe" style="display:' + (DB.commissionVtcMode === 'pourcent' ? 'none' : 'block') + '">' +
+            '<div class="lbl" style="font-size:11px">Montant fixe par course (GNF)</div>' +
+            '<input type="number" id="zn-commission-vtc" value="' + (Number(DB.commissionCourseVtc)||0) + '"/>' +
+          '</div>' +
+          '<div id="zn-vtc-bloc-pourcent" style="display:' + (DB.commissionVtcMode === 'pourcent' ? 'block' : 'none') + '">' +
+            '<div class="lbl" style="font-size:11px">Pourcentage du prix de la course (%)</div>' +
+            '<input type="number" id="zn-commission-vtc-pct" min="0" max="100" step="0.5" value="' + (Number(DB.commissionVtcPourcent)||0) + '" oninput="apercuCommissionVtc()"/>' +
+            '<div id="zn-vtc-apercu" style="font-size:11px;color:#EAB308;margin-top:6px;font-weight:700"></div>' +
+            '<div style="font-size:11px;color:var(--text2);margin-top:4px">Calcul\u00e9 sur le prix finalement convenu entre le passager et le chauffeur, arrondi aux 100 GNF. Tant que le prix n\'est pas connu (v\u00e9rification de solde avant la mise en service), c\'est le montant fixe ci-dessus qui sert d\'estimation \u2014 gardez-le renseign\u00e9.</div>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--text2);margin-top:8px">La moto reste toujours au montant fixe : ses courses se ressemblent. Une voiture, non \u2014 cinq kilom\u00e8tres en ville et une course jusqu\'\u00e0 l\'a\u00e9roport n\'ont rien \u00e0 voir.</div>' +
+        '</div>' +
         '<button class="btn" style="width:100%;padding:11px" onclick="majCommissionTaxi()">💾 Enregistrer</button>' +
       '</div>' +
       '<div class="sect" style="margin-top:0">🧍 Registre des passagers</div>' +
