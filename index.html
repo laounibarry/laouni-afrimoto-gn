@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.612';
+window.AFRIMOTO_VERSION = 'v9.613';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28998,17 +28998,9 @@ body.mode-passager .nav-inner{display:none!important}
       await _rpc('annuler_course', {
         p_course_id: _courseId, p_qui: 'passager', p_acteur: String((DB.user && DB.user.id) || '')
       });
-      // Le passager annule : c'est le CHAUFFEUR qui doit etre rembourse, s'il avait paye.
-      // Le passager, lui, ne recupere rien : il est a l'origine de l'annulation.
-      try {
-        if (_d && _d.commission > 0 && _d.taxiId &&
-            typeof _commissionAuTaxi === 'function' && _commissionAuTaxi()) {
-          var _sp = false;
-          try { _sp = await _dejaRencontres(_d); } catch (x) {}
-          if (!_sp) await rembourserTaxiCommission(_d, 'le passager a annulé avant la prise en charge');
-          else toast('ℹ️ Aucun remboursement : le chauffeur était déjà sur place.');
-        }
-      } catch (x) { try { addDebugLog('REMBOURSEMENT passager-annule : ' + (x && x.message)); } catch (e) {} }
+      // v9.613 : la meme regle. Si aucun chauffeur n'est venu, le passager recupere sa
+      // commission — c'est le cas le plus frequent : il annule faute de chauffeur.
+      await _rembourserSiChauffeurPasArrive(_d, 'annulée avant l\'arrivée du chauffeur');
     }
     try { alarmePrixProposeStop(); } catch (x) {}
     _arreterPassager();
@@ -29418,6 +29410,47 @@ body.mode-passager .nav-inner{display:none!important}
      ON LIT LA COURSE AVANT DE L'ANNULER. \u00ab annuler_course \u00bb detache le chauffeur et
      remet la course en recherche : apres coup, on ne saurait plus qui rembourser.
      \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+  /* ══════════════════════════════════════════════════════════════════════════
+     v9.613 — LA REGLE DE REMBOURSEMENT, TELLE QU'ELLE A TOUJOURS ETE VOULUE.
+
+     En v9.612 j'avais ajoute une condition « celui qui annule ne recupere rien ». Elle
+     ne fait PAS partie de la regle. Je l'avais deduite d'un vieux commentaire du code
+     au lieu de m'en tenir a ce qui etait demande. Resultat : un passager qui annulait
+     faute de chauffeur perdait sa commission alors qu'il devait etre rembourse.
+
+     LA REGLE, LA VRAIE, ET ELLE TIENT EN UNE PHRASE :
+
+         Le chauffeur est-il ARRIVE (a moins de 200 m du passager, distance reglable
+         dans l'espace admin) ?
+             OUI  -> personne n'est rembourse, quel que soit celui qui annule.
+                     Le chauffeur s'est deplace : son temps et son carburant sont engages.
+             NON  -> celui qui a paye la commission est rembourse, quel que soit celui
+                     qui annule. Personne ne s'est deplace, aucun service n'a ete rendu.
+
+     Les trois cas du terrain en decoulent d'eux-memes :
+       · aucun chauffeur trouve, le passager annule   -> rembourse
+       · le chauffeur annule avant d'arriver          -> le passager est rembourse
+       · le passager annule avant que le chauffeur bouge -> il est rembourse
+     ══════════════════════════════════════════════════════════════════════════ */
+  async function _rembourserSiChauffeurPasArrive(d, motif) {
+    if (!d || !(Number(d.commission) > 0)) return;
+    var arrive = false;
+    // Sans chauffeur designe, personne n'a pu se deplacer : le remboursement est du.
+    if (d.taxiId) { try { arrive = await _dejaRencontres(d); } catch (x) {} }
+    if (arrive) {
+      toast('ℹ️ Aucun remboursement : le chauffeur était déjà arrivé sur place.');
+      try { addDebugLog('REMBOURSEMENT refuse : chauffeur deja sur place'); } catch (x) {}
+      return;
+    }
+    try {
+      if (typeof _commissionAuTaxi === 'function' && _commissionAuTaxi()) {
+        if (d.taxiId) await rembourserTaxiCommission(d, motif);
+      } else {
+        await rembourserPassagerCourse(d, motif);
+      }
+    } catch (x) { try { addDebugLog('REMBOURSEMENT : ' + (x && x.message)); } catch (e) {} }
+  }
+
   async function _lireCoursePourRemboursement(idCourse) {
     try {
       var q = await supabaseClient.from('demandes_course')
@@ -29442,15 +29475,8 @@ body.mode-passager .nav-inner{display:none!important}
     _fermerEntrante();
     if (!r || r.ok !== true) { toast('\u274c Annulation impossible.', true); return; }
 
-    // Le chauffeur annule : c'est le PASSAGER qui doit etre rembourse, s'il avait paye.
-    try {
-      if (d && d.commission > 0 && typeof _commissionAuTaxi === 'function' && !_commissionAuTaxi()) {
-        var surPlace = false;
-        try { surPlace = await _dejaRencontres(d); } catch (x) {}
-        if (!surPlace) await rembourserPassagerCourse(d, 'le chauffeur a annul\u00e9');
-        else toast('\u2139\ufe0f Aucun remboursement : le chauffeur \u00e9tait d\u00e9j\u00e0 sur place.');
-      }
-    } catch (x) { try { addDebugLog('REMBOURSEMENT chauffeur-annule : ' + (x && x.message)); } catch (e) {} }
+    // v9.613 : une seule regle, la meme pour les deux cotes.
+    await _rembourserSiChauffeurPasArrive(d, 'le chauffeur a annul\u00e9 avant d\'arriver');
 
     toast('Course annul\u00e9e. Le passager est pr\u00e9venu et un autre chauffeur est cherch\u00e9.');
     try { if (typeof sortirModeService === 'function') sortirModeService(); } catch (x) {}
