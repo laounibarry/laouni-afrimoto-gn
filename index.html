@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.613';
+window.AFRIMOTO_VERSION = 'v9.614';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2564,11 +2564,16 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <div id="page-suspendus" class="page">
   <div class="h2">⏸️ Voitures et motos suspendues</div>
   <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn" id="sp-f-tous"    onclick="setFiltreSuspendus('tous')"    style="font-size:12px;padding:7px 12px">Tous</button>
-    <button class="btn-ghost" id="sp-f-moto"    onclick="setFiltreSuspendus('moto')"    style="font-size:12px;padding:7px 12px">🏍️ Motos</button>
-    <button class="btn-ghost" id="sp-f-voiture" onclick="setFiltreSuspendus('voiture')" style="font-size:12px;padding:7px 12px">🚗 Voitures</button>
-    <button class="btn-ghost" id="sp-f-maj"     onclick="setFiltreSuspendus('maj')"     style="font-size:12px;padding:7px 12px">🔄 Mise à jour en retard</button>
-    <button class="btn-ghost" id="sp-f-manuel"  onclick="setFiltreSuspendus('manuel')"  style="font-size:12px;padding:7px 12px">✋ Suspension manuelle</button>
+    <!-- v9.614 : les quatre familles séparées. Tout peut être suspendu — une moto du
+         registre, une voiture du registre, un taxi moto, un taxi VTC — et chacune se
+         régularise différemment. Les mélanger obligeait à trier à l'œil. -->
+    <button class="btn" id="sp-f-tous"              onclick="setFiltreSuspendus('tous')"         style="font-size:12px;padding:7px 12px">Tous</button>
+    <button class="btn-ghost" id="sp-f-taxi-moto"   onclick="setFiltreSuspendus('taxi-moto')"    style="font-size:12px;padding:7px 12px">🏍️ Taxi moto</button>
+    <button class="btn-ghost" id="sp-f-taxi-vtc"    onclick="setFiltreSuspendus('taxi-vtc')"     style="font-size:12px;padding:7px 12px">🚗 Taxi VTC</button>
+    <button class="btn-ghost" id="sp-f-veh-moto"    onclick="setFiltreSuspendus('veh-moto')"     style="font-size:12px;padding:7px 12px">🏍️ Motos (registre)</button>
+    <button class="btn-ghost" id="sp-f-veh-voiture" onclick="setFiltreSuspendus('veh-voiture')"  style="font-size:12px;padding:7px 12px">🚗 Voitures (registre)</button>
+    <button class="btn-ghost" id="sp-f-maj"         onclick="setFiltreSuspendus('maj')"          style="font-size:12px;padding:7px 12px">🔄 Mise à jour en retard</button>
+    <button class="btn-ghost" id="sp-f-manuel"      onclick="setFiltreSuspendus('manuel')"       style="font-size:12px;padding:7px 12px">✋ Autre raison</button>
   </div>
   <div class="fld" style="margin-bottom:12px">
     <input type="text" id="sp-recherche" placeholder="🔎 Plaque, nom du propriétaire, téléphone…" oninput="rSuspendus()"/>
@@ -23035,7 +23040,7 @@ function appliquerMaj(x, estTaxi, prix, par) {
 let filtreSuspendus = 'tous';
 function setFiltreSuspendus(f) {
   filtreSuspendus = f;
-  ['tous','moto','voiture','maj','manuel'].forEach(function(x){
+  ['tous','taxi-moto','taxi-vtc','veh-moto','veh-voiture','maj','manuel'].forEach(function(x){
     const b = document.getElementById('sp-f-' + x);
     if(b) { b.className = (x === f) ? 'btn' : 'btn-ghost'; b.style.fontSize = '12px'; b.style.padding = '7px 12px'; }
   });
@@ -23047,78 +23052,132 @@ function _suspEnRetard(x, estTaxi) {
   return !!(e && new Date() > e);
 }
 
-function rSuspendus() {
+// ════════════════════════════════════════════════════════════════════════════
+// v9.614 — LA LISTE VIENT DU SERVEUR, PLUS DE LA MEMOIRE DE LA PAGE.
+//
+// Vous avez fait une mise a jour, rafraichi la page, et tous les autres suspendus ont
+// disparu. La cause : cet ecran filtrait « DB.taxis » et « DB.vehs », c'est-a-dire ce que
+// la page avait en memoire A CET INSTANT. Apres un rafraichissement, l'ecran se dessine
+// AVANT que les donnees soient revenues du serveur : la liste etait donc vide, et rien
+// ne la redessinait quand elles arrivaient enfin.
+//
+// On interroge desormais la base directement, a chaque ouverture. La liste est juste,
+// complete, et immediatement a jour apres une mise a jour ou une levee de suspension.
+//
+// Les VOLES y figurent aussi : un vehicule vole est bloque au meme titre qu'un suspendu,
+// et l'administration doit le voir dans cette liste.
+// ════════════════════════════════════════════════════════════════════════════
+let _suspEnCours = false;
+async function rSuspendus() {
   const boite = document.getElementById('suspendus-contenu');
   if(!boite) return;
-  const q = nrm((document.getElementById('sp-recherche') || {}).value || '');
+  if(_suspEnCours) return;
+  _suspEnCours = true;
+  if(!boite.innerHTML) boite.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--text2)">Chargement\u2026</div>';
 
-  // On rassemble les deux familles dans une seule liste : pour l'agent qui regularise,
-  // « une moto de taxi » et « une moto du registre » se traitent de la meme facon.
+  let lignesTaxis = [], lignesVehs = [];
+  try {
+    const [rt, rv] = await Promise.all([
+      supabaseClient.from('taxis')
+        .select('id,nom,plaque,tel,gilet,statut,suspendu_auto,derniere_maj,type_vehicule,moto_id')
+        .neq('statut', 'actif'),
+      supabaseClient.from('vehicules')
+        .select('id,mat,vin,brand,model,owner,phone,statut,suspendu_auto,derniere_maj,type')
+        .neq('statut', 'actif')
+    ]);
+    lignesTaxis = (rt && rt.data) || [];
+    lignesVehs  = (rv && rv.data) || [];
+  } catch(e) {
+    _suspEnCours = false;
+    boite.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:#EF4444">Impossible de lire la liste. V\u00e9rifiez la connexion, puis rouvrez cet onglet.</div>';
+    return;
+  }
+  _suspEnCours = false;
+
+  const q = nrm((document.getElementById('sp-recherche') || {}).value || '');
   let liste = [];
-  (DB.taxis || []).forEach(function(t){
-    if(t.statut !== 'suspendu') return;
-    liste.push({ kind:'taxi', id:t.id, obj:t, estTaxi:true,
-                 type:(_typeTaxi(t) === 'voiture' ? 'voiture' : 'moto'),
-                 titre:(t.nom || 'Chauffeur') + ' · ' + (t.plaque || '—'),
-                 sous:'📞 ' + (t.tel || '—') + (t.gilet ? ' · Gilet n° ' + t.gilet : ''),
-                 famille:(_typeTaxi(t) === 'voiture' ? '🚗 Taxi VTC' : '🏍️ Taxi moto') });
+
+  lignesTaxis.forEach(function(r){
+    const estVoiture = (r.type_vehicule === 'voiture');
+    liste.push({
+      kind:'taxi', id:r.id, estTaxi:true,
+      famille: estVoiture ? 'taxi-vtc' : 'taxi-moto',
+      etiquette: estVoiture ? '\uD83D\uDE97 Taxi VTC' : '\uD83C\uDFCD\uFE0F Taxi moto',
+      obj: { id:r.id, nom:r.nom, plaque:r.plaque, tel:r.tel, statut:r.statut,
+             suspenduAuto: r.suspendu_auto === true, derniereMaj: r.derniere_maj, motoId: r.moto_id },
+      titre: (r.nom || 'Chauffeur') + ' \u00b7 ' + (r.plaque || '\u2014'),
+      sous: '\uD83D\uDCDE ' + (r.tel || '\u2014') + (r.gilet ? ' \u00b7 Gilet n\u00b0 ' + r.gilet : '')
+    });
   });
-  (DB.vehs || []).forEach(function(v){
-    if(v.statut !== 'suspendu') return;
-    liste.push({ kind:'veh', id:v.id, obj:v, estTaxi:false,
-                 type:(v.type === 'voiture' ? 'voiture' : 'moto'),
-                 titre:(v.mat || v.vin || '—') + ' · ' + ((v.brand || '') + ' ' + (v.model || '')).trim(),
-                 sous:'👤 ' + (v.owner || '—') + ' · 📞 ' + (v.phone || '—'),
-                 famille:(v.type === 'voiture' ? '🚗 Voiture (registre)' : '🏍️ Moto (registre)') });
+
+  lignesVehs.forEach(function(r){
+    const estVoiture = (r.type === 'voiture');
+    liste.push({
+      kind:'veh', id:r.id, estTaxi:false,
+      famille: estVoiture ? 'veh-voiture' : 'veh-moto',
+      etiquette: estVoiture ? '\uD83D\uDE97 Voiture (registre)' : '\uD83C\uDFCD\uFE0F Moto (registre)',
+      obj: { id:r.id, mat:r.mat, vin:r.vin, statut:r.statut,
+             suspenduAuto: r.suspendu_auto === true, derniereMaj: r.derniere_maj,
+             stolen: r.statut === 'vole' },
+      titre: (r.mat || r.vin || '\u2014') + ' \u00b7 ' + ((r.brand || '') + ' ' + (r.model || '')).trim(),
+      sous: '\uD83D\uDC64 ' + (r.owner || '\u2014') + ' \u00b7 \uD83D\uDCDE ' + (r.phone || '\u2014')
+    });
   });
 
   liste = liste.filter(function(it){
     const auto = !!(it.obj.suspenduAuto);
-    if(filtreSuspendus === 'moto'    && it.type !== 'moto')    return false;
-    if(filtreSuspendus === 'voiture' && it.type !== 'voiture') return false;
-    if(filtreSuspendus === 'maj'     && !auto)                 return false;
-    if(filtreSuspendus === 'manuel'  && auto)                  return false;
+    const parFamille = (filtreSuspendus !== 'tous' && filtreSuspendus !== 'maj' && filtreSuspendus !== 'manuel');
+    if(parFamille && it.famille !== filtreSuspendus) return false;
+    if(filtreSuspendus === 'maj'    && !auto) return false;
+    if(filtreSuspendus === 'manuel' &&  auto) return false;
     if(!q) return true;
-    return [it.titre, it.sous].some(function(s){ return nrm(s || '').includes(q); });
+    return [it.titre, it.sous].some(function(x){ return nrm(x || '').includes(q); });
   });
 
   const nbAuto = liste.filter(function(it){ return !!it.obj.suspenduAuto; }).length;
 
   if(!liste.length) {
     boite.innerHTML = '<div class="card" style="text-align:center;padding:26px">' +
-      '<div style="font-size:34px;margin-bottom:8px">✅</div>' +
-      '<div style="font-weight:800">Aucun véhicule suspendu' +
-      (filtreSuspendus !== 'tous' || q ? ' pour ce filtre' : '') + '</div></div>';
+      '<div style="font-size:34px;margin-bottom:8px">\u2705</div>' +
+      '<div style="font-weight:800">Aucun v\u00e9hicule suspendu' +
+      ((filtreSuspendus !== 'tous' || q) ? ' pour ce filtre' : '') + '</div></div>';
     return;
   }
 
   let html = '<div class="card" style="margin-bottom:10px;padding:11px;border-left:3px solid #EAB308">' +
-    '<div style="font-weight:900">' + liste.length + ' véhicule' + (liste.length > 1 ? 's' : '') + ' suspendu' + (liste.length > 1 ? 's' : '') + '</div>' +
-    '<div style="font-size:12px;color:var(--text2)">🔄 ' + nbAuto + ' pour mise à jour en retard · ✋ ' + (liste.length - nbAuto) + ' suspension' + ((liste.length - nbAuto) > 1 ? 's' : '') + ' manuelle' + ((liste.length - nbAuto) > 1 ? 's' : '') + '</div></div>';
+    '<div style="font-weight:900">' + liste.length + ' v\u00e9hicule' + (liste.length > 1 ? 's' : '') +
+    ' bloqu\u00e9' + (liste.length > 1 ? 's' : '') + '</div>' +
+    '<div style="font-size:12px;color:var(--text2)">\uD83D\uDD04 ' + nbAuto +
+    ' pour mise \u00e0 jour en retard \u00b7 \u270B ' + (liste.length - nbAuto) + ' autre(s)</div></div>';
 
   html += liste.map(function(it){
     const auto = !!(it.obj.suspenduAuto);
+    const vole = (it.obj.statut === 'vole');
     const retard = _suspEnRetard(it.obj, it.estTaxi);
     const ech = echeanceMaj(it.obj, it.estTaxi);
     const prix = (typeof prixMajDe === 'function') ? prixMajDe(it.obj, it.estTaxi) : 0;
-    const motif = auto
-      ? '<div style="font-size:12px;color:#EAB308;font-weight:800;margin-top:4px">🔄 Mise à jour non payée' +
-        (ech ? ' — échéance du ' + ech.toLocaleDateString('fr-FR') : '') + '</div>'
-      : '<div style="font-size:12px;color:#EF4444;font-weight:800;margin-top:4px">✋ Suspension manuelle</div>';
+
+    let motif;
+    if(vole) {
+      motif = '<div style="font-size:12px;color:#EF4444;font-weight:800;margin-top:4px">\uD83D\uDEA8 D\u00e9clar\u00e9 vol\u00e9</div>';
+    } else if(auto) {
+      motif = '<div style="font-size:12px;color:#EAB308;font-weight:800;margin-top:4px">\uD83D\uDD04 Mise \u00e0 jour non pay\u00e9e' +
+              (ech ? ' \u2014 \u00e9ch\u00e9ance du ' + ech.toLocaleDateString('fr-FR') : '') + '</div>';
+    } else {
+      motif = '<div style="font-size:12px;color:#EF4444;font-weight:800;margin-top:4px">\u270B Suspension manuelle</div>';
+    }
 
     let boutons = '';
-    // Le bouton de mise a jour n'apparait que s'il sert a quelque chose : payer avant
-    // l'echeance est refuse plus loin par « majClient », autant ne pas le proposer ici.
-    if(retard) {
+    if(retard && !vole) {
       boutons += '<button class="btn" style="flex:1;padding:10px;font-size:12px;background:#EAB308;color:#111;font-weight:900" ' +
-                 'onclick="majStaff(\'' + it.kind + '\',\'' + it.id + '\')">🔄 Mettre à jour' +
-                 (prix ? ' · ' + fmt(prix) : '') + '</button>';
+                 'onclick="majStaff(&#39;' + it.kind + '&#39;,&#39;' + it.id + '&#39;)">\uD83D\uDD04 Mettre \u00e0 jour' +
+                 (prix ? ' \u00b7 ' + fmt(prix) : '') + '</button>';
     }
     boutons += '<button class="btn-ghost" style="flex:1;padding:10px;font-size:12px;border-color:rgba(34,197,94,.5);color:#22C55E" ' +
-               'onclick="leverSuspension(\'' + it.kind + '\',\'' + it.id + '\')">✅ Lever la suspension</button>';
+               'onclick="leverSuspension(&#39;' + it.kind + '&#39;,&#39;' + it.id + '&#39;)">\u2705 Lever la suspension</button>';
 
-    return '<div class="card" style="margin-bottom:8px;border-left:3px solid ' + (auto ? '#EAB308' : '#EF4444') + '">' +
-      '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">' + esc(it.famille) + '</div>' +
+    return '<div class="card" style="margin-bottom:8px;border-left:3px solid ' + (auto && !vole ? '#EAB308' : '#EF4444') + '">' +
+      '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">' + it.etiquette + '</div>' +
       '<div style="font-weight:900;margin-top:2px">' + esc(it.titre) + '</div>' +
       '<div style="font-size:12px;color:var(--text2)">' + esc(it.sous) + '</div>' +
       motif +
@@ -23129,12 +23188,31 @@ function rSuspendus() {
   boite.innerHTML = html;
 }
 
-function leverSuspension(kind, id) {
+// v9.614 : la liste des suspendus vient du serveur ; la fiche a lever peut donc ne pas
+// etre en memoire. On va la chercher, et on la range dans DB pour que l'enregistrement
+// et le reste de l'ecran la retrouvent ensuite.
+async function _ficheSuspendue(kind, id) {
+  const estTaxi = (kind === 'taxi');
+  let x = estTaxi ? (DB.taxis || []).find(function(t){ return t.id === id; })
+                  : (DB.vehs  || []).find(function(v){ return v.id === id; });
+  if(x) return x;
+  try {
+    const { data } = await supabaseClient.from(estTaxi ? 'taxis' : 'vehicules')
+      .select('*').eq('id', id).limit(1);
+    if(data && data[0]) {
+      x = estTaxi ? mapTaxi(data[0]) : mapVehicule(data[0]);
+      if(estTaxi) { DB.taxis = DB.taxis || []; DB.taxis.push(x); }
+      else        { DB.vehs  = DB.vehs  || []; DB.vehs.push(x); }
+    }
+  } catch(e) {}
+  return x || null;
+}
+
+async function leverSuspension(kind, id) {
   if(DB.user && DB.user.role === 'sousagent') { toast('Réservé aux agents et à l\'administration', true); return; }
   if(!isAdmin() && !isAgent()) { toast('Réservé aux agents et à l\'administration', true); return; }
   const estTaxi = kind === 'taxi';
-  const x = estTaxi ? DB.taxis.find(function(t){ return t.id === id; })
-                    : DB.vehs.find(function(v){ return v.id === id; });
+  const x = await _ficheSuspendue(kind, id);
   if(!x) { toast('Élément introuvable', true); return; }
 
   // ══ LE CAS QU'IL NE FAUT PAS LAISSER PASSER ══
@@ -23167,9 +23245,12 @@ function leverSuspension(kind, id) {
   });
 }
 
-function majStaff(kind, id) {
+async function majStaff(kind, id) {
   const estTaxi = kind === 'taxi';
-  const x = estTaxi ? DB.taxis.find(t => t.id === id) : DB.vehs.find(v => v.id === id);
+  // v9.614 : meme raison que pour « leverSuspension » — la fiche peut venir du serveur.
+  const x = (typeof _ficheSuspendue === 'function')
+    ? await _ficheSuspendue(kind, id)
+    : (estTaxi ? DB.taxis.find(t => t.id === id) : DB.vehs.find(v => v.id === id));
   if(!x) { toast('Élément introuvable', true); return; }
   if(DB.user && DB.user.role === 'sousagent') { toast('Réservé aux agents et à l\'administration', true); return; }
   const prix = prixMajDe(x, estTaxi);
