@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.610';
+window.AFRIMOTO_VERSION = 'v9.611';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -4641,12 +4641,23 @@ const _aFuseau = (t) => /(?:Z|[+-]\d{2}:?\d{2})$/.test(t);
 const fdt = d => {
   if(!d) return '—';
   if(typeof d === 'string' && d.includes('T')) {
+    // ══════════════════════════════════════════════════════════════════════
+    // v9.611 — TOUTES LES HEURES SONT DES HEURES DE GUINÉE.
+    //
+    // Un chauffeur publie un trajet à 10:00. La base enregistre bien 10:00 (la Guinée
+    // est à UTC+0 toute l'année). Mais cette ligne reconvertissait ensuite l'instant
+    // dans le fuseau de L'APPAREIL QUI LIT : sur un ordinateur réglé en France,
+    // 10:00 devenait 12:00. Le chauffeur voyait donc son trajet décalé de deux heures.
+    //
+    // On lit désormais en UTC, qui EST l'heure de Guinée. Le trajet affiche 10:00 pour
+    // tout le monde, à Conakry comme à Paris — et c'est bien 10:00 à Conakry qui compte.
+    // ══════════════════════════════════════════════════════════════════════
     if(_aFuseau(d)) {
       const inst = new Date(d);
       if(!isNaN(inst)) {
         const deux = (n) => ('0' + n).slice(-2);
-        return deux(inst.getDate()) + '/' + deux(inst.getMonth() + 1) + '/' + inst.getFullYear() +
-               ' ' + deux(inst.getHours()) + ':' + deux(inst.getMinutes());
+        return deux(inst.getUTCDate()) + '/' + deux(inst.getUTCMonth() + 1) + '/' + inst.getUTCFullYear() +
+               ' ' + deux(inst.getUTCHours()) + ':' + deux(inst.getUTCMinutes());
       }
     }
     const parts = d.split('T');
@@ -6502,7 +6513,39 @@ async function doLogin() {
     let v = null;
     if(ownerTab==='mat') v = DB.vehs.find(x => nrm(x.mat)===nrm(id2));
     else if(ownerTab==='vin') v = DB.vehs.find(x => x.vin && nrm(x.vin)===nrm(id2));
-    
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // v9.611 — POURQUOI VOUS LISIEZ « IDENTIFIANTS INCORRECTS » AU LIEU DU BON MESSAGE.
+    //
+    // Le controle de suspension existait bien, quelques lignes plus bas. Il n'etait
+    // simplement JAMAIS ATTEINT : sur l'espace public, « DB.vehs » est VIDE. Je l'ai
+    // verifie dans le navigateur — zero vehicule en memoire, meme apres huit secondes.
+    // Les vehicules ne sont charges qu'apres la connexion.
+    //
+    // Le vehicule n'etant pas trouve en memoire, on tombait directement dans le message
+    // generique. Le proprietaire d'une moto suspendue croyait donc s'etre trompe de code,
+    // et recommencait indefiniment.
+    //
+    // On demande maintenant la fiche AU SERVEUR quand elle manque en memoire. Une seule
+    // requete, uniquement en cas de besoin, uniquement pour l'espace proprietaire.
+    // ══════════════════════════════════════════════════════════════════════════
+    if(!v && id2 && typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        const _col = (ownerTab === 'vin') ? 'vin' : 'mat';
+        const { data: _dv } = await supabaseClient.from('vehicules')
+          .select('id,mat,vin,statut,suspendu_auto,derniere_maj,code,client_id,owner,type')
+          .ilike(_col, String(id2).trim()).limit(1);
+        if(_dv && _dv.length) {
+          const _r = _dv[0];
+          // On construit la fiche a la main : « mapVehicule » vit dans une autre portee.
+          v = { id:_r.id, mat:_r.mat, vin:_r.vin, statut:_r.statut,
+                suspenduAuto:_r.suspendu_auto === true, derniereMaj:_r.derniere_maj,
+                code:_r.code, clientId:_r.client_id, owner:_r.owner, type:_r.type,
+                stolen: _r.statut === 'vole' };
+        }
+      } catch(e) {}
+    }
+
     console.log('🔍 LOGIN OWNER DEBUG:', {id2, ownerTab, vehiculeTrouve: v ? 'OUI' : 'NON', vehiculeId: v?.id, vehiculeStatut: v?.statut, vehiculeNom: v?.owner});
     
     if(v) {
@@ -6517,10 +6560,54 @@ async function doLogin() {
         }
       }
       
-      // 🔧 FIX CRITICAL: Bloquer IMMÉDIATEMENT si véhicule suspendu
-      if(v.statut === 'suspendu') {
-        console.log('🚫 BLOQUE: Véhicule SUSPENDU!', v.statut);
-        err.innerHTML = '🚫 <b>Ce véhicule est suspendu.</b> Vous ne pouvez pas accéder à cet espace propriétaire. Rendez-vous chez un agent agréé pour régulariser la situation.';
+      // ══════════════════════════════════════════════════════════════════════
+      // v9.611 — LE MESSAGE DIT LA RAISON, ET CE QU'IL FAUT FAIRE.
+      //
+      // « Ce véhicule est suspendu, rendez-vous chez un agent » n'apprenait rien : le
+      // propriétaire ignorait POURQUOI et repartait sans savoir quoi apporter. Une moto
+      // suspendue pour une mise à jour non payée ne se règle pas comme une suspension
+      // décidée par l'administration, ni comme un véhicule déclaré volé.
+      // ══════════════════════════════════════════════════════════════════════
+      if(v.statut === 'suspendu' || v.statut === 'vole' || v.stolen) {
+        console.log('🚫 BLOQUE: Véhicule', v.statut);
+        let _titre, _raison, _etapes;
+
+        if(v.statut === 'vole' || v.stolen) {
+          _titre  = '🚨 Ce véhicule est déclaré volé';
+          _raison = 'Une déclaration de vol a été enregistrée pour ce véhicule. L\'accès à l\'espace propriétaire est fermé tant qu\'elle est active.';
+          _etapes = ['Présentez-vous à l\'administration Laouni AfriMoto avec une pièce d\'identité et votre carte grise.',
+                     'Si le véhicule a été retrouvé, l\'administration lève la déclaration après vérification.',
+                     'S\'il s\'agit d\'une erreur, seul le déclarant ou l\'administration peut l\'annuler.'];
+        } else if(v.suspenduAuto) {
+          let _quand = '';
+          try {
+            const _e = (typeof echeanceMaj === 'function') ? echeanceMaj(v, false) : null;
+            if(_e) _quand = ' Elle était due le <b>' + _e.toLocaleDateString('fr-FR') + '</b>.';
+          } catch(e) {}
+          _titre  = '⏸️ Ce véhicule est suspendu';
+          _raison = '<b>Raison : la mise à jour annuelle de l\'enregistrement n\'a pas été payée.</b>' + _quand;
+          _etapes = ['Rendez-vous chez un <b>agent agréé Laouni AfriMoto</b> le plus proche.',
+                     'Munissez-vous de votre <b>pièce d\'identité</b> et de la <b>carte grise</b> du véhicule.',
+                     'Réglez la mise à jour en espèces auprès de l\'agent.',
+                     'La suspension est levée <b>immédiatement</b> après le paiement, et cet accès est rétabli.'];
+        } else {
+          _titre  = '⏸️ Ce véhicule est suspendu';
+          _raison = '<b>Raison : décision de l\'administration.</b> Elle peut faire suite à un document non conforme, à un litige, ou à un signalement.';
+          _etapes = ['Présentez-vous à l\'<b>administration Laouni AfriMoto</b>, ou chez un agent agréé qui transmettra.',
+                     'Munissez-vous de votre <b>pièce d\'identité</b> et de la <b>carte grise</b> du véhicule.',
+                     'L\'administration vous indiquera le motif précis et les pièces à fournir.',
+                     'L\'accès est rétabli dès que la suspension est levée.'];
+        }
+
+        err.innerHTML =
+          '<div style="font-weight:900;font-size:14px;margin-bottom:6px">' + _titre + '</div>' +
+          '<div style="font-size:12px;line-height:1.5;margin-bottom:8px">' + _raison + '</div>' +
+          '<div style="font-size:12px;font-weight:800;margin-bottom:4px">Pour lever la suspension :</div>' +
+          '<ol style="margin:0 0 0 16px;padding:0;font-size:12px;line-height:1.6">' +
+            _etapes.map(function(e){ return '<li>' + e + '</li>'; }).join('') +
+          '</ol>' +
+          '<div style="font-size:11px;margin-top:8px;opacity:.85">Véhicule concerné : <b>' + esc(v.mat || v.vin || '') + '</b>' +
+            (v.owner ? ' — ' + esc(v.owner) : '') + '</div>';
         err.style.display = 'block';
         return;
       }
