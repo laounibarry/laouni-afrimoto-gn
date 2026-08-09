@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.614';
+window.AFRIMOTO_VERSION = 'v9.615';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -23067,11 +23067,14 @@ function _suspEnRetard(x, estTaxi) {
 // Les VOLES y figurent aussi : un vehicule vole est bloque au meme titre qu'un suspendu,
 // et l'administration doit le voir dans cette liste.
 // ════════════════════════════════════════════════════════════════════════════
-let _suspEnCours = false;
+let _suspEnCours = false, _suspRedemande = false;
 async function rSuspendus() {
   const boite = document.getElementById('suspendus-contenu');
   if(!boite) return;
-  if(_suspEnCours) return;
+  // v9.615 : une demande qui arrive pendant la lecture n'est plus PERDUE, elle est
+  // rejouee ensuite. Sans cela, changer de filtre pendant le chargement laissait
+  // l'ecran sur le filtre precedent.
+  if(_suspEnCours) { _suspRedemande = true; return; }
   _suspEnCours = true;
   if(!boite.innerHTML) boite.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--text2)">Chargement\u2026</div>';
 
@@ -23093,6 +23096,8 @@ async function rSuspendus() {
     return;
   }
   _suspEnCours = false;
+  // Une demande est arrivee pendant la lecture (changement de filtre, saisie) : on la rejoue.
+  if(_suspRedemande) { _suspRedemande = false; return rSuspendus(); }
 
   const q = nrm((document.getElementById('sp-recherche') || {}).value || '');
   let liste = [];
