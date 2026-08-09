@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.611';
+window.AFRIMOTO_VERSION = 'v9.612';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -28992,9 +28992,23 @@ body.mode-passager .nav-inner{display:none!important}
 
   window.annulerRechercheAutomatique = async function () {
     if (_courseId) {
+      // v9.612 : on lit AVANT d'annuler — ensuite le chauffeur est detache de la course
+      // et l'on ne saurait plus a qui rendre la commission.
+      var _d = await _lireCoursePourRemboursement(_courseId);
       await _rpc('annuler_course', {
         p_course_id: _courseId, p_qui: 'passager', p_acteur: String((DB.user && DB.user.id) || '')
       });
+      // Le passager annule : c'est le CHAUFFEUR qui doit etre rembourse, s'il avait paye.
+      // Le passager, lui, ne recupere rien : il est a l'origine de l'annulation.
+      try {
+        if (_d && _d.commission > 0 && _d.taxiId &&
+            typeof _commissionAuTaxi === 'function' && _commissionAuTaxi()) {
+          var _sp = false;
+          try { _sp = await _dejaRencontres(_d); } catch (x) {}
+          if (!_sp) await rembourserTaxiCommission(_d, 'le passager a annulé avant la prise en charge');
+          else toast('ℹ️ Aucun remboursement : le chauffeur était déjà sur place.');
+        }
+      } catch (x) { try { addDebugLog('REMBOURSEMENT passager-annule : ' + (x && x.message)); } catch (e) {} }
     }
     try { alarmePrixProposeStop(); } catch (x) {}
     _arreterPassager();
@@ -29387,14 +29401,57 @@ body.mode-passager .nav-inner{display:none!important}
   // v9.594 : l'annulation par le chauffeur passe par le serveur, et lui confirme a l'ecran.
   // Elle ecrivait le statut directement — c'est ainsi qu'une course annulee pouvait
   // resonner quelques minutes plus tard sans que personne ne comprenne.
+  /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     v9.612 \u2014 LES REMBOURSEMENTS N'ETAIENT PLUS DECLENCHES.
+
+     En reecrivant les annulations, j'ai reporte l'appel au serveur mais PAS la regle de
+     remboursement qui l'accompagnait. Exactement la meme faute que pour la commission :
+     j'ai remplace sans lister d'abord tout ce que l'ancien code faisait.
+
+     LES REGLES, INCHANGEES DEPUIS L'ORIGINE :
+       \u00b7 celui qui annule ne recupere jamais rien ;
+       \u00b7 le chauffeur annule  -> le passager est rembourse, s'il avait paye ;
+       \u00b7 le passager annule   -> le chauffeur est rembourse, s'il avait paye ;
+       \u00b7 si les deux se sont deja rencontres, plus aucun remboursement : le chauffeur
+         s'est deplace, son temps et son carburant sont engages.
+
+     ON LIT LA COURSE AVANT DE L'ANNULER. \u00ab annuler_course \u00bb detache le chauffeur et
+     remet la course en recherche : apres coup, on ne saurait plus qui rembourser.
+     \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+  async function _lireCoursePourRemboursement(idCourse) {
+    try {
+      var q = await supabaseClient.from('demandes_course')
+        .select('id,commission,passager_id,taxi_id,lat,lng,en_cours,statut_attribution')
+        .eq('id', idCourse).limit(1);
+      var r = q && q.data && q.data[0];
+      if (!r) return null;
+      return { id: r.id, commission: Number(r.commission) || 0,
+               passagerId: r.passager_id, taxiId: r.taxi_id,
+               lat: r.lat, lng: r.lng, enCours: r.en_cours === true,
+               statutAttribution: r.statut_attribution };
+    } catch (e) { return null; }
+  }
+
   window.annulerCourseParTaxi = async function (idCourse) {
     var t = _taxiDeCetAppareil();
+    var d = await _lireCoursePourRemboursement(idCourse);   // AVANT l'annulation
     _marquerRefusee(idCourse);   // v9.597 : il s'est retire, elle ne lui revient plus
     var r = await _rpc('annuler_course', {
       p_course_id: idCourse, p_qui: 'chauffeur', p_acteur: t ? String(t.id) : null
     });
     _fermerEntrante();
     if (!r || r.ok !== true) { toast('\u274c Annulation impossible.', true); return; }
+
+    // Le chauffeur annule : c'est le PASSAGER qui doit etre rembourse, s'il avait paye.
+    try {
+      if (d && d.commission > 0 && typeof _commissionAuTaxi === 'function' && !_commissionAuTaxi()) {
+        var surPlace = false;
+        try { surPlace = await _dejaRencontres(d); } catch (x) {}
+        if (!surPlace) await rembourserPassagerCourse(d, 'le chauffeur a annul\u00e9');
+        else toast('\u2139\ufe0f Aucun remboursement : le chauffeur \u00e9tait d\u00e9j\u00e0 sur place.');
+      }
+    } catch (x) { try { addDebugLog('REMBOURSEMENT chauffeur-annule : ' + (x && x.message)); } catch (e) {} }
+
     toast('Course annul\u00e9e. Le passager est pr\u00e9venu et un autre chauffeur est cherch\u00e9.');
     try { if (typeof sortirModeService === 'function') sortirModeService(); } catch (x) {}
   };
