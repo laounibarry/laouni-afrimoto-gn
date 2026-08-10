@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.615';
+window.AFRIMOTO_VERSION = 'v9.616';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -10978,6 +10978,9 @@ function rClientContent() {
     const mesVehs = DB.vehs.filter(v => v.clientId===cl.id || v.phone===cl.tel || v.id===cl.vid);
     // Taxis liés à ce client (par téléphone)
     const mesTaxis = DB.taxis.filter(t => t.tel===cl.tel);
+    // v9.616 : on repart d'une ardoise vierge à chaque rendu. Sans cela, le deuxième
+    // affichage croirait avoir déjà montré tous les blocs et n'en montrerait aucun.
+    majRendusRAZ();
     el.innerHTML =
       // v9.436 : liste de selection DANS LE MENU — le chauffeur choisit son vehicule ici
       // et passe en ligne d'un appui, sans dependre de la carte.
@@ -11212,6 +11215,9 @@ function rClientContent() {
           <button class="btn-blue" style="font-size:11px;padding:5px 9px" onclick="showVeh('${v.id}')">👁️</button>
           <button class="btn-gold" style="font-size:11px;padding:5px 9px" onclick="afficherQrVehicule('${v.id}')" title="Réimprimer le QR code">&#128273;</button>
         </div>${!v.stolen ? majProprioHtml(v) : ''}`).join('') : '') +
+      // v9.616 : tout taxi qui n'a pas déjà eu son bloc ci-dessus en reçoit un ici.
+      // Deux véhicules également taxis = quatre boutons, un par enregistrement.
+      majTaxisRestantsHtml(mesTaxis) +
       ((!mesVehs.length && !mesTaxis.length) ? '<div class="empty">🏍️<br>Aucun véhicule enregistré à votre nom</div>' : '');
 
   } else if(clientTab === 'revenus') {
@@ -23314,25 +23320,59 @@ function majRappelProprioHtml(v) {
     '<div style="font-size:11px;color:var(--text2);margin-top:6px">💳 Payez depuis votre <b>espace client</b> (onglet Mes véhicules) ou en espèces chez un agent agréé.</div>' +
   '</div>';
 }
+// ════════════════════════════════════════════════════════════════════════════
+// v9.616 — UN BOUTON DE MISE A JOUR PAR ENREGISTREMENT, SANS EXCEPTION.
+//
+// Un client qui possede DEUX vehicules, tous deux egalement declares comme taxis, a
+// QUATRE enregistrements distincts : deux au registre, deux comme taxis. Chacun a sa
+// propre echeance et son propre tarif. Il lui faut donc quatre boutons.
+//
+// Jusqu'ici, le bloc « taxi » n'apparaissait que si l'on RETROUVAIT le taxi a partir du
+// vehicule (par « moto_id », ou a defaut par la plaque). Des que ce lien manquait ou ne
+// correspondait pas, le taxi n'avait plus aucun bouton : impossible de le mettre a jour
+// depuis son espace, et il finissait suspendu sans que le proprietaire comprenne.
+//
+// On tient desormais la liste de ce qui a deja ete affiche, et l'on ajoute a la fin tout
+// taxi oublie. Le lien devient un confort, plus une condition.
+// ════════════════════════════════════════════════════════════════════════════
+window._majRendus = window._majRendus || {};
+function majRendusRAZ() { window._majRendus = {}; }
+
+function majTaxisRestantsHtml(mesTaxis) {
+  const restants = (mesTaxis || []).filter(function(t){
+    return t && t.statut !== 'vole' && !window._majRendus[t.id];
+  });
+  if(!restants.length) return '';
+  let html = '';
+  restants.forEach(function(t){
+    html += majBlocUn(t, true, 'Mise à jour taxi — ' + (t.plaque || t.nom || ''));
+  });
+  return html ? '<div class="sect">🔄 Mise à jour de vos taxis</div>' + html : '';
+}
+
+// Le bloc, sorti de « majProprioHtml » pour servir aux deux endroits.
+function majBlocUn(x, estTaxi, titre) {
+  const e = echeanceMaj(x, estTaxi); if(!e) return '';
+  window._majRendus[x.id] = true;
+  const retard = new Date() > e;
+  const prix = prixMajDe(x, estTaxi);
+  return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (retard ? '#EF4444' : 'rgba(249,115,22,.25)') + '">' +
+    '<div class="sect" style="margin-top:0">🔄 ' + esc(titre) + '</div>' +
+    '<div style="font-size:12px;margin-bottom:8px">' + (retard
+      ? '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + e.toLocaleDateString('fr-FR') + '</b>'
+      : 'Prochaine échéance : <b>' + e.toLocaleDateString('fr-FR') + '</b>') + '</div>' +
+    (new Date() >= e
+      ? '<button class="btn" style="width:100%;padding:11px" onclick="majClient(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Mettre à jour maintenant — ' + fmt(prix) + '</button>'
+      : '<button class="btn" disabled style="width:100%;padding:11px;opacity:.45;cursor:not-allowed">🔒 Mise à jour disponible le ' + e.toLocaleDateString('fr-FR') + ' — ' + fmt(prix) + '</button>') +
+    '<div class="qr-note-txt" style="font-size:10px;margin-top:6px">Payable avec votre solde, ou en espèces chez un agent.</div>' +
+  '</div>';
+}
+
 function majProprioHtml(v) {
-  const bloc = (x, estTaxi, titre) => {
-    const e = echeanceMaj(x, estTaxi); if(!e) return '';
-    const retard = new Date() > e;
-    const prix = prixMajDe(x, estTaxi);
-    return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (retard ? '#EF4444' : 'rgba(249,115,22,.25)') + '">' +
-      '<div class="sect" style="margin-top:0">🔄 ' + titre + '</div>' +
-      '<div style="font-size:12px;margin-bottom:8px">' + (retard
-        ? '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + e.toLocaleDateString('fr-FR') + '</b>'
-        : 'Prochaine échéance : <b>' + e.toLocaleDateString('fr-FR') + '</b>') + '</div>' +
-      (new Date() >= e
-        ? '<button class="btn" style="width:100%;padding:11px" onclick="majClient(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Mettre à jour maintenant — ' + fmt(prix) + '</button>'
-        : '<button class="btn" disabled style="width:100%;padding:11px;opacity:.45;cursor:not-allowed">🔒 Mise à jour disponible le ' + e.toLocaleDateString('fr-FR') + ' — ' + fmt(prix) + '</button>') +
-      '<div class="qr-note-txt" style="font-size:10px;margin-top:6px">Payable avec votre solde, ou en espèces chez un agent.</div>' +
-    '</div>';
-  };
-  let html = bloc(v, false, 'Mise à jour — ' + (v.mat || v.vin || '') + (v.brand ? ' (' + v.brand + ' ' + (v.model||'') + ')' : ''));
+  // v9.616 : le bloc est désormais partagé (majBlocUn), et il note ce qu'il a affiché.
+  let html = majBlocUn(v, false, 'Mise à jour — ' + (v.mat || v.vin || '') + (v.brand ? ' (' + v.brand + ' ' + (v.model||'') + ')' : ''));
   const tx = (DB.taxis||[]).find(t => t.motoId === v.id || nrm(t.plaque||'') === nrm(v.mat||''));
-  if(tx && tx.statut !== 'vole') html += bloc(tx, true, 'Mise à jour taxi — ' + (tx.plaque || ''));
+  if(tx && tx.statut !== 'vole') html += majBlocUn(tx, true, 'Mise à jour taxi — ' + (tx.plaque || ''));
   return html;
 }
 function staffMajFicheHtml(x, estTaxi) {
