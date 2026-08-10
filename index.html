@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.616';
+window.AFRIMOTO_VERSION = 'v9.617';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -29101,7 +29101,19 @@ body.mode-passager .nav-inner{display:none!important}
     if (!_courseId) return;
     var e = await _rpc('avancer_course', { p_course_id: _courseId });
     if (!e) return;                      // reseau : on retentera au prochain tour
-    if (e.ok === false) { _arreterPassager(); try { closeModal('m-recherche-auto'); } catch (x) {} return; }
+    if (e.ok === false) {
+      // v9.617 : LA COURSE SE FERME SANS ANNULATION — periMEE au bout de quinze minutes,
+      // ou close par le serveur. Jusqu'ici on refermait simplement l'ecran : le passager
+      // avait paye sa commission, personne n'etait venu, et il ne revoyait jamais son
+      // argent. C'est exactement le cas ou plus aucun chauffeur ne prend la course.
+      try {
+        var _df = await _lireCoursePourRemboursement(_courseId);
+        await _rembourserSiChauffeurPasArrive(_df, 'aucun chauffeur n\'a pris la course');
+      } catch (x) {}
+      _arreterPassager();
+      try { closeModal('m-recherche-auto'); } catch (x) {}
+      return;
+    }
     _dessinerPassager(e);
   }
 
@@ -29558,21 +29570,39 @@ body.mode-passager .nav-inner{display:none!important}
        · le chauffeur annule avant d'arriver          -> le passager est rembourse
        · le passager annule avant que le chauffeur bouge -> il est rembourse
      ══════════════════════════════════════════════════════════════════════════ */
+  /* v9.617 — LA COMMISSION NE PEUT ETRE REGLEE QU'UNE SEULE FOIS, DANS UN SENS OU L'AUTRE.
+     Vous avez decrit le cas exact : un chauffeur arrive puis annule — la commission lui
+     reste acquise, c'est normal. Mais la course repart en recherche, personne ne la prend,
+     elle finit par expirer... et le passager perdait 2000 F au lieu de 1000.
+     Deux causes, corrigees ici :
+       1. Rien ne marquait la commission comme DEJA ACQUISE apres le passage du chauffeur.
+       2. Une course qui EXPIRE ne remboursait rien : mon code ne se declenchait que sur
+          une annulation, jamais sur une expiration du serveur.
+     On inscrit donc « commission = 0 » sur la course des que son sort est tranche — rendue
+     ou acquise. Ainsi elle n'est jamais rendue deux fois, ni rendue a tort. */
+  async function _soldeCommission(idCourse) {
+    try { await sbMajStatutDemande(idCourse, { commission: 0 }); } catch (x) {}
+  }
+
   async function _rembourserSiChauffeurPasArrive(d, motif) {
     if (!d || !(Number(d.commission) > 0)) return;
     var arrive = false;
     // Sans chauffeur designe, personne n'a pu se deplacer : le remboursement est du.
     if (d.taxiId) { try { arrive = await _dejaRencontres(d); } catch (x) {} }
     if (arrive) {
+      // Le chauffeur s'est deplace : la commission lui est acquise. On le grave, sinon
+      // la suite du parcours (expiration, nouvelle annulation) la rendrait indument.
+      await _soldeCommission(d.id);
       toast('ℹ️ Aucun remboursement : le chauffeur était déjà arrivé sur place.');
-      try { addDebugLog('REMBOURSEMENT refuse : chauffeur deja sur place'); } catch (x) {}
+      try { addDebugLog('COMMISSION acquise : chauffeur deja sur place'); } catch (x) {}
       return;
     }
     try {
       if (typeof _commissionAuTaxi === 'function' && _commissionAuTaxi()) {
-        if (d.taxiId) await rembourserTaxiCommission(d, motif);
+        if (d.taxiId) { await rembourserTaxiCommission(d, motif); await _soldeCommission(d.id); }
       } else {
         await rembourserPassagerCourse(d, motif);
+        await _soldeCommission(d.id);
       }
     } catch (x) { try { addDebugLog('REMBOURSEMENT : ' + (x && x.message)); } catch (e) {} }
   }
