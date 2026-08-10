@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.618';
+window.AFRIMOTO_VERSION = 'v9.619';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -20462,6 +20462,17 @@ function _fraisAnnonce() { return (DB.fraisAnnonce != null ? Number(DB.fraisAnno
 // message d'erreur disent toujours la meme chose. Publication gratuite = jamais bloquee.
 function _venteBloquee(solde) { const f = _fraisAnnonce(); return f > 0 && (Number(solde)||0) < f; }
 function saveAnnonce() {
+  // v9.619 : service « Annonces » fermé par l'administration. Contrôlé tout au début,
+  // avant la moindre validation et surtout avant le débit des frais de publication.
+  if(typeof serviceActif === 'function' && !serviceActif('annonces')) {
+    const _e = document.getElementById('anerr');
+    if(_e) {
+      _e.textContent = '⛔ ' + motifServiceCoupe('annonces') + ' La publication d\'annonces est fermée pour le moment.';
+      _e.style.display = 'block';
+    }
+    toast('⛔ ' + motifServiceCoupe('annonces'), true);
+    return;
+  }
   const titre=document.getElementById('an-titre').value.trim();
   const prix=parseInt(document.getElementById('an-prix').value)||0;
   const contact=document.getElementById('an-contact').value.trim();
