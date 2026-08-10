@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.620';
+window.AFRIMOTO_VERSION = 'v9.621';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -29174,6 +29174,30 @@ body.mode-passager .nav-inner{display:none!important}
     _sigAffiche = sig;
 
     var b = _el('ra-btn-annuler'); if (b) b.style.display = '';
+
+    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    // v9.621 \u2014 L'ECRAN DE SUIVI RESTAIT OUVERT PAR-DESSUS, AVEC L'ANCIEN CHAUFFEUR.
+    //
+    // Quand une course est acceptee, on ouvre l'ecran de suivi du chauffeur \u2014 carte plein
+    // ecran, cote site ET cote application Android. Il se pose PAR-DESSUS la fenetre de
+    // recherche.
+    //
+    // Si le chauffeur annule ensuite, le serveur fait bien son travail : la course repart
+    // en recherche et passe au suivant. La fenetre de recherche dessous se met a jour
+    // correctement... mais PERSONNE NE FERMAIT L'ECRAN DE SUIVI. Le passager continuait
+    // donc de voir \u00AB Course confirmee \u00BB avec le premier chauffeur, alors que la course
+    // etait deja ailleurs.
+    //
+    // Des que la course repasse en recherche, on referme ce qui la montrait comme conclue.
+    // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    if (e.statut === 'en_attente' || e.statut === 'prix_propose') {
+      try {
+        var _ms = document.getElementById('m-suivi-taxi');
+        if (typeof fermerSuiviTaxi === 'function' && _ms && _ms.classList.contains('on')) fermerSuiviTaxi();
+      } catch (x) {}
+      try { if (window.AfriMotoNative && AfriMotoNative.fermerEcranCourse) AfriMotoNative.fermerEcranCourse(); } catch (x) {}
+      try { openModal('m-recherche-auto'); } catch (x) {}
+    }
 
     if (e.statut === 'en_attente' && e.taxi) {
       _txt('ra-icone', '\uD83D\uDCE1');
