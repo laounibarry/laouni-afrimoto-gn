@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.619';
+window.AFRIMOTO_VERSION = 'v9.620';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -23472,6 +23472,16 @@ function majRappelProprioHtml(v) {
 window._majRendus = window._majRendus || {};
 function majRendusRAZ() { window._majRendus = {}; }
 
+// v9.620 — LE VEHICULE D'UN TAXI EST TOUJOURS LA, MEME S'IL N'EST PAS RATTACHE AU COMPTE.
+//
+// Constate sur un compte reel : deux taxis, mais SEULEMENT TROIS blocs au lieu de quatre.
+// Le vehicule CX-8787-MF manquait — il existe bien au registre, mais il n'etait pas
+// rattache a ce compte client (ni par « clientId », ni par le telephone). La liste des
+// vehicules du client ne le contenait donc pas, et son bloc n'existait nulle part.
+//
+// Or, comme vous le dites : on ne devient pas taxi sans etre d'abord enregistre. Un taxi
+// a FORCEMENT son vehicule au registre. On le retrouve donc par le taxi lui-meme
+// (« motoId »), sans dependre du rattachement au compte.
 function majTaxisRestantsHtml(mesTaxis) {
   const restants = (mesTaxis || []).filter(function(t){
     return t && t.statut !== 'vole' && !window._majRendus[t.id];
@@ -23479,9 +23489,20 @@ function majTaxisRestantsHtml(mesTaxis) {
   if(!restants.length) return '';
   let html = '';
   restants.forEach(function(t){
+    // D'abord SON vehicule, s'il n'a pas deja ete montre plus haut.
+    try {
+      const v = (DB.vehs || []).find(function(x){
+        return x.id === t.motoId || (t.plaque && nrm(x.mat || '') === nrm(t.plaque));
+      });
+      if(v && !window._majRendus[v.id] && !v.stolen && v.statut !== 'vole') {
+        html += majBlocUn(v, false, 'Mise à jour — ' + (v.mat || v.vin || '') +
+                          (v.brand ? ' (' + v.brand + ' ' + (v.model || '') + ')' : ''));
+      }
+    } catch(e) {}
+    // Puis le taxi.
     html += majBlocUn(t, true, 'Mise à jour taxi — ' + (t.plaque || t.nom || ''));
   });
-  return html ? '<div class="sect">🔄 Mise à jour de vos taxis</div>' + html : '';
+  return html ? '<div class="sect">🔄 Mise à jour de vos autres enregistrements</div>' + html : '';
 }
 
 // Le bloc, sorti de « majProprioHtml » pour servir aux deux endroits.
