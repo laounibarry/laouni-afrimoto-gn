@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.617';
+window.AFRIMOTO_VERSION = 'v9.618';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1312,6 +1312,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.commission_course_taxi != null) DB.commissionCourseTaxi = cfg.commission_course_taxi;
         if(cfg.commission_course_vtc != null) DB.commissionCourseVtc = cfg.commission_course_vtc; // v9.389
         // v9.604 : mode de commission VTC — montant fixe ou pourcentage du prix.
+        // v9.618 : les interrupteurs de service. Une cle ABSENTE vaut ACTIVE — un
+        // interrupteur ne doit jamais eteindre un service par oubli ou par accident.
+        if(cfg.services && typeof cfg.services === 'object') DB.services = cfg.services;
         if(cfg.commission_vtc_mode != null) DB.commissionVtcMode = cfg.commission_vtc_mode;
         if(cfg.commission_vtc_pourcent != null) DB.commissionVtcPourcent = cfg.commission_vtc_pourcent;
         if(cfg.renouvellement) DB.renouvellement = Object.assign({moto:'anniversaire', taxi:'mensuel'}, cfg.renouvellement);
@@ -2126,6 +2129,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       frais_trajet_defaut:DB.fraisTrajetDefaut, pourcentage_trajet_defaut:DB.pourcentageTrajetDefaut, bandeau_actif:DB.bandeauActif,
       bandeau_texte:DB.bandeauTexte, bandeau_vitesse:DB.bandeauVitesse,
       commission_course_taxi:DB.commissionCourseTaxi, commission_course_vtc:Number(DB.commissionCourseVtc)||0, // v9.389
+      services: (DB.services && typeof DB.services === 'object') ? DB.services : {}, // v9.618
       commission_vtc_mode:(DB.commissionVtcMode === 'pourcent' ? 'pourcent' : 'fixe'), // v9.604
       commission_vtc_pourcent:Number(DB.commissionVtcPourcent)||0,
       trajet_unique_desactive:DB.trajetUniqueDesactive,
@@ -2612,6 +2616,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('journal')" id="gt-journal" style="font-size:12px;padding:7px 11px">📋 Journal accès</button>
     <button class="btn-ghost" onclick="setGestTab('securite')" id="gt-securite" style="font-size:12px;padding:7px 11px">🔒 Sécurité</button>
     <button class="btn-ghost" onclick="setGestTab('listeNoire')" id="gt-listeNoire" style="font-size:12px;padding:7px 11px">🚫 Liste noire</button>
+    <!-- v9.618 : ouvrir ou fermer chaque service, et tout d'un coup. -->
+    <button class="btn-ghost" onclick="setGestTab('services')" id="gt-services" style="font-size:12px;padding:7px 11px">🔌 Services</button>
   </div>
   <input type="text" id="gest-q" placeholder="Rechercher..." style="margin-bottom:11px" oninput="rGestion()"/>
   <div id="gestion-content"></div>
@@ -4351,6 +4357,7 @@ const DB = {
   commissionCourseVtc: 3000, // v9.389 : une course en voiture coute plus cher au client
   // v9.604 : 'fixe' = le montant ci-dessus ; 'pourcent' = un pourcentage du prix convenu.
   // On demarre sur 'fixe' : rien ne change tant que l'administration n'a pas choisi.
+  services: {},              // v9.618 : interrupteurs de service — vide = tout actif
   commissionVtcMode: 'fixe',
   commissionVtcPourcent: 10,
   verrouAppActif: true, // v9.347 : l'admin peut ouvrir ou fermer cette possibilite pour tous
@@ -4677,6 +4684,43 @@ const fdt = d => {
   }
   return String(d).substring(0, 16);
 };
+// ════════════════════════════════════════════════════════════════════════════
+// v9.618 — LES INTERRUPTEURS DE SERVICE.
+//
+// L'administration peut couper un service : le taxi moto, le VTC, les trajets, les
+// annonces — ou tout d'un coup avec l'interrupteur general.
+//
+// UNE REGLE DE SURETE : une cle absente vaut ACTIVE. Si la configuration n'est pas encore
+// chargee, si le SQL n'a pas ete lance, si une cle a ete oubliee — le service fonctionne.
+// Un interrupteur ne doit jamais pouvoir eteindre l'entreprise par accident.
+//
+// Ce que « couper » veut dire : on n'accepte plus de NOUVELLE demande. Les courses deja
+// en route vont a leur terme — on n'abandonne personne au bord de la route.
+// ════════════════════════════════════════════════════════════════════════════
+const SERVICES_NOMS = {
+  taxi_moto: '🏍️ Taxi moto',
+  vtc:       '🚗 VTC Taxi',
+  trajets:   '🚙 Voyager (trajets)',
+  annonces:  '🏷️ Annonces'
+};
+function serviceActif(nom) {
+  try {
+    const s = DB.services || {};
+    if(s.global === false) return false;          // l'interrupteur general prime
+    return s[nom] !== false;                       // absent ou true => actif
+  } catch(e) { return true; }                      // en cas de doute, on laisse passer
+}
+function motifServiceCoupe(nom) {
+  try {
+    const s = DB.services || {};
+    if(s.global === false) return 'Le service est momentanément suspendu par l\'administration.';
+    if(s[nom] === false) return 'Le service ' + (SERVICES_NOMS[nom] || nom) + ' est momentanément suspendu par l\'administration.';
+  } catch(e) {}
+  return '';
+}
+// Le service correspondant a un type de vehicule.
+function serviceDuType(type) { return (type === 'voiture') ? 'vtc' : 'taxi_moto'; }
+
 const isAdmin = () => DB.user && DB.user.role === 'admin';
 const isAgent = () => DB.user && (DB.user.role === 'agent' || DB.user.role === 'admin');
 const isSA = () => DB.user && DB.user.role === 'sousagent';
@@ -16908,6 +16952,17 @@ async function toggleTaxiEnService(id) {
   }
 
   if(!t.enService) {
+    // v9.618 : le service de ce métier est-il ouvert ? Inutile de mettre un chauffeur en
+    // service si aucune course ne peut lui être envoyée.
+    try {
+      const _svc = serviceDuType(_typeTaxi(t));
+      if(typeof serviceActif === 'function' && !serviceActif(_svc)) {
+        toast('⛔ ' + motifServiceCoupe(_svc) + ' Vous ne pouvez pas passer en service pour le moment.', true);
+        rClientContent();
+        return;
+      }
+    } catch(e) {}
+
     // v9.606 : PREMIER CONTROLE, avant tous les autres. Inutile de verifier le solde, la
     // photo ou le selfie d'un vehicule qui n'a pas le droit de rouler.
     const _motif = _motifSuspension(t);
@@ -18408,6 +18463,12 @@ async function confirmerEtPublierTrajet() {
 }
 // Publie réellement le trajet après confirmation du chauffeur (ou direct pour le staff)
 async function _publierTrajetDefinitif() {
+  // v9.618 : service « Voyager » coupé par l'administration.
+  if(typeof serviceActif === 'function' && !serviceActif('trajets')) {
+    toast('⛔ ' + motifServiceCoupe('trajets') + ' La publication de trajets est fermée pour le moment.', true);
+    try { closeModal('m-trajet'); } catch(e) {}
+    return;
+  }
   // ══ v9.606 — UNE VOITURE SUSPENDUE NE PUBLIE PAS DE TRAJET ══
   //
   // Jusqu'ici, une voiture suspendue empechait seulement l'affichage de sa photo et de sa
@@ -20983,6 +21044,29 @@ function apercuCommissionVtc() {
                  ' · à ' + fmt(150000) + ' → <b>' + fmt(arrondi(150000)) + '</b>';
 }
 
+// v9.618 : ouvrir ou fermer un service. Réservé à l'administration — un agent ne décide
+// pas de fermer un métier pour tout le pays.
+function basculerService(cle) {
+  if(!isAdmin()) { toast('⛔ Réservé à l\'administration', true); return; }
+  DB.services = DB.services || {};
+  const etaitOuvert = (DB.services[cle] !== false);
+  const nom = (cle === 'global') ? 'TOUS les services' : (SERVICES_NOMS[cle] || cle);
+
+  const appliquer = () => {
+    DB.services[cle] = !etaitOuvert;
+    sbSaveConfig();
+    toast(etaitOuvert ? '🔴 ' + nom + ' : fermé' : '🟢 ' + nom + ' : rouvert');
+    rGestion();
+  };
+
+  if(etaitOuvert) {
+    askConfirm('Fermer ' + nom + ' ?\n\nLes nouvelles demandes seront refusées avec un message. ' +
+               'Les courses déjà en route iront à leur terme.', appliquer);
+  } else {
+    appliquer();   // rouvrir ne demande pas de confirmation
+  }
+}
+
 function majCommissionTaxi() {
   const v = parseInt(document.getElementById('zn-commission-taxi').value);
   if(isNaN(v) || v < 0) { toast('Valeur invalide', true); return; }
@@ -21012,7 +21096,7 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression'].forEach(x=>{
+  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression','services'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
@@ -21786,6 +21870,45 @@ function rGestion() {
           </div>
         </div>`).join('')}
     `;
+  } else if(gestTab==='services') {
+    // v9.618 — OUVRIR OU FERMER CHAQUE SERVICE.
+    const s = DB.services || {};
+    const gen = (s.global !== false);
+    const ligne = (cle, titre, detail) => {
+      const on = (s[cle] !== false);
+      const eteintParGeneral = (!gen && on);
+      return '<div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px;' +
+             'border-left:3px solid ' + (on && gen ? '#22C55E' : '#EF4444') + '">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:900;font-size:14px">' + titre + '</div>' +
+          '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + detail + '</div>' +
+          (eteintParGeneral ? '<div style="font-size:11px;color:#EF4444;font-weight:700;margin-top:3px">Éteint par l\'interrupteur général</div>' : '') +
+        '</div>' +
+        '<button class="' + (on ? 'btn' : 'btn-red') + '" style="padding:10px 14px;font-size:12px;font-weight:900;white-space:nowrap" ' +
+          'onclick="basculerService(\'' + cle + '\')">' + (on ? '🟢 Ouvert' : '🔴 Fermé') + '</button>' +
+      '</div>';
+    };
+
+    html =
+      '<div class="card" style="margin-bottom:14px;border:2px solid ' + (gen ? 'rgba(34,197,94,.45)' : '#EF4444') + '">' +
+        '<div class="sect" style="margin-top:0">🔌 Interrupteur général</div>' +
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">' +
+          'Ferme <b>tous</b> les services d\'un seul geste. Les courses déjà en route vont à leur terme : ' +
+          'on n\'abandonne personne au bord de la route. Seules les <b>nouvelles</b> demandes sont refusées.' +
+        '</div>' +
+        '<button class="' + (gen ? 'btn' : 'btn-red') + '" style="width:100%;padding:13px;font-size:14px;font-weight:900" ' +
+          'onclick="basculerService(\'global\')">' + (gen ? '🟢 Tous les services sont OUVERTS' : '🔴 TOUT EST FERMÉ — appuyer pour rouvrir') + '</button>' +
+      '</div>' +
+      '<div class="sect">Service par service</div>' +
+      ligne('taxi_moto', '🏍️ Taxi moto', 'Demandes de course en moto, et mise en service des chauffeurs moto.') +
+      ligne('vtc',       '🚗 VTC Taxi',  'Demandes de course en voiture, et mise en service des chauffeurs VTC.') +
+      ligne('trajets',   '🚙 Voyager',   'Publication de trajets entre villes.') +
+      ligne('annonces',  '🏷️ Annonces',  'Publication d\'annonces.') +
+      '<div class="qr-note-txt" style="font-size:11px;margin-top:12px">' +
+        'Un service fermé refuse les nouvelles demandes avec un message clair, et empêche les chauffeurs ' +
+        'concernés de passer en service. Rien n\'est supprimé : rouvrir remet tout en marche instantanément.' +
+      '</div>';
+
   } else if(gestTab==='zones') {
     const toutesZones = [...PREFECTURES_GN, ...VILLES_VOISINES];
     const paysVoisins = [...new Set(VILLES_VOISINES.map(v => extraitPays(v)).filter(Boolean))];
@@ -29184,6 +29307,16 @@ body.mode-passager .nav-inner{display:none!important}
     // d'abord tout ce que l'ancien faisait de bien.
     // ══════════════════════════════════════════════════════════════════════════
     var _type = (typeof filtrePassagerType !== 'undefined' && filtrePassagerType) ? filtrePassagerType : 'moto';
+
+    // v9.618 : le service est-il ouvert ? On refuse AVANT de créer la course et avant de
+    // prélever quoi que ce soit — sinon le passager paierait pour un service fermé.
+    try {
+      if (typeof serviceActif === 'function' && !serviceActif(serviceDuType(_type))) {
+        toast('⛔ ' + motifServiceCoupe(serviceDuType(_type)) + ' Réessayez plus tard.', true);
+        return;
+      }
+    } catch (x) {}
+
     var _commission = 0;
     try { _commission = _commissionPourType(_type, prix) || 0; } catch (x) { _commission = 0; }
 
