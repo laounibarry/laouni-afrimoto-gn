@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.623';
+window.AFRIMOTO_VERSION = 'v9.624';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -13218,6 +13218,34 @@ const MODES_VERIF = {
 // deploiement n'a pas d'importance.
 // ══════════════════════════════════════════════════════════════════════════
 async function rafraichirVehiculesEtTaxis(terme) {
+  // ══════════════════════════════════════════════════════════════════════════
+  // v9.624 — LE VERROU DE LA VERIFICATION EST ICI, ET NON DANS LE BOUTON.
+  //
+  // En v9.622 je n'avais bloque QUE « doSearch », le bouton de recherche. Or la
+  // verification a plusieurs portes : le scan d'un QR code, un lien direct vers une
+  // fiche, la recherche depuis la carte. Toutes passent par CETTE fonction, mais
+  // aucune ne passait par le bouton — d'ou la verification qui fonctionnait encore
+  // alors que le service etait ferme.
+  //
+  // On verrouille donc la porte commune. L'administration et les agents ne sont jamais
+  // bloques : fermer le service au public ne doit pas empecher le personnel de
+  // travailler sur un litige ou un vol.
+  // ══════════════════════════════════════════════════════════════════════════
+  try {
+    const _staff = (typeof isAdmin === 'function' && isAdmin()) ||
+                   (typeof isAgent === 'function' && isAgent());
+    if(!_staff && typeof serviceActif === 'function' && !serviceActif('verification')) {
+      const _z = document.getElementById('sr');
+      if(_z) _z.innerHTML = '<div class="card" style="text-align:center;padding:22px;border:2px solid #EF4444">' +
+        '<div style="font-size:30px;margin-bottom:6px">⛔</div>' +
+        '<div style="font-weight:800;margin-bottom:4px">Vérification momentanément fermée</div>' +
+        '<div style="font-size:12px;color:var(--text2)">' + esc(motifServiceCoupe('verification')) +
+        ' Réessayez plus tard.</div></div>';
+      try { toast('⛔ ' + motifServiceCoupe('verification'), true); } catch(e) {}
+      return;
+    }
+  } catch(e) {}
+
   // Range une ligne recue dans la liste locale, sans effacer le reste.
   const _ranger = (liste, ligne, convertir) => {
     if(!ligne) return;
@@ -17662,6 +17690,29 @@ async function majSuiviTaxi() {
   // v9.482 : 'terminee', 'expiree' et 'refusee' ferment aussi l'ecran — une course finie n'a
   // rien a faire sur la carte de suivi.
   const _stFin = String(d.statutAttribution || '');
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // v9.624 — LE STATUT QUI MANQUAIT, ICI AUSSI.
+  //
+  // La liste ci-dessous couvre « annulee », « terminee », « expiree », « refusee ».
+  // Mais quand un chauffeur annule, le serveur N'ECRIT PAS « annulee_chauffeur » : il
+  // remet la course EN RECHERCHE et la donne au suivant. Son statut redevient donc
+  // « en_attente » — un mot absent de cette liste.
+  //
+  // La carte de suivi restait donc ouverte avec l'ancien chauffeur, sa photo et un code
+  // devenu nul, pendant que la course sonnait deja ailleurs. Exactement ce que montrait
+  // votre photo.
+  //
+  // On ferme, et on rouvre la fenetre de recherche : le passager voit que ca continue.
+  // ══════════════════════════════════════════════════════════════════════════
+  if(_stFin === 'en_attente' || _stFin === 'prix_propose') {
+    toast('🔄 Le chauffeur s\'est retiré — nous cherchons un autre chauffeur.', true);
+    try { fermerSuiviTaxi(); } catch(e) {}
+    try { if(window.AfriMotoNative && AfriMotoNative.fermerEcranCourse) AfriMotoNative.fermerEcranCourse(); } catch(e) {}
+    try { if(DB.user && DB.user.role === 'passager') openModal('m-recherche-auto'); } catch(e) {}
+    return;
+  }
+
   if(_stFin.startsWith('annulee') || _stFin === 'terminee' || _stFin === 'expiree' || _stFin.startsWith('refusee')) {
     toast(_stFin.startsWith('annulee') ? '❌ Cette course a été annulée.' : '✅ Cette course est terminée.', true);
     fermerSuiviTaxi();
