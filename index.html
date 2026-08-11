@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.621';
+window.AFRIMOTO_VERSION = 'v9.622';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -4698,10 +4698,11 @@ const fdt = d => {
 // en route vont a leur terme — on n'abandonne personne au bord de la route.
 // ════════════════════════════════════════════════════════════════════════════
 const SERVICES_NOMS = {
-  taxi_moto: '🏍️ Taxi moto',
-  vtc:       '🚗 VTC Taxi',
-  trajets:   '🚙 Voyager (trajets)',
-  annonces:  '🏷️ Annonces'
+  taxi_moto:    '🏍️ Taxi moto',
+  vtc:          '🚗 VTC Taxi',
+  trajets:      '🚙 Voyager (trajets)',
+  annonces:     '🏷️ Annonces',
+  verification: '🔍 Vérification de véhicule'   // v9.622
 };
 function serviceActif(nom) {
   try {
@@ -13180,6 +13181,17 @@ async function doSearch(mode) {
   const q = (document.getElementById(inputId)||{}).value||'';
   const qn = nrm(q.trim());
   if(!qn) return;
+  // v9.622 : service de vérification fermé par l'administration. On le dit dans la zone
+  // de résultat plutôt que par un simple toast : c'est là que l'utilisateur regarde.
+  if(typeof serviceActif === 'function' && !serviceActif('verification')) {
+    const _z = document.getElementById('sr');
+    if(_z) _z.innerHTML = '<div class="card" style="text-align:center;padding:22px;border:2px solid #EF4444">' +
+      '<div style="font-size:30px;margin-bottom:6px">⛔</div>' +
+      '<div style="font-weight:800;margin-bottom:4px">Vérification momentanément fermée</div>' +
+      '<div style="font-size:12px;color:var(--text2)">' + esc(motifServiceCoupe('verification')) +
+      ' Réessayez plus tard.</div></div>';
+    return;
+  }
   const el = document.getElementById('sr');
   if(el) el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text2);font-size:13px">⏳ Vérification en cours...</div>';
   // On transmet le terme cherche : le serveur fait la recherche et ne renvoie que la
@@ -21885,6 +21897,11 @@ function rGestion() {
     // v9.618 — OUVRIR OU FERMER CHAQUE SERVICE.
     const s = DB.services || {};
     const gen = (s.global !== false);
+    // v9.622 : on compte l'état réel service par service, pour que le bouton général
+    // dise la vérité au lieu de se fier au seul interrupteur global.
+    const CLES_SERVICES = ['taxi_moto','vtc','trajets','annonces','verification'];
+    const nbServices = CLES_SERVICES.length;
+    const nbFermes = CLES_SERVICES.filter(function(k){ return s[k] === false; }).length;
     const ligne = (cle, titre, detail) => {
       const on = (s[cle] !== false);
       const eteintParGeneral = (!gen && on);
@@ -21907,14 +21924,25 @@ function rGestion() {
           'Ferme <b>tous</b> les services d\'un seul geste. Les courses déjà en route vont à leur terme : ' +
           'on n\'abandonne personne au bord de la route. Seules les <b>nouvelles</b> demandes sont refusées.' +
         '</div>' +
+        // v9.622 : ce bouton annonçait « Tous les services sont OUVERTS » alors qu'un
+        // service était fermé juste en dessous. Il ne regardait que l'interrupteur
+        // général et ignorait le détail — un libellé qui ment sur l'état réel.
+        // Il compte désormais ce qui est réellement ouvert.
         '<button class="' + (gen ? 'btn' : 'btn-red') + '" style="width:100%;padding:13px;font-size:14px;font-weight:900" ' +
-          'onclick="basculerService(\'global\')">' + (gen ? '🟢 Tous les services sont OUVERTS' : '🔴 TOUT EST FERMÉ — appuyer pour rouvrir') + '</button>' +
+          'onclick="basculerService(\'global\')">' + (!gen
+            ? '🔴 TOUT EST FERMÉ — appuyer pour rouvrir'
+            : (nbFermes === 0
+                ? '🟢 Tous les services sont OUVERTS'
+                : '🟠 ' + (nbServices - nbFermes) + ' service' + ((nbServices - nbFermes) > 1 ? 's' : '') + ' ouvert' + ((nbServices - nbFermes) > 1 ? 's' : '') +
+                  ' sur ' + nbServices + ' — appuyer pour TOUT fermer')) + '</button>' +
       '</div>' +
       '<div class="sect">Service par service</div>' +
       ligne('taxi_moto', '🏍️ Taxi moto', 'Demandes de course en moto, et mise en service des chauffeurs moto.') +
       ligne('vtc',       '🚗 VTC Taxi',  'Demandes de course en voiture, et mise en service des chauffeurs VTC.') +
       ligne('trajets',   '🚙 Voyager',   'Publication de trajets entre villes.') +
       ligne('annonces',  '🏷️ Annonces',  'Publication d\'annonces.') +
+      // v9.622 : la vérification publique du registre — le cœur du service.
+      ligne('verification', '🔍 Vérification', 'Recherche publique d\'un véhicule au registre, et scan des QR codes.') +
       '<div class="qr-note-txt" style="font-size:11px;margin-top:12px">' +
         'Un service fermé refuse les nouvelles demandes avec un message clair, et empêche les chauffeurs ' +
         'concernés de passer en service. Rien n\'est supprimé : rouvrir remet tout en marche instantanément.' +
