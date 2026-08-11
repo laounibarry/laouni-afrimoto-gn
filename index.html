@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.622';
+window.AFRIMOTO_VERSION = 'v9.623';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -7135,9 +7135,103 @@ function updateNav() {
 // ESPACE CLIENT
 // ════════════════════════════════════════════════
 let clientTab = 'vente';
+// ════════════════════════════════════════════════════════════════════════════
+// v9.623 — LE RELEVE DE COMPTE : SAVOIR OU PASSE SON ARGENT.
+//
+// Jusqu'ici chacun voyait son solde baisser sans jamais savoir pourquoi. Un chauffeur
+// qui perd mille francs sans explication finit par croire qu'on le vole — et il a raison
+// de le croire, puisque rien ne lui prouve le contraire.
+//
+// Cet ecran montre CHAQUE mouvement : la date, l'heure, le motif, le montant, et le sens.
+// Il est nourri par la table des mouvements, la meme que celle de l'administration : le
+// chauffeur et le passager voient donc exactement ce que la societe voit.
+//
+// « type » vaut 'passager' ou 'client' selon qui consulte. Un mouvement le concerne s'il
+// en est la SOURCE (il paie) ou la CIBLE (il recoit).
+// ════════════════════════════════════════════════════════════════════════════
+window._releveCache = null;
+
+async function chargerReleve(type, id) {
+  try {
+    const { data } = await supabaseClient.from('mouvements')
+      .select('date,created_at,type,description,montant,de,vers,source_type,source_id,cible_type,cible_id,annule')
+      .or('and(source_type.eq.' + type + ',source_id.eq.' + id + '),' +
+          'and(cible_type.eq.' + type + ',cible_id.eq.' + id + ')')
+      .order('date', { ascending: false }).limit(120);
+    return data || [];
+  } catch(e) { return []; }
+}
+
+function releveHtml(lignes, type, id, soldeActuel) {
+  if(!lignes || !lignes.length) {
+    return '<div class="card" style="text-align:center;padding:26px">' +
+      '<div style="font-size:32px;margin-bottom:8px">📄</div>' +
+      '<div style="font-weight:800">Aucun mouvement pour le moment</div>' +
+      '<div style="font-size:12px;color:var(--text2);margin-top:4px">Vos recharges et vos dépenses apparaîtront ici, une par une.</div></div>';
+  }
+  let totalEntre = 0, totalSorti = 0;
+  const corps = lignes.map(function(m){
+    const annule = (m.annule === true);
+    // Il est la SOURCE : l'argent sort de sa poche. Il est la CIBLE : il entre.
+    const sort = (String(m.source_type) === type && String(m.source_id) === String(id));
+    const mt = Number(m.montant) || 0;
+    if(!annule) { if(sort) totalSorti += mt; else totalEntre += mt; }
+    const d = new Date(m.date || m.created_at);
+    const dd = isNaN(d) ? '—' :
+      ('0'+d.getUTCDate()).slice(-2) + '/' + ('0'+(d.getUTCMonth()+1)).slice(-2) + '/' + d.getUTCFullYear() +
+      ' à ' + ('0'+d.getUTCHours()).slice(-2) + 'h' + ('0'+d.getUTCMinutes()).slice(-2);
+    return '<div class="card" style="margin-bottom:7px;padding:11px;border-left:3px solid ' +
+        (annule ? '#9CA3AF' : (sort ? '#EF4444' : '#22C55E')) + (annule ? ';opacity:.55' : '') + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:700;line-height:1.35">' + esc(m.description || 'Mouvement') + '</div>' +
+          '<div style="font-size:11px;color:var(--text2);margin-top:3px">' + dd + '</div>' +
+          '<div style="font-size:11px;color:var(--text2)">' + (sort ? 'Vers : ' + esc(m.vers || '—') : 'De : ' + esc(m.de || '—')) + '</div>' +
+          (annule ? '<div style="font-size:11px;color:#9CA3AF;font-weight:700;margin-top:2px">Mouvement annulé</div>' : '') +
+        '</div>' +
+        '<div style="font-weight:900;font-size:15px;white-space:nowrap;color:' +
+          (annule ? '#9CA3AF' : (sort ? '#EF4444' : '#22C55E')) + '">' +
+          (sort ? '− ' : '+ ') + fmt(mt) + '</div>' +
+      '</div></div>';
+  }).join('');
+
+  return '<div class="card" style="margin-bottom:12px;border:2px solid rgba(249,115,22,.35)">' +
+      '<div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px">Solde actuel</div>' +
+      '<div style="font-size:30px;font-weight:900;color:#EAB308;line-height:1.15">' + fmt(soldeActuel || 0) + '</div>' +
+      '<div style="display:flex;gap:14px;margin-top:9px;font-size:12px">' +
+        '<div><span style="color:#22C55E;font-weight:800">+ ' + fmt(totalEntre) + '</span><br>' +
+          '<span style="font-size:10px;color:var(--text2)">reçu au total</span></div>' +
+        '<div><span style="color:#EF4444;font-weight:800">− ' + fmt(totalSorti) + '</span><br>' +
+          '<span style="font-size:10px;color:var(--text2)">dépensé au total</span></div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:9px;line-height:1.45">' +
+        'Chaque ligne ci-dessous est un mouvement réel de votre compte. C\'est exactement ce que ' +
+        'voit l\'administration : rien n\'est caché, rien n\'est arrondi.</div>' +
+    '</div>' +
+    '<div class="sect">Détail des mouvements (' + lignes.length + ')</div>' + corps;
+}
+
+// v9.623 : le relevé du passager s'ouvre et se referme d'un appui, sous son solde.
+window.ouvrirRelevePassager = function () {
+  const el = document.getElementById('releve-passager');
+  if(!el) return;
+  if(el.innerHTML.trim()) { el.innerHTML = ''; return; }   // second appui : on referme
+  const ps = (DB.passagers || []).find(function(x){ return x.id === (DB.user && DB.user.id); });
+  if(!ps) { toast('Compte introuvable', true); return; }
+  rendreReleve('releve-passager', 'passager', ps.id, ps.solde || 0);
+};
+
+async function rendreReleve(conteneurId, type, id, solde) {
+  const el = document.getElementById(conteneurId);
+  if(!el) return;
+  el.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--text2)">Chargement de votre relevé…</div>';
+  const lignes = await chargerReleve(type, id);
+  el.innerHTML = releveHtml(lignes, type, id, solde);
+}
+
 function setClientTab(t) {
   clientTab = t;
-  ['trajet','vente','vehs','avis','revenus'].forEach(x=>{
+  ['trajet','vente','vehs','avis','revenus','solde'].forEach(x=>{
     const b = document.getElementById('ct-'+x);
     if(b) { b.className = x===t?'btn':'btn-ghost'; b.style.fontSize='12px'; b.style.padding='7px 12px'; }
   });
@@ -7889,6 +7983,11 @@ function rPassager() {
                         : fmt(Number(DB.commissionCourseVtc)||0)) + '</div>' +
         '<button onclick="openRecharge()" class="btn" style="padding:10px 16px;font-size:13px;font-weight:800">💳 Recharger</button>' +
       '</div>' +
+      // v9.623 : le relevé détaillé. Le passager voyait son solde baisser sans jamais
+      // savoir pourquoi — il peut désormais vérifier chaque franc, ligne par ligne.
+      '<button onclick="ouvrirRelevePassager()" class="btn-ghost" style="width:100%;padding:11px;font-size:13px;font-weight:800;margin-top:8px">' +
+        '📄 Voir le détail de mes dépenses</button>' +
+      '<div id="releve-passager" style="margin-top:10px"></div>' +
     '</div>' +
     // — Mon compte (replie) : profil complet, numero unique, mot de passe —
     '<div id="bloc-compte" style="display:' + (window._blocsOuverts && _blocsOuverts['bloc-compte'] ? '' : 'none') + ';margin-bottom:10px">' +
@@ -10739,6 +10838,8 @@ function rClient() {
       '<button id="ct-vente" class="btn-ghost" style="flex:1 1 30%;min-width:104px;font-size:12px;padding:7px 10px" onclick="setClientTab(\'vente\')">🏷️ Vendre</button>' +
       '<button id="ct-vehs" class="btn-ghost" style="flex:1 1 30%;min-width:104px;font-size:12px;padding:7px 10px" onclick="setClientTab(\'vehs\')">🏍️ Mes véhicules</button>' +
       '<button id="ct-avis" class="btn-ghost" style="flex:1 1 30%;min-width:104px;font-size:12px;padding:7px 10px" onclick="setClientTab(\'avis\')">⭐ Mes avis</button>' +
+      // v9.623 : le relevé de compte — voir où passe son argent, ligne par ligne.
+      '<button id="ct-solde" class="btn-ghost" style="flex:1 1 30%;min-width:104px;font-size:12px;padding:7px 10px" onclick="setClientTab(\'solde\')">💳 Mon solde</button>' +
       // v9.345 : reserve aux proprietaires de taxi moto. Un client qui ne fait
       // que du trajet longue distance ne passe jamais « en service » et n'est
       // pas paye a la course : cet onglet n'aurait aucun sens pour lui.
@@ -11264,6 +11365,11 @@ function rClientContent() {
       // Deux véhicules également taxis = quatre boutons, un par enregistrement.
       majTaxisRestantsHtml(mesTaxis) +
       ((!mesVehs.length && !mesTaxis.length) ? '<div class="empty">🏍️<br>Aucun véhicule enregistré à votre nom</div>' : '');
+
+  } else if(clientTab === 'solde') {
+    // v9.623 : le relevé se charge depuis le serveur, après affichage du cadre.
+    el.innerHTML = '<div class="sect">💳 Mon solde et mes mouvements</div><div id="releve-client"></div>';
+    try { rendreReleve('releve-client', 'client', cl.id, cl.solde || 0); } catch(e) {}
 
   } else if(clientTab === 'revenus') {
     // ════════════════════════════════════════════════
