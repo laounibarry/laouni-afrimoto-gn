@@ -1,8 +1,22 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "com.laouni_securite_ultime.twa",
-        "sha256_cert_fingerprints": ["4C:C2:9B:67:BE:72:D5:AF:8E:F3:32:2D:AE:E2:AB:F9:17:66:71:9E:1D:E0:A1:E5:40:BA:2A:1F:21:5E:68:B2"]
-      }
-    }]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.laouni_securite_ultime.twa",
+      "sha256_cert_fingerprints": [
+        "4C:C2:9B:67:BE:72:D5:AF:8E:F3:32:2D:AE:E2:AB:F9:17:66:71:9E:1D:E0:A1:E5:40:BA:2A:1F:21:5E:68:B2"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.afrimoto.afrimoto_app",
+      "sha256_cert_fingerprints": [
+        "FC:9B:2F:F2:B6:E2:45:A3:82:74:54:83:A5:2D:6F:D2:3D:0B:20:4A:5A:16:E0:AE:6E:E1:03:D1:97:45:CE:E5"
+      ]
+    }
+  }
+]
