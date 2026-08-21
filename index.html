@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.626';
+window.AFRIMOTO_VERSION = 'v9.627';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -2607,6 +2607,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('alertes')" id="gt-alertes" style="font-size:12px;padding:7px 11px">🔔 Alertes</button>
     <button class="btn-ghost" onclick="setGestTab('mdp')" id="gt-mdp" style="font-size:12px;padding:7px 11px">🔑 MDP</button>
     <button class="btn-ghost" onclick="setGestTab('zones')" id="gt-zones" style="font-size:12px;padding:7px 11px">🌍 Zones</button>
+    <button class="btn-ghost" onclick="setGestTab('promotions')" id="gt-promotions" style="font-size:12px;padding:7px 11px">🎁 Promotions</button>
     <button class="btn-ghost" onclick="setGestTab('avis')" id="gt-avis" style="font-size:12px;padding:7px 11px">⭐ Avis</button>
     <button class="btn-ghost" onclick="setGestTab('passagers')" id="gt-passagers" style="font-size:12px;padding:7px 11px">🧍 Passagers</button>
     <button class="btn-ghost" onclick="setGestTab('bilan')" id="gt-bilan" style="font-size:12px;padding:7px 11px">📊 Bilan</button>
@@ -3536,6 +3537,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div id="ra-titre" style="font-size:16px;font-weight:900;color:var(--text2);margin-bottom:6px">Recherche en cours...</div>
     <div id="ra-detail" style="font-size:13px;color:var(--text2);margin-bottom:16px"></div>
     <div id="ra-compteur" style="font-size:32px;font-weight:900;color:#EAB308;margin-bottom:16px"></div>
+    <!-- 🎁 TROUVER UN CHAUFFEUR MALGRÉ TOUT. Le chauffeur est prévenu de la remise
+         dès que la course sonne ; certains la refusent. Le passager ne reste jamais
+         bloqué : il relance au prix plein, en un appui, et garde sa remise pour une
+         prochaine course. -->
+    <div id="ra-promo" style="display:none;text-align:left;background:rgba(249,115,22,.10);border:1px solid rgba(249,115,22,.45);border-radius:10px;padding:12px;margin-bottom:12px"></div>
     <button id="ra-btn-annuler" class="btn-red" style="width:100%;padding:12px" onclick="annulerRechercheAutomatique()">Annuler la recherche</button>
   </div>
 </div>
@@ -3676,6 +3682,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div style="font-size:50px;margin-bottom:10px">🔔</div>
     <div style="font-size:16px;font-weight:900;color:var(--text2);margin-bottom:10px">Nouvelle demande de course !</div>
     <div id="ce-detail" style="font-size:13px;color:var(--text2);margin-bottom:6px"></div>
+    <!-- 🎁 L'AVERTISSEMENT DE PROMOTION. Il est ICI, tout en haut, AVANT le prix et
+         avant les boutons : le chauffeur doit savoir combien d'espèces il encaissera
+         AVANT d'accepter, pas après. -->
+    <div id="ce-promo" style="display:none;text-align:left;background:rgba(249,115,22,.10);border:1px solid rgba(249,115,22,.45);border-radius:10px;padding:12px;margin-bottom:12px"></div>
     <div id="ce-compteur" style="font-size:36px;font-weight:900;color:#EF4444;margin-bottom:12px">30</div>
     <div id="ce-carte" style="display:none;width:100%;height:190px;border-radius:12px;overflow:hidden;margin-bottom:6px"></div>
     <div id="ce-carte-info" style="font-size:11px;color:var(--text2);margin-bottom:10px"></div>
@@ -11863,6 +11873,20 @@ async function _terminerCourseConfirmee(demandeId) {
   demande.dateFin = new Date().toISOString(); // v9.340
   sbMajStatutDemande(demandeId, {statut_attribution: 'terminee', en_cours: false, date_fin: demande.dateFin, heure_fin: Math.floor(demande.heureFin instanceof Date ? demande.heureFin.getHours() : typeof demande.heureFin === 'number' ? demande.heureFin : new Date(demande.heureFin).getHours()), minute_fin: Math.floor(demande.minuteFin instanceof Date ? demande.minuteFin.getMinutes() : typeof demande.minuteFin === 'number' ? demande.minuteFin : new Date(demande.heureFin).getMinutes())});
   logMvt('trajet', '✅ Course terminée — ' + esc(demande.passagerNom), 0);
+
+  // ══ 🎁 LA REMISE EST VERSÉE AU CHAUFFEUR ══
+  //
+  // Il a encaissé moins d'espèces que le prix de la course : la société lui verse la
+  // différence sur son solde — ce solde qui lui sert à payer ses commissions. Le
+  // serveur ne verse qu'une fois, et seulement si la course est terminée : on peut
+  // donc appeler sans crainte, même si l'écran se rafraîchit.
+  try {
+    if (window.PROMO) {
+      const _verse = await PROMO.crediter(demandeId);
+      if (_verse > 0) toast('🎁 ' + fmt(_verse) + ' de promotion versés sur votre solde.');
+    }
+  } catch(e) {}
+
   toast('✅ Course terminée !');
   rClient();
 }
@@ -21305,13 +21329,220 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression','services'].forEach(x=>{
+  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','promotions','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression','services'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
   rGestion();
 }
 function setVehFiltre(t){ window.vehFiltreType = t; if(typeof rGestion==='function') rGestion(); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🎁 GESTION > PROMOTIONS
+//
+// Une promotion, c'est de l'argent de la société. Elle se règle donc ici, et nulle
+// part ailleurs :
+//
+//   • ON LA CRÉE     — un nom, un pourcentage, une manière d'attribuer.
+//   • ON L'ATTRIBUE  — à une personne, à une liste, à tous, ou par zone.
+//   • ON L'ARRÊTE    — un bouton, tout de suite, sans rien supprimer.
+//
+// Ce qui se passe ensuite : le passager paie le prix remisé EN ESPÈCES au chauffeur,
+// et la remise est versée sur le solde du chauffeur à la fin de la course — ce solde
+// qui lui sert à payer ses commissions. Le chauffeur est prévenu dès que la course
+// sonne, et le passager peut toujours repartir au prix plein si personne n'accepte.
+//
+// LES GARDE-FOUS, parce qu'une promotion qu'on oublie coûte tous les jours :
+//   • un plafond de remise par course ;
+//   • un nombre de courses par personne ;
+//   • une date de fin.
+//
+// Rien n'est écrit sans le mot de passe administrateur : le serveur le redemande.
+// ════════════════════════════════════════════════════════════════════════════
+var _promoMdp = null;
+function promoMdp() {
+  if (_promoMdp) return _promoMdp;
+  var p = prompt('Mot de passe administrateur\n\nUne promotion coûte de l\'argent à la société : le serveur le redemande à chaque écriture.');
+  if (!p) return null;
+  _promoMdp = p;
+  return _promoMdp;
+}
+function _promoRefus(r) {
+  var raison = (r && r.raison) ? String(r.raison) : '';
+  if (raison === 'admin_refuse') { _promoMdp = null; toast('⛔ Mot de passe refusé.', true); return; }
+  if (raison === 'taux_invalide') { toast('⛔ Le pourcentage doit être entre 1 et 100.', true); return; }
+  if (raison === 'nom_manquant') { toast('⛔ Donnez un nom à la promotion.', true); return; }
+  if (raison === 'introuvable') { toast('⛔ Cette promotion n\'existe plus.', true); return; }
+  if (raison === 'personne_a_ajouter') { toast('⛔ Aucun numéro valable dans la liste.', true); return; }
+  toast('⛔ Refusé par le serveur' + (raison ? ' (' + raison + ')' : '') + '.', true);
+}
+
+async function rPromotions() {
+  var zone = document.getElementById('promo-zone');
+  if (!zone) return;
+  var promos = [], benef = {};
+  try {
+    var a = await supabaseClient.from('promotions').select('*').order('created_at', { ascending: false }).limit(200);
+    if (a.error) throw a.error;
+    promos = a.data || [];
+    var b = await supabaseClient.from('promotions_beneficiaires').select('promo_id').limit(5000);
+    (b.data || []).forEach(function (x) { benef[x.promo_id] = (benef[x.promo_id] || 0) + 1; });
+  } catch (e) {
+    zone.innerHTML = '<div class="qr-note-txt" style="color:#EF4444">Les promotions n\'ont pas pu être lues. ' +
+      'Si le message revient, exécutez <b>promotions.sql</b> dans Supabase.</div>';
+    return;
+  }
+
+  var opts = '';
+  try { (PREFECTURES_GN || []).forEach(function (p) { opts += '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }); } catch (e) {}
+
+  var h =
+    '<div class="qr-note-txt" style="background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px">' +
+      'Le passager paie le prix remisé <b>en espèces</b> au chauffeur. La remise est versée sur le ' +
+      '<b>solde du chauffeur</b> à la fin de la course — ce solde lui sert à payer ses commissions. ' +
+      'Il est prévenu <b>dès que la course sonne</b>, et le passager peut toujours repartir au prix plein.' +
+    '</div>' +
+
+    '<div class="sect" style="margin-top:0">➕ Nouvelle promotion</div>' +
+    '<div class="card" style="margin-bottom:16px;border-color:rgba(249,115,22,.4)">' +
+      '<div class="fld"><div class="lbl">Nom (vu par le passager)</div>' +
+        '<input id="pr-nom" placeholder="Ex : Rentrée scolaire"/></div>' +
+      '<div class="fld"><div class="lbl">Remise en %</div>' +
+        '<input id="pr-taux" type="number" min="1" max="100" step="1" value="50"/></div>' +
+      '<div class="fld"><div class="lbl">Comment on l\'attribue</div>' +
+        '<select id="pr-attribution" onchange="promoMajFormulaire()">' +
+          '<option value="individuel">👤 Individuel</option>' +
+          '<option value="masse">👥 En masse</option>' +
+          '<option value="zone">🌍 Par zone</option>' +
+          '<option value="parrainage">🤝 Parrainage</option>' +
+        '</select></div>' +
+      '<div class="fld" id="pr-bloc-zone" style="display:none"><div class="lbl">Préfecture de départ</div>' +
+        '<select id="pr-zone"><option value="">— choisir —</option>' + opts + '</select></div>' +
+      '<div class="fld" id="pr-bloc-masse" style="display:none"><div class="lbl">À qui</div>' +
+        '<select id="pr-masse"><option value="tous">Tous les passagers</option>' +
+        '<option value="nouveaux">Nouveaux comptes</option></select></div>' +
+      '<div class="fld"><div class="lbl">Plafond de remise par course (GNF) — vide = pas de plafond</div>' +
+        '<input id="pr-plafond" type="number" min="0" step="500" placeholder="0"/></div>' +
+      '<div class="fld"><div class="lbl">Nombre de courses par personne — 0 = illimité</div>' +
+        '<input id="pr-max" type="number" min="0" step="1" value="1"/></div>' +
+      '<div class="fld"><div class="lbl">Date de fin — une promotion qu\'on oublie coûte tous les jours</div>' +
+        '<input id="pr-fin" type="date"/></div>' +
+      '<button class="btn" style="width:100%;padding:12px" onclick="promoCreer()">🎁 Créer la promotion</button>' +
+    '</div>' +
+
+    '<div class="sect">📋 Les promotions</div>';
+
+  if (!promos.length) {
+    h += '<div class="qr-note-txt">Aucune promotion pour le moment.</div>';
+  } else {
+    promos.forEach(function (p) {
+      var actif = p.actif === true;
+      var n = benef[p.id] || 0;
+      var genre = p.attribution === 'zone' ? '🌍 Zone ' + esc(p.zone || '')
+                : p.attribution === 'masse' ? '👥 En masse (' + esc(p.cible_masse || 'tous') + ')'
+                : p.attribution === 'parrainage' ? '🤝 Parrainage'
+                : '👤 Individuel';
+      var finT = p.fin ? ('jusqu\'au ' + new Date(p.fin).toLocaleDateString('fr-FR')) : 'sans date de fin';
+      var aUneListe = (p.attribution !== 'parrainage' && p.attribution !== 'zone');
+      h += '<div class="card" style="margin-bottom:10px;border-color:' + (actif ? 'rgba(22,163,74,.45)' : 'var(--border)') + '">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">' +
+          '<div style="flex:1;font-weight:900;font-size:15px">' + esc(p.nom || '') + '</div>' +
+          '<div style="background:' + (actif ? '#F97316' : '#64748B') + ';color:#fff;font-weight:900;' +
+            'font-size:12px;border-radius:20px;padding:4px 10px">−' + (p.taux || 0) + ' %</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text2)">' + genre + ' · ' + n + ' bénéficiaire(s) · ' + finT + '</div>' +
+        (Number(p.plafond_remise) > 0 ? '<div style="font-size:12px;color:var(--text2)">Plafond : ' + fmt(p.plafond_remise) + ' par course</div>' : '') +
+        (Number(p.max_par_personne) > 0 ? '<div style="font-size:12px;color:var(--text2)">' + p.max_par_personne + ' course(s) par personne</div>' : '') +
+        (!actif ? '<div style="font-size:12px;color:#EF4444;font-weight:700">Arrêtée : plus personne n\'en bénéficie.</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">' +
+          (aUneListe ? '<button class="btn-ghost" style="flex:1;padding:9px;font-size:12px;font-weight:800" onclick="promoAttribuer(\'' + p.id + '\')">👤 Attribuer</button>' : '') +
+          '<button class="btn-ghost" style="flex:1;padding:9px;font-size:12px;font-weight:800" onclick="promoRegler(\'' + p.id + '\',' + (actif ? 'false' : 'true') + ',false)">' +
+            (actif ? '⏸️ Arrêter' : '▶️ Activer') + '</button>' +
+          '<button class="btn-red" style="padding:9px 12px;font-size:12px" onclick="promoRegler(\'' + p.id + '\',null,true)">🗑️</button>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+  zone.innerHTML = h;
+  try { promoMajFormulaire(); } catch (e) {}
+}
+
+function promoMajFormulaire() {
+  var a = (document.getElementById('pr-attribution') || {}).value || 'individuel';
+  var z = document.getElementById('pr-bloc-zone'), m = document.getElementById('pr-bloc-masse');
+  if (z) z.style.display = (a === 'zone') ? '' : 'none';
+  if (m) m.style.display = (a === 'masse') ? '' : 'none';
+}
+
+async function promoCreer() {
+  var nom = ((document.getElementById('pr-nom') || {}).value || '').trim();
+  var taux = parseInt((document.getElementById('pr-taux') || {}).value) || 0;
+  var attribution = (document.getElementById('pr-attribution') || {}).value || 'individuel';
+  var zone = (document.getElementById('pr-zone') || {}).value || null;
+  var masse = (document.getElementById('pr-masse') || {}).value || 'tous';
+  var plafond = parseInt((document.getElementById('pr-plafond') || {}).value) || 0;
+  var maxPar = parseInt((document.getElementById('pr-max') || {}).value) || 0;
+  var fin = (document.getElementById('pr-fin') || {}).value || null;
+
+  if (!nom) { toast('⛔ Donnez un nom à la promotion.', true); return; }
+  if (taux <= 0 || taux > 100) { toast('⛔ Le pourcentage doit être entre 1 et 100.', true); return; }
+  if (attribution === 'zone' && !zone) { toast('⛔ Choisissez la préfecture de départ.', true); return; }
+
+  var mdp = promoMdp(); if (!mdp) return;
+  try {
+    var r = await supabaseClient.rpc('creer_promotion', {
+      p_num: String(DB.adminId || ''),
+      p_mot_de_passe: mdp,
+      p_donnees: {
+        nom: nom, taux: taux, attribution: attribution,
+        zone: (attribution === 'zone') ? zone : null,
+        cible_masse: (attribution === 'masse') ? masse : null,
+        plafond_remise: plafond, max_par_personne: maxPar,
+        fin: fin ? (fin + 'T23:59:59') : null, actif: true
+      }
+    });
+    if (r.error || !r.data || r.data.ok !== true) { _promoRefus(r.data); return; }
+    toast('🎁 Promotion créée.');
+    rPromotions();
+  } catch (e) { toast('⛔ Le serveur n\'a pas répondu.', true); }
+}
+
+async function promoRegler(id, actif, supprimer) {
+  if (supprimer && !confirm('Supprimer cette promotion ?\n\nElle sera effacée, ainsi que la liste de ceux qui en bénéficient. Les courses déjà faites gardent leur remise.')) return;
+  var mdp = promoMdp(); if (!mdp) return;
+  try {
+    var r = await supabaseClient.rpc('regler_promotion', {
+      p_num: String(DB.adminId || ''),
+      p_mot_de_passe: mdp, p_promo_id: String(id),
+      p_actif: (actif === null ? null : !!actif), p_supprimer: !!supprimer
+    });
+    if (r.error || !r.data || r.data.ok !== true) { _promoRefus(r.data); return; }
+    toast(supprimer ? '🗑️ Promotion supprimée.' : (actif ? '▶️ Promotion activée.' : '⏸️ Promotion arrêtée.'));
+    rPromotions();
+  } catch (e) { toast('⛔ Le serveur n\'a pas répondu.', true); }
+}
+
+async function promoAttribuer(id) {
+  var saisie = prompt('Attribuer cette promotion\n\nTapez les numéros uniques des passagers, séparés par des virgules.\n\nOu tapez TOUS pour l\'attribuer à tous les passagers validés.');
+  if (saisie === null) return;
+  saisie = saisie.trim();
+  if (!saisie) { toast('⛔ Donnez au moins un numéro de passager.', true); return; }
+  var tous = (saisie.toUpperCase() === 'TOUS');
+  var numeros = tous ? null : saisie.split(/[,;\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
+  if (tous && !confirm('Attribuer cette promotion à TOUS les passagers validés ?\n\nVérifiez le plafond et le nombre de courses par personne avant.')) return;
+
+  var mdp = promoMdp(); if (!mdp) return;
+  try {
+    var r = await supabaseClient.rpc('attribuer_promotion', {
+      p_num: String(DB.adminId || ''),
+      p_mot_de_passe: mdp, p_promo_id: String(id),
+      p_passagers: tous ? null : numeros, p_tous: tous
+    });
+    if (r.error || !r.data || r.data.ok !== true) { _promoRefus(r.data); return; }
+    toast('✅ ' + (r.data.ajoutes || 0) + ' passager(s) ajouté(s).');
+    rPromotions();
+  } catch (e) { toast('⛔ Le serveur n\'a pas répondu.', true); }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // v9.558 — UN ABONNEMENT QUI VIT AVEC L'ECRAN
@@ -22133,6 +22364,11 @@ function rGestion() {
         'Un service fermé refuse les nouvelles demandes avec un message clair, et empêche les chauffeurs ' +
         'concernés de passer en service. Rien n\'est supprimé : rouvrir remet tout en marche instantanément.' +
       '</div>';
+
+  } else if(gestTab==='promotions') {
+    // Le contenu se remplit tout seul : il vient du serveur.
+    html = '<div id="promo-zone"><div class="qr-note-txt">Chargement des promotions…</div></div>';
+    setTimeout(function(){ try{ rPromotions(); }catch(e){} }, 0);
 
   } else if(gestTab==='zones') {
     const toutesZones = [...PREFECTURES_GN, ...VILLES_VOISINES];
@@ -28934,6 +29170,8 @@ body.mode-passager .nav-inner{display:none!important}
         <div id="sug-pax-arrivee" class="pax-sug"></div>
       </div>
       <div id="pax-estim" style="display:none;font-size:12px;font-weight:700;color:#333;padding:0 4px 7px"></div>
+      <!-- 🎁 LA REMISE. Le prix barré, ce qu'il paie vraiment, et le choix du prix plein. -->
+      <div id="pax-promo" style="display:none;font-size:12px;padding:8px 10px;margin:0 0 7px;border-radius:10px;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.45)"></div>
       <div class="pax-champ"><span style="font-size:13px">&#128176;</span>
         <input id="pax-prix" type="number" min="500" step="500" placeholder="Votre prix (GNF, optionnel)" oninput="this.dataset.modifie=1"/>
       </div>
@@ -29091,7 +29329,55 @@ body.mode-passager .nav-inner{display:none!important}
     if(el.dataset.m!==h9){ el.dataset.m=h9; el.style.display=''; el.innerHTML=h9; }
     var prix=document.getElementById('pax-prix');
     if(prix && !prix.dataset.modifie && String(prix.value)!==String(est.prix)) prix.value=est.prix; // proposition, toujours modifiable
+    try{ _paxMajPromo(est.prix); }catch(e){}
   }
+
+  /* ══ 🎁 LA REMISE, SUR L'ÉCRAN DE COMMANDE ══
+     On ne calcule aucune remise ici : on affiche celle que le serveur accorde, pour
+     CE prix-là. Et on laisse toujours le choix du prix plein — un chauffeur accepte
+     tout de suite une course sans remise. */
+  var _paxPromoPrix = -1;      // le prix pour lequel on a déjà demandé
+  window._paxSansRemise = false;
+  async function _paxMajPromo(prixEstime){
+    var el = document.getElementById('pax-promo'); if(!el) return;
+    var u = (window.DB && DB.user && DB.user.role === 'passager') ? DB.user : null;
+    if(!u || !prixEstime){ el.style.display='none'; el.innerHTML=''; _paxPromoPrix=-1; return; }
+    if(_paxPromoPrix === prixEstime && el.dataset.fait === '1') return;  // rien de neuf
+    _paxPromoPrix = prixEstime;
+    var p = null;
+    try{
+      p = await PROMO.pour(u.id, prixEstime,
+             (typeof filtrePassagerZone!=='undefined' && filtrePassagerZone) ? filtrePassagerZone : null);
+    }catch(e){ p = null; }
+    if(!p){ el.style.display='none'; el.innerHTML=''; el.dataset.fait=''; return; }
+    var f = (typeof fmt==='function') ? fmt : function(v){ return v; };
+    var sans = !!window._paxSansRemise;
+    el.style.background = sans ? 'rgba(100,116,139,.10)' : 'rgba(22,163,74,.10)';
+    el.style.borderColor = sans ? 'rgba(100,116,139,.45)' : 'rgba(22,163,74,.45)';
+    el.innerHTML =
+      '<div style="font-weight:900;color:' + (sans ? '#64748B' : '#16A34A') + ';margin-bottom:3px">' +
+        '🎁 ' + esc(p.nom || '') + ' — ' + (p.taux || 0) + ' % de remise</div>' +
+      (sans
+        ? '<div style="font-weight:900;color:#0F172A">Prix plein choisi : ' + f(prixEstime) + '</div>'
+        : '<div><span style="color:#64748B;text-decoration:line-through">' + f(prixEstime) + '</span>' +
+          ' <b style="color:#16A34A;font-size:14px">vous payez ' + f(p.a_payer || 0) + '</b></div>' +
+          (p.restantes != null
+            ? '<div style="color:#64748B;font-size:11px">Encore ' + p.restantes + ' course(s) à ce tarif.</div>'
+            : '')) +
+      '<div style="margin-top:5px"><a href="javascript:void(0)" onclick="paxBasculerRemise()" ' +
+        'style="color:#EA580C;font-weight:800;font-size:11.5px;text-decoration:none">' +
+        (sans ? '🎁 Reprendre ma remise' : '⚡ Commander sans la remise (chauffeur trouvé plus vite)') +
+      '</a></div>';
+    el.dataset.fait = '1';
+    el.style.display = '';
+  }
+  window.paxBasculerRemise = function(){
+    window._paxSansRemise = !window._paxSansRemise;
+    try{ if(window.PROMO) PROMO.sansRemise = window._paxSansRemise; }catch(e){}
+    var el=document.getElementById('pax-promo'); if(el) el.dataset.fait='';
+    var g=_paxPromoPrix; _paxPromoPrix=-1;
+    try{ _paxMajPromo(g); }catch(e){}
+  };
   // Des qu'un lieu est choisi (suggestion, destination recente, carte...), le trajet se met a jour
   try{
     var _apLieuOrig=window._appliquerLieu;
@@ -29370,6 +29656,132 @@ body.mode-passager .nav-inner{display:none!important}
   }
 
   /* ══════════════════════════════════════════════════════════════════════
+     🎁 LES PROMOTIONS
+     ══════════════════════════════════════════════════════════════════════
+
+     UN PASSAGER QUI A UNE REMISE DE 50 % NE PAIE QUE LA MOITIE EN ESPECES.
+     Le chauffeur, lui, ne perd rien : la remise lui est versee sur son solde a
+     la fin de la course — ce solde qui lui sert a payer ses commissions.
+
+     TROIS REGLES QUI NE SE NEGOCIENT PAS :
+
+       1. Le chauffeur est prevenu DES QUE LA COURSE SONNE. Il voit le
+          pourcentage, la remise, et surtout LES ESPECES QU'IL ENCAISSERA.
+          Jamais de mauvaise surprise a l'arrivee.
+
+       2. Le passager peut TOUJOURS commander au prix plein. Certains chauffeurs
+          refusent une course remisee ; personne ne doit rester a pied pour ca.
+          Sa remise n'est pas perdue : elle n'est comptee qu'au versement.
+
+       3. Rien n'est calcule ici. Le serveur accorde la remise, le serveur la
+          verse. Le telephone ne fait qu'afficher.
+
+     Tout tient dans ce bloc : pour revenir en arriere, on le supprime.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  window.PROMO = {
+    courante: null,      // ce a quoi le passager a droit pour le prix affiche
+    sansRemise: false,   // il a demande le prix plein pour cette course-la
+
+    /* Ce a quoi ce passager a droit, pour ce prix, au depart de cette zone. */
+    async pour(passagerId, prix, zone) {
+      var r = await _rpc('promo_du_passager', {
+        p_passager_id: String(passagerId || ''),
+        p_prix: Number(prix) || 0,
+        p_zone: zone || null
+      });
+      this.courante = (r && r.promo === true) ? r : null;
+      return this.courante;
+    },
+
+    /* Inscrit la remise SUR la course : c'est ce qui la fait apparaitre chez le
+       chauffeur au moment ou elle sonne. */
+    async appliquer(courseId, zone) {
+      return await _rpc('appliquer_promo_course', {
+        p_course_id: String(courseId || ''), p_zone: zone || null
+      });
+    },
+
+    /* Le passager renonce a sa remise POUR CETTE COURSE. */
+    async retirer(courseId) {
+      var r = await _rpc('retirer_promo_course', { p_course_id: String(courseId || '') });
+      return !!(r && r.ok === true);
+    },
+
+    /* A la fin de la course : le serveur verse la remise au chauffeur. Appelable
+       plusieurs fois sans risque — il ne verse qu'une fois. */
+    async crediter(courseId) {
+      var r = await _rpc('crediter_promo_chauffeur', { p_course_id: String(courseId || '') });
+      return (r && r.ok === true && Number(r.verse) > 0) ? Number(r.verse) : 0;
+    },
+
+    /* La remise inscrite sur une course, lue directement : « ma_course » ne la
+       renvoie pas dans son etat. */
+    async deLaCourse(courseId) {
+      try {
+        var r = await supabaseClient.from('demandes_course')
+          .select('promo_nom,promo_taux,promo_remise,promo_a_payer')
+          .eq('id', String(courseId || '')).limit(1);
+        if (r.error || !r.data || !r.data.length) return null;
+        var m = r.data[0];
+        return (m.promo_taux == null) ? null : m;
+      } catch (e) { return null; }
+    }
+  };
+
+  /* L'avertissement chez le chauffeur, dans la fenetre d'appel. */
+  async function _promoChauffeur(courseId, prixCourse) {
+    var b = _el('ce-promo');
+    if (!b) return;
+    b.style.display = 'none'; b.innerHTML = '';
+    var p = await PROMO.deLaCourse(courseId);
+    if (!p) return;
+    var aPayer = Number(p.promo_a_payer) || 0;
+    var remise = Number(p.promo_remise) || 0;
+    b.innerHTML =
+      '<div style="font-weight:900;font-size:13px;color:#EA580C;margin-bottom:6px">' +
+        '🎁 Ce passager a une promotion de ' + (p.promo_taux || 0) + ' %</div>' +
+      '<div style="font-size:12.5px;line-height:1.5;color:var(--text2)">' +
+        'Il vous donne en espèces : <b style="color:var(--text)">' + fmt(aPayer) + '</b><br>' +
+        'Versé sur votre solde : <b style="color:#16A34A">' + fmt(remise) + '</b><br>' +
+        'Vous touchez bien le prix complet.</div>';
+    b.style.display = 'block';
+  }
+
+  /* Le bandeau « chercher sans la remise », pendant la recherche. */
+  async function _promoPassagerRecherche(courseId) {
+    var b = _el('ra-promo');
+    if (!b) return;
+    b.style.display = 'none'; b.innerHTML = '';
+    var p = await PROMO.deLaCourse(courseId);
+    if (!p) return;
+    b.innerHTML =
+      '<div style="font-size:12.5px;line-height:1.45;color:var(--text)">' +
+        'Votre course part avec la remise 🎁 <b>' + esc(p.promo_nom || '') + '</b> (' +
+        (p.promo_taux || 0) + ' %).</div>' +
+      '<div style="font-size:11.5px;line-height:1.4;color:var(--text2);margin:4px 0 8px">' +
+        'Certains chauffeurs la refusent. Si l’attente est longue, cherchez au prix ' +
+        'plein : vous garderez votre remise pour une prochaine course.</div>' +
+      '<button class="btn-ghost" style="width:100%;padding:10px;font-size:13px;font-weight:800" ' +
+        'onclick="chercherSansLaRemise()">⚡ Chercher sans la remise</button>';
+    b.style.display = 'block';
+  }
+
+  window.chercherSansLaRemise = async function () {
+    if (!_courseId) return;
+    if (!confirm('Chercher sans la remise ?\n\nVous paierez le prix complet pour cette ' +
+                 'course. Votre remise reste valable pour une prochaine fois.')) return;
+    var ok = await PROMO.retirer(_courseId);
+    if (ok) {
+      PROMO.sansRemise = true;
+      var b = _el('ra-promo'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+      toast('✅ Course relancée au prix plein. Votre remise est gardée pour plus tard.');
+    } else {
+      toast('⚠️ Impossible : un chauffeur a déjà pris votre course.', true);
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════
      COTE PASSAGER
      ══════════════════════════════════════════════════════════════════════ */
 
@@ -29631,6 +30043,17 @@ body.mode-passager .nav-inner{display:none!important}
     }
 
     _courseId = r.id; _sigAffiche = ''; _sonPrix = false;
+
+    // 🎁 La remise est inscrite SUR la course tout de suite : c'est ce qui la fera
+    // apparaitre chez le chauffeur au moment ou elle sonne. Si le passager a demande
+    // le prix plein, on n'inscrit rien — le chauffeur verra une course ordinaire.
+    try {
+      if (!PROMO.sansRemise) {
+        await PROMO.appliquer(r.id, (typeof filtrePassagerZone !== 'undefined' && filtrePassagerZone) ? filtrePassagerZone : null);
+        _promoPassagerRecherche(r.id);
+      }
+    } catch (x) {}
+
     try { openModal('m-recherche-auto'); } catch (x) {}
     _txt('ra-icone', '\uD83D\uDD04'); _txt('ra-titre', 'Recherche en cours...');
     _html('ra-detail', 'Nous cherchons un chauffeur...'); _txt('ra-compteur', '');
@@ -29829,6 +30252,9 @@ body.mode-passager .nav-inner{display:none!important}
         depart: e.depart, arrivee: e.arrivee
       });
     } catch (x) {}
+
+    // 🎁 L'avertissement de promotion, AVANT que le chauffeur accepte.
+    try { _promoChauffeur(e.id, _pp); } catch (x) {}
 
     try { openModal('m-course-entrante'); } catch (x) {}
     // 3. Le reveil de l'ecran, meme telephone verrouille.
