@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.627';
+window.AFRIMOTO_VERSION = 'v9.628';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -21380,16 +21380,35 @@ function _promoRefus(r) {
 async function rPromotions() {
   var zone = document.getElementById('promo-zone');
   if (!zone) return;
+  // ══ LA LISTE VIENT DU SERVEUR, PAS DE LA TABLE ══
+  //
+  // La table des promotions est FERMÉE, et elle doit le rester : la liste des
+  // bénéficiaires dit qui a droit à quoi. On passe donc par une fonction qui
+  // redemande le mot de passe administrateur.
   var promos = [], benef = {};
+  var mdpL = promoMdp();
+  if (!mdpL) {
+    zone.innerHTML = '<div class="qr-note-txt">Le mot de passe administrateur est ' +
+      'nécessaire pour lire les promotions. <a href="javascript:void(0)" ' +
+      'onclick="rPromotions()" style="color:#F97316;font-weight:800">Réessayer</a></div>';
+    return;
+  }
   try {
-    var a = await supabaseClient.from('promotions').select('*').order('created_at', { ascending: false }).limit(200);
+    var a = await supabaseClient.rpc('lister_promotions', {
+      p_num: String(DB.adminId || ''), p_mot_de_passe: mdpL
+    });
     if (a.error) throw a.error;
-    promos = a.data || [];
-    var b = await supabaseClient.from('promotions_beneficiaires').select('promo_id').limit(5000);
-    (b.data || []).forEach(function (x) { benef[x.promo_id] = (benef[x.promo_id] || 0) + 1; });
+    if (!a.data || a.data.ok !== true) {
+      _promoMdp = null;
+      zone.innerHTML = '<div class="qr-note-txt" style="color:#EF4444">Mot de passe refusé. ' +
+        '<a href="javascript:void(0)" onclick="rPromotions()" style="color:#F97316;font-weight:800">Réessayer</a></div>';
+      return;
+    }
+    promos = a.data.promotions || [];
+    promos.forEach(function (p) { benef[p.id] = Number(p.beneficiaires) || 0; });
   } catch (e) {
     zone.innerHTML = '<div class="qr-note-txt" style="color:#EF4444">Les promotions n\'ont pas pu être lues. ' +
-      'Si le message revient, exécutez <b>promotions.sql</b> dans Supabase.</div>';
+      'Si le message revient, exécutez <b>promotions-liste-admin.sql</b> dans Supabase.</div>';
     return;
   }
 
@@ -21453,6 +21472,10 @@ async function rPromotions() {
         '<div style="font-size:12px;color:var(--text2)">' + genre + ' · ' + n + ' bénéficiaire(s) · ' + finT + '</div>' +
         (Number(p.plafond_remise) > 0 ? '<div style="font-size:12px;color:var(--text2)">Plafond : ' + fmt(p.plafond_remise) + ' par course</div>' : '') +
         (Number(p.max_par_personne) > 0 ? '<div style="font-size:12px;color:var(--text2)">' + p.max_par_personne + ' course(s) par personne</div>' : '') +
+        // CE QU'ELLE A DEJA COUTE. Sans ce chiffre, on ne sait pas quand arreter.
+        '<div style="font-size:12px;color:var(--text2)">' + (Number(p.courses_faites) || 0) +
+          ' course(s) utilisée(s) · <b style="color:#EA580C">' + fmt(Number(p.deja_verse) || 0) +
+          '</b> déjà versés aux chauffeurs</div>' +
         (!actif ? '<div style="font-size:12px;color:#EF4444;font-weight:700">Arrêtée : plus personne n\'en bénéficie.</div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">' +
           (aUneListe ? '<button class="btn-ghost" style="flex:1;padding:9px;font-size:12px;font-weight:800" onclick="promoAttribuer(\'' + p.id + '\')">👤 Attribuer</button>' : '') +
