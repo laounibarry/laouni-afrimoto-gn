@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.628';
+window.AFRIMOTO_VERSION = 'v9.629';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -24939,6 +24939,55 @@ function editSA(id) {
 }
 
 // Modal agent
+
+// ════════════════════════════════════════════════════════════════════════════
+// UNE DESTINATION REÇUE PAR LIEN
+//
+// Quelqu'un partage sa position depuis AfriMoto : le lien arrive sur WhatsApp
+// et ramène ici avec « ?dest_lat=…&dest_lng=…&dest_nom=… ».
+//
+// On pose la destination TOUT SEUL. Celui qui reçoit n'a rien à retaper — et
+// c'est le but : beaucoup d'endroits, ici, n'ont pas d'adresse écrite. Faire
+// retaper « derrière la station, deuxième cour », c'est renoncer.
+//
+// L'adresse est ensuite nettoyée de la barre du navigateur : sans ça, un
+// rafraîchissement reposerait la même destination des jours plus tard.
+// ════════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    var p = new URLSearchParams(location.search);
+    var lat = parseFloat(p.get('dest_lat'));
+    var lng = parseFloat(p.get('dest_lng'));
+    if(!isFinite(lat) || !isFinite(lng)) return;
+    if(Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+
+    var nom = (p.get('dest_nom') || '').trim() ||
+              ('Position partagée (' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ')');
+
+    // On laisse la page finir de se construire : les champs n'existent pas
+    // encore au moment où cet écouteur se déclenche.
+    setTimeout(function () {
+      try {
+        var champ = document.getElementById('pax-arrivee') ? 'pax-arrivee' : 'pa-arrivee';
+        if(typeof _appliquerLieu === 'function') {
+          _appliquerLieu(champ, nom, lat, lng);
+        } else {
+          var e = document.getElementById(champ);
+          if(e) e.value = nom;
+        }
+        if(typeof toast === 'function') {
+          toast('📍 Destination reçue : ' + nom);
+        }
+      } catch(e) {}
+
+      // On efface les paramètres, mais on garde la page où elle est.
+      try {
+        history.replaceState({}, '', location.pathname);
+      } catch(e) {}
+    }, 900);
+  } catch(e) {}
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const existing = document.getElementById('m-ag');
   if(!existing) {

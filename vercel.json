@@ -15,6 +15,10 @@
   ],
   "rewrites": [
     {
+      "source": "/aller",
+      "destination": "/aller.html"
+    },
+    {
       "source": "/.well-known/assetlinks.json",
       "destination": "/assetlinks.json"
     }
