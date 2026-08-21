@@ -1,6 +1,12 @@
 {
   "redirects": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "laouni-afrimoto-gn.vercel.app" }],
+      "destination": "https://laouni-securite-ultime.com/",
+      "permanent": true
+    },
+    {
       "source": "/:chemin*",
       "has": [{ "type": "host", "value": "laouni-afrimoto-gn.vercel.app" }],
       "destination": "https://laouni-securite-ultime.com/:chemin*",
