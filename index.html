@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.630';
+window.AFRIMOTO_VERSION = 'v9.631';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -21466,7 +21466,10 @@ function diagParams(nom) {
 }
 
 async function rDiagnostic() {
-  const zone = _el('diag-zone');
+  // document.getElementById en clair : le raccourci « _el » du site est defini
+  // A L'INTERIEUR d'autres fonctions, donc invisible ici. L'appeler laissait la
+  // page bloquee sur « Preparation… », sans le moindre message.
+  const zone = document.getElementById('diag-zone');
   if (!zone) return;
   zone.innerHTML =
     '<div class="card" style="margin-bottom:10px">' +
@@ -21481,7 +21484,7 @@ async function rDiagnostic() {
 }
 
 async function rDiagnosticLancer() {
-  const res = _el('diag-res');
+  const res = document.getElementById('diag-res');
   if (!res) return;
   const total = DIAG_FONCTIONS.length;
   let faites = 0, manquantes = 0;
