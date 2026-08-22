@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.631';
+window.AFRIMOTO_VERSION = 'v9.632';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -21439,8 +21439,13 @@ function diagParams(nom) {
     case 'declarer_vol': return { p_terme:'', p_preuve:'', p_avec_crime:false, p_type_crime:'', p_ville:'' };
     case 'regler_config': return { p_identifiant:'', p_mot_de_passe:'', p_reglages:{} };
     case 'frais_trajet': return { p_pref:'Conakry', p_prix:0 };
-    case 'publier_trajet': case 'publier_annonce': case 'devenir_taxi':
+    case 'publier_trajet': case 'publier_annonce':
       return { p_client_num:'', p_mot_de_passe:'', p_donnees:{} };
+    // « devenir_taxi » passe par un AGENT, pas par le client : p_agent_num, et
+    // non p_client_num. Groupee par erreur avec les deux precedentes, elle
+    // etait annoncee manquante alors qu'elle est bien installee.
+    case 'devenir_taxi':
+      return { p_agent_num:'', p_mot_de_passe:'', p_donnees:{} };
     case 'reserver_trajet': return { p_trajet_id:ID_VIDE, p_prenom:'', p_nom:'', p_tel:'' };
     case 'annuler_reservation': return { p_trajet_id:ID_VIDE, p_tel:'', p_code:'' };
     case 'noter_course': return { p_passager_id:'', p_course_id:'', p_note:5, p_commentaire:'' };
@@ -21458,7 +21463,10 @@ function diagParams(nom) {
     case 'changer_mdp_compte':
       return { p_num:'', p_mot_de_passe:'', p_cible_type:'client', p_cible_id:ID_VIDE, p_nouveau:'xxxxxx' };
     case 'affaires_agent': return { p_agent_id:null, p_role:'admin' };
-    case 'annuler_course': return { p_course_id:ID_VIDE, p_par:'passager', p_motif:'' };
+    // Les vrais noms, ceux qu'emploie le site : p_qui et p_acteur. J'avais
+    // ecrit p_par et p_motif de memoire — d'ou une croix rouge sur une
+    // fonction parfaitement installee.
+    case 'annuler_course': return { p_course_id:ID_VIDE, p_qui:'passager', p_acteur:null };
     case 'demarrer_course': return { p_course_id:ID_VIDE, p_taxi_id:ID_VIDE, p_pin:'0000' };
     case 'regler_rayon_taxi': return { p_taxi_id:ID_VIDE, p_rayon:5 };
     default: return {};
