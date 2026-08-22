@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.632';
+window.AFRIMOTO_VERSION = 'v9.633';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -18625,7 +18625,21 @@ function saveTrajet() {
   
   // Calculer les frais
   const fraisInfo = calculerFraisTrajet(pref, prix);
-  
+
+  // ══ v9.633 — UNE ZONE BLOQUEE EST VRAIMENT BLOQUEE ══
+  //
+  // « calculerFraisTrajet » renvoyait bien « bloque », mais PERSONNE ne le
+  // lisait. Une prefecture mise en « ⛔ Bloque » dans Gestion > Zones laissait
+  // donc publier les trajets — et EN PLUS gratuitement, puisque le montant des
+  // frais est vide dans ce cas.
+  //
+  // L'administration croyait avoir ferme une zone : elle etait ouverte et sans
+  // frais. C'est l'application Flutter qui a revele le trou.
+  if(fraisInfo && fraisInfo.bloque) {
+    toast('⛔ La publication de trajets est fermée au départ de cette préfecture.', true);
+    return;
+  }
+
   // Vérifier le solde si client
   if(DB.user && DB.user.role === 'client') {
     const cl = DB.clients.find(x => x.id === DB.user.id);
@@ -18736,6 +18750,14 @@ async function _publierTrajetDefinitif() {
   const pl=parseInt(document.getElementById('tr-places').value)||1;
   const prix=parseInt(document.getElementById('tr-prix').value)||0;
   const fraisInfo = calculerFraisTrajet(pref, prix);
+
+  // v9.633 — le meme verrou ici : c'est le SECOND chemin de publication, et il
+  // ne passe pas toujours par « saveTrajet ». Ne corriger que l'un des deux
+  // laisserait la porte ouverte.
+  if(fraisInfo && fraisInfo.bloque) {
+    toast('⛔ La publication de trajets est fermée au départ de cette préfecture.', true);
+    return;
+  }
 
   // 🔧 FIX: Si c'est un CLIENT qui crée le trajet, utiliser son tel
   if(DB.user && DB.user.role==='client') {
@@ -19952,17 +19974,38 @@ function publierAvisCourse() {
     created_at: new Date().toISOString()
   };
   
-  supabaseClient.from('avis_courses').insert({
-    id: _nvAvis.id, course_id: _nvAvis.courseId, passager_id: DB.user.id, 
-    taxi_id: _nvAvis.taxiId || null, // v9.360 : lien direct et sans ambiguite avec le taxi
-    taxi_nom: _nvAvis.taxiNom, tel: _nvAvis.tel, note: _nvAvis.note,
-    comment: _nvAvis.comment, created_at: _nvAvis.created_at
+  // ══ v9.633 — C'EST LE SERVEUR QUI ACCEPTE OU REFUSE L'AVIS ══
+  //
+  // L'avis s'ecrivait DIRECTEMENT dans la table, avec pour seuls controles une
+  // note entre 1 et 5 et un telephone rempli. Rien n'empechait donc de noter
+  // deux fois la meme course, ni de noter une course qui n'est pas la sienne,
+  // ni une course non terminee.
+  //
+  // Or c'est sur ces notes que les passagers choisissent leur chauffeur : une
+  // note falsifiee coute des courses a quelqu'un, ou en donne a un autre.
+  //
+  // « noter_course » existe depuis longtemps sur le serveur et refuse tout
+  // cela. Le site ne l'appelait simplement jamais — c'est l'application Flutter
+  // qui a montre la difference.
+  supabaseClient.rpc('noter_course', {
+    p_passager_id: DB.user.id,
+    p_course_id: _nvAvis.courseId,
+    p_note: _nvAvis.note,
+    p_commentaire: _nvAvis.comment
   }).then(({data, error}) => {
-    if(error) { 
-      console.error('Avis course erreur:', error.message); 
-      err.textContent='⚠️ Erreur avis: ' + error.message; 
-      err.style.display='block'; 
-      return; 
+    const refus = (data && data.ok === false) ? data : null;
+    if(error || refus) {
+      const raison = refus ? (refus.raison || '') : '';
+      const message =
+        raison === 'deja_note'            ? '⚠️ Vous avez déjà donné votre avis sur cette course.' :
+        raison === 'course_non_terminee'  ? '⚠️ On ne note qu\'une course terminée.' :
+        raison === 'course_autre'         ? '⚠️ Cette course n\'est pas la vôtre.' :
+        raison === 'note_invalide'        ? '⚠️ Sélectionnez une note de 1 à 5 étoiles.' :
+        ('⚠️ Avis refusé : ' + (raison || (error && error.message) || 'réessayez'));
+      console.error('Avis course refuse:', raison || (error && error.message));
+      err.textContent = message;
+      err.style.display = 'block';
+      return;
     }
     DB.avisCourses = DB.avisCourses || [];
     DB.avisCourses.push(_nvAvis);
