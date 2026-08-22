@@ -2623,6 +2623,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <button class="btn-ghost" onclick="setGestTab('listeNoire')" id="gt-listeNoire" style="font-size:12px;padding:7px 11px">🚫 Liste noire</button>
     <!-- v9.618 : ouvrir ou fermer chaque service, et tout d'un coup. -->
     <button class="btn-ghost" onclick="setGestTab('services')" id="gt-services" style="font-size:12px;padding:7px 11px">🔌 Services</button>
+    <!--
+      v9.630 : LE DIAGNOSTIC DU SERVEUR, repris de l'application Flutter.
+      Le panneau cache (trois appuis sur le numero de version) montre l'etat de
+      l'APPAREIL. Celui-ci montre l'etat du SERVEUR : il appelle chaque fonction
+      une par une et nomme le fichier SQL a executer quand il en manque une.
+    -->
+    <button class="btn-ghost" onclick="setGestTab('diagnostic')" id="gt-diagnostic" style="font-size:12px;padding:7px 11px">🩺 Diagnostic</button>
   </div>
   <input type="text" id="gest-q" placeholder="Rechercher..." style="margin-bottom:11px" oninput="rGestion()"/>
   <div id="gestion-content"></div>
@@ -21329,7 +21336,7 @@ function majCommissionTaxi() {
 
 function setGestTab(t) {
   gestTab = t;
-  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','promotions','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression','services'].forEach(x=>{
+  ['agents','vehs','taxis','vtc','clients','sas','trajets','annonces','alertes','mdp','zones','promotions','avis','passagers','courses','bilan','tresorerie','transferts','historique-complet','recherche-unifiee','validation','corbeille','journal','securite','suppression','services','diagnostic'].forEach(x=>{
     const b=document.getElementById('gt-'+x);
     if(b){b.className=x===t?'btn':'btn-ghost';b.style.fontSize='12px';b.style.padding='7px 11px';}
   });
@@ -21375,6 +21382,146 @@ function _promoRefus(r) {
   if (raison === 'introuvable') { toast('⛔ Cette promotion n\'existe plus.', true); return; }
   if (raison === 'personne_a_ajouter') { toast('⛔ Aucun numéro valable dans la liste.', true); return; }
   toast('⛔ Refusé par le serveur' + (raison ? ' (' + raison + ')' : '') + '.', true);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// v9.630 — LE DIAGNOSTIC DU SERVEUR
+//
+// La meme liste que l'application Flutter, aux memes noms de parametres. Quand
+// une fonction manque, le fichier SQL a executer est nomme a l'ecran : plus
+// besoin de deviner lequel, ni de tout rejouer « au cas ou ».
+//
+// A ne pas confondre avec le panneau cache (trois appuis sur le numero de
+// version) : celui-la montre l'etat de L'APPAREIL, celui-ci l'etat du SERVEUR.
+// ══════════════════════════════════════════════════════════════════════════
+const DIAG_FONCTIONS = [
+  ['verifier_connexion', 'Connexion agent et administration', 'CONNEXION-admin-serveur.sql'],
+  ['enregistrer_vehicule', 'Enregistrer un véhicule (les 6 photos)', 'SECURITE-7-enregistrer-vehicule-v3.sql'],
+  ['declarer_vol', 'Déclarer un vol · véhicule retrouvé', 'SECURITE-2-registre-vol.sql'],
+  ['regler_config', 'Zones, Tarifs, Services, Sécurité', 'SECURITE-5-reglages-admin.sql'],
+  ['frais_trajet', 'Frais de publication par zone', 'SECURITE-4-publier-trajet.sql'],
+  ['publier_trajet', 'Publier un trajet Voyager', 'trajets-v2-sieges.sql'],
+  ['reserver_trajet', 'Réserver une place (plan des sièges)', 'trajets-v2-sieges.sql'],
+  ['annuler_reservation', 'Annuler sa réservation · 3 abandons', 'annuler-reservation.sql'],
+  ['publier_annonce', 'Vendre — publier une annonce', 'publier_annonce.sql'],
+  ['noter_course', 'Laisser un avis après une course', 'noter-course.sql'],
+  ['devenir_taxi', 'Transformer un véhicule en taxi / VTC', 'devenir-taxi.sql'],
+  ['lever_suspension', 'Lever une suspension', 'lever-suspension.sql'],
+  ['mettre_a_jour_enregistrement', 'Mettre à jour un enregistrement', 'mettre-a-jour-enregistrement.sql'],
+  ['valider_enregistrement', 'Valider un enregistrement', 'validation-corbeille.sql'],
+  ['restaurer_corbeille', 'Restaurer depuis la corbeille', 'validation-corbeille.sql'],
+  ['supprimer_vers_corbeille', 'Supprimer vers la corbeille', 'registre-modifier.sql'],
+  ['modifier_vehicule', 'Corriger une fiche véhicule', 'registre-modifier.sql'],
+  ['suspendre_vehicule', 'Suspendre un véhicule', 'registre-modifier.sql'],
+  ['suspendre_taxi', 'Suspendre un taxi', 'registre-modifier.sql'],
+  ['suspendre_client', 'Suspendre un compte client', 'registre-modifier.sql'],
+  ['changer_mdp_compte', 'Redonner un mot de passe', 'changer-mdp-compte.sql'],
+  ['debloquer_reservation', 'Débloquer de la liste noire', 'debloquer-reservation.sql'],
+  ['affaires_agent', 'Les litiges', 'dossier-litige.sql'],
+  ['annuler_course', 'Annuler une course · remboursement', 'REMBOURSEMENT-serveur-v3.sql'],
+  ['demarrer_course', 'Démarrer avec le code à 4 chiffres', 'COURSE-code-rendu-obligatoire.sql'],
+  ['ouvrir_session_personnel', 'Session unique du personnel', 'CONNEXION-admin-serveur.sql'],
+  ['regler_rayon_taxi', 'Périmètre de travail du chauffeur', 'déjà en place'],
+  ['liberer_chauffeurs_fantomes', 'Sortir du service un chauffeur muet', 'SUSPENDU-hors-service-immediat.sql'],
+  ['tresorerie', 'La trésorerie', 'déjà en place'],
+];
+
+const ID_VIDE = '00000000-0000-0000-0000-000000000000';
+
+// Les VRAIS noms de parametres. C'est ce qui rend le test fiable : appelee sans
+// parametres, une fonction qui existe repond exactement comme une fonction qui
+// n'existe pas — impossible alors de les distinguer.
+function diagParams(nom) {
+  switch (nom) {
+    case 'verifier_connexion': return { p_role:'agent', p_identifiant:'', p_mot_de_passe:'' };
+    case 'ouvrir_session_personnel': return { p_role:'agent', p_identifiant:'', p_mot_de_passe:'' };
+    case 'enregistrer_vehicule': return { p_agent_num:'', p_mot_de_passe:'', p_donnees:{} };
+    case 'declarer_vol': return { p_terme:'', p_preuve:'', p_avec_crime:false, p_type_crime:'', p_ville:'' };
+    case 'regler_config': return { p_identifiant:'', p_mot_de_passe:'', p_reglages:{} };
+    case 'frais_trajet': return { p_pref:'Conakry', p_prix:0 };
+    case 'publier_trajet': case 'publier_annonce': case 'devenir_taxi':
+      return { p_client_num:'', p_mot_de_passe:'', p_donnees:{} };
+    case 'reserver_trajet': return { p_trajet_id:ID_VIDE, p_prenom:'', p_nom:'', p_tel:'' };
+    case 'annuler_reservation': return { p_trajet_id:ID_VIDE, p_tel:'', p_code:'' };
+    case 'noter_course': return { p_passager_id:'', p_course_id:'', p_note:5, p_commentaire:'' };
+    case 'lever_suspension': case 'valider_enregistrement': case 'mettre_a_jour_enregistrement':
+      return { p_num:'', p_mot_de_passe:'', p_cible_type:'vehicule', p_cible_id:ID_VIDE };
+    case 'restaurer_corbeille': case 'debloquer_reservation':
+      return { p_num:'', p_mot_de_passe:'', p_id:'' };
+    case 'supprimer_vers_corbeille':
+      return { p_num:'', p_mot_de_passe:'', p_table:'vehicules', p_id:'', p_label:'' };
+    case 'modifier_vehicule':
+      return { p_num:'', p_mot_de_passe:'', p_vehicule_id:ID_VIDE, p_donnees:{} };
+    case 'suspendre_vehicule': return { p_num:'', p_mot_de_passe:'', p_vehicule_id:ID_VIDE, p_suspendre:true };
+    case 'suspendre_taxi': return { p_num:'', p_mot_de_passe:'', p_taxi_id:ID_VIDE, p_suspendre:true };
+    case 'suspendre_client': return { p_num:'', p_mot_de_passe:'', p_client_id:ID_VIDE, p_suspendre:true };
+    case 'changer_mdp_compte':
+      return { p_num:'', p_mot_de_passe:'', p_cible_type:'client', p_cible_id:ID_VIDE, p_nouveau:'xxxxxx' };
+    case 'affaires_agent': return { p_agent_id:null, p_role:'admin' };
+    case 'annuler_course': return { p_course_id:ID_VIDE, p_par:'passager', p_motif:'' };
+    case 'demarrer_course': return { p_course_id:ID_VIDE, p_taxi_id:ID_VIDE, p_pin:'0000' };
+    case 'regler_rayon_taxi': return { p_taxi_id:ID_VIDE, p_rayon:5 };
+    default: return {};
+  }
+}
+
+async function rDiagnostic() {
+  const zone = _el('diag-zone');
+  if (!zone) return;
+  zone.innerHTML =
+    '<div class="card" style="margin-bottom:10px">' +
+      '<div style="font-weight:900;font-size:15px;margin-bottom:4px">🩺 Diagnostic du serveur</div>' +
+      '<div style="font-size:12px;color:var(--text2)">' +
+        'Chaque fonction est appelée à vide. Rien n\'est créé, rien n\'est modifié — ' +
+        'le test peut se relancer autant de fois que nécessaire.' +
+      '</div>' +
+      '<button class="btn" style="margin-top:10px" onclick="rDiagnosticLancer()">Lancer le test</button>' +
+    '</div>' +
+    '<div id="diag-res"></div>';
+}
+
+async function rDiagnosticLancer() {
+  const res = _el('diag-res');
+  if (!res) return;
+  const total = DIAG_FONCTIONS.length;
+  let faites = 0, manquantes = 0;
+  let lignes = '';
+  res.innerHTML = '<div class="qr-note-txt">Test en cours…</div>';
+
+  for (const f of DIAG_FONCTIONS) {
+    const nom = f[0], titre = f[1], fichier = f[2];
+    let presente = true;
+    try {
+      const r = await supabaseClient.rpc(nom, diagParams(nom));
+      // PGRST202 : aucune fonction de ce nom avec ces parametres.
+      if (r && r.error && r.error.code === 'PGRST202') presente = false;
+    } catch (e) {
+      presente = !(String(e && e.message || e).indexOf('PGRST202') >= 0);
+    }
+    faites++;
+    if (!presente) manquantes++;
+    lignes +=
+      '<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+        '<div style="width:18px;flex-shrink:0">' + (presente ? '✅' : '❌') + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:700">' + titre + '</div>' +
+          '<div style="font-size:11px;color:var(--text2);font-family:monospace">' + nom + '</div>' +
+          (presente ? '' :
+            '<div style="font-size:11px;color:#F59E0B;margin-top:2px">→ à exécuter dans Supabase : <b>' + fichier + '</b></div>') +
+        '</div>' +
+      '</div>';
+    res.innerHTML =
+      '<div class="card" style="margin-bottom:10px;border-left:3px solid ' +
+        (manquantes ? '#F59E0B' : '#22C55E') + '">' +
+        '<div style="font-weight:900;font-size:14px">' +
+          (faites < total ? '⏳ ' + faites + ' / ' + total + ' vérifiées…'
+            : (manquantes === 0
+                ? '✅ Tout est en place — le serveur est complet.'
+                : '⚠️ ' + manquantes + ' fonction(s) manquante(s) sur ' + total + '.')) +
+        '</div>' +
+      '</div>' +
+      '<div class="card">' + lignes + '</div>';
+  }
 }
 
 async function rPromotions() {
@@ -22387,6 +22534,22 @@ function rGestion() {
         'Un service fermé refuse les nouvelles demandes avec un message clair, et empêche les chauffeurs ' +
         'concernés de passer en service. Rien n\'est supprimé : rouvrir remet tout en marche instantanément.' +
       '</div>';
+
+  } else if(gestTab==='diagnostic') {
+    // v9.630 — LE DIAGNOSTIC DU SERVEUR (repris de l'application Flutter).
+    //
+    // Il appelle chaque fonction serveur avec ses vrais noms de parametres et
+    // des valeurs vides. Deux reponses possibles :
+    //
+    //   • erreur « PGRST202 » — aucune fonction de ce nom avec ces parametres :
+    //     elle MANQUE, et le fichier SQL a executer est nomme a l'ecran.
+    //   • toute autre erreur — la fonction existe et a simplement refuse nos
+    //     valeurs vides. C'est exactement ce qu'on cherche.
+    //
+    // Rien n'est modifie : les valeurs sont vides ou impossibles (identifiant
+    // vide, identifiant tout a zero). Le test peut se relancer sans risque.
+    html = '<div id="diag-zone"><div class="qr-note-txt">Préparation…</div></div>';
+    setTimeout(function(){ try{ rDiagnostic(); }catch(e){} }, 0);
 
   } else if(gestTab==='promotions') {
     // Le contenu se remplit tout seul : il vient du serveur.
