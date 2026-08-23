@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.633';
+window.AFRIMOTO_VERSION = 'v9.634';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1259,8 +1259,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         } catch(e) { console.warn('Reset link error:', e); toast('⚠️ Lien invalide. Faites une nouvelle demande.', true); }
       }
 
-      // Suspension automatique des enregistrements non renouvelés
-      try { verifierMisesAJour(); } catch(e) { console.warn('verifierMisesAJour:', e && e.message); }
+      // ⚠️ v9.634 — LA SUSPENSION AUTOMATIQUE A ÉTÉ DÉPLACÉE PLUS BAS.
+      // Elle s'exécutait ICI, 24 lignes AVANT appliquerConfigAdmin : elle jugeait
+      // donc sur les valeurs écrites en dur dans ce fichier (tarifsMaj {taxi:25000},
+      // renouvellement {moto:'anniversaire'}), pas sur ce que dit la base.
+      // Concrètement : le garde-fou « prix à zéro, on ne suspend personne » lisait
+      // 25 000 GNF au lieu du 0 réel, et aurait recoupé les taxis quand même.
 
       // Traitement QR code scanné depuis l'extérieur (après chargement DB)
       if(window._pendingQR) {
@@ -1274,17 +1278,41 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(tx) setTimeout(() => afficherFichePubliqueTaxi(tx), 300);
       }
 
-      // Synchroniser les catégories locales vers la table 'categories' de Supabase
-      // (sinon la clé étrangère vehicules.cat_id rejette les catégories inconnues
-      // et la catégorie du véhicule est perdue à l'enregistrement)
+      // Config admin (tarifs, commissions, bandeau, etc.)
+      if(configRows && configRows.length > 0) appliquerConfigAdmin(configRows[0]);
+
+      // ⚠️ v9.634 — CE BLOC ÉTAIT AU-DESSUS, DONC AVANT appliquerConfigAdmin.
+      // Il recopiait dans la table `categories` les prix ÉCRITS EN DUR dans ce
+      // fichier (50 000 / 75 000 / 100 000), à chaque ouverture de page, en
+      // écrasant ce que l'administration avait réglé — un upsert onConflict:'id'
+      // remplace `nom` et `prix`. Tout changement de tarif était donc annulé au
+      // rechargement suivant. Il vient maintenant APRÈS : il recopie ce que dit
+      // vraiment config_admin.
+      //
+      // ⚠️ ET SURTOUT : CE BLOC NE SERT PAS À CE QU'IL CROIT.
+      // La clé étrangère `vehicules_cat_id_fkey` interroge la table `tarifs`,
+      // PAS `categories`. `tarifs` est restée vide depuis le premier jour —
+      // c'est pour cela que la base refusait toute catégorie de véhicule, et
+      // que les 31 fiches du registre n'en avaient aucune.
+      //
+      // On ne peut pas la remplir d'ici : `tarifs` est protégée par une règle
+      // de sécurité qui refuse toute écriture anonyme (testé le 23/08 :
+      // « new row violates row-level security policy for table "tarifs" »).
+      // C'est une bonne chose — sinon n'importe quel visiteur changerait vos
+      // prix. Elle se remplit donc par SQL, ce qui a été fait le 23/08.
+      //
+      // ⚠️ CONSÉQUENCE À CONNAÎTRE : une catégorie créée depuis l'écran Tarifs
+      // n'arrivera pas dans `tarifs`, donc aucun véhicule ne pourra la porter,
+      // tant qu'elle n'y est pas ajoutée par SQL.
       try {
         for(const t of (DB.tarifs || [])) {
           sbUpsertSouple('categories', { id: t.id, nom: t.label || '', prix: t.prix || 0 }, { nom: 'label' });
         }
       } catch(e) { console.warn('sync categories:', e && e.message); }
 
-      // Config admin (tarifs, commissions, bandeau, etc.)
-      if(configRows && configRows.length > 0) appliquerConfigAdmin(configRows[0]);
+      // La suspension automatique JUGE MAINTENANT SUR LA CONFIG RÉELLE, pas sur
+      // les valeurs par défaut de ce fichier.
+      try { verifierMisesAJour(); } catch(e) { console.warn('verifierMisesAJour:', e && e.message); }
 
 
     } catch(e) {
@@ -1404,7 +1432,15 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       owner:r.proprietaire||r.owner||'', phone:r.telephone||r.phone||'',
       addr:r.adresse||r.addr||'', secours:r.contact_secours||r.secours||'',
       lienSecours:r.lien_secours||r.lienSecours||'', color:r.couleur||r.color||'',
-      annee:r.annee||'', catId:r.categorie_id||r.catId||'',
+      // ⚠️ v9.634 — LA COLONNE S'APPELLE `cat_id`, PAS `categorie_id`.
+      // Elle n'était lue nulle part : `catId` valait la chaîne vide pour les
+      // 31 véhicules du registre. Conséquences en chaîne : prixMajDe() rendait
+      // 0 (donc renouvellement gratuit à vie), la fiche n'affichait aucune
+      // catégorie, et la sauvegarde renvoyait null — ce qui EFFAÇAIT la
+      // catégorie en base à chaque enregistrement, y compris quand le
+      // propriétaire venait de PAYER son renouvellement.
+      // C'est la vraie cause du registre sans catégories, pas la clé étrangère.
+      annee:r.annee||'', catId:r.cat_id||r.categorie_id||r.catId||'',
       statut:r.statut||'actif', stolen:r.vole||r.stolen||r.statut==='vole'||false,
       code:r.code||'', clientId:r.client_id||r.clientId||null,
       agentId:r.agent_id||r.agentId||null,
@@ -15670,7 +15706,12 @@ async function saveMoto() {
       err.textContent='⚠️ Solde insuffisant ('+fmt(ag?ag.solde:0)+' disponible, '+fmt(debit)+' requis).'; err.style.display='block'; return;
     }
     ag.solde -= debit;
-    logMvt('enreg','Enregistrement '+curVehType+' '+mat+' — débit '+fmt(debit),debit,ag.name,'Admin');
+    // v9.634 — la part société allait « vers : Admin ». Elle sortait du solde de
+    // l'agent et n'arrivait comptablement nulle part : c'est la plus grosse
+    // recette du système (90 % du prix d'enregistrement) et elle n'apparaissait
+    // dans aucun total. Même étiquette que les commissions de course, pour
+    // qu'un seul filtre les compte toutes.
+    logMvt('enreg','🏍️ Enregistrement '+curVehType+' '+mat+' — part société',debit,ag.name,'Société (enregistrement)');
   } else if(agId && tf && isAdmin()) {
     logMvt('enreg','Enregistrement '+curVehType+' '+mat+' — Admin direct (exempté de débit)',0,'Administrateur','Système');
   }
@@ -18407,7 +18448,7 @@ function saveTaxi() {
     }
     if(ag && debit > 0) {
       ag.solde -= debit;
-      logMvt('enreg','Enregistrement taxi '+plaque.toUpperCase()+' — débit '+fmt(debit),debit,ag.name,'Admin');
+      logMvt('enreg','🛵 Enregistrement taxi '+plaque.toUpperCase()+' — part société',debit,ag.name,'Société (enregistrement)');
     }
   }
 
@@ -23794,37 +23835,137 @@ function echeanceMaj(x, estTaxi) {
   e.setMonth(e.getMonth() + periodeMoisMaj(estTaxi));
   return e;
 }
+// ══ v9.634 — ON NE COUPE PERSONNE POUR UNE DETTE DE ZÉRO ══
+// Cette fonction tourne à CHAQUE ouverture du site. Elle comparait la date et
+// elle suspendait. Elle ne regardait jamais le prix.
+// Relevé dans la base le 23/08/2026 : 11 taxis sur 20 coupés, 8 comptes clients
+// bloqués — pour un renouvellement affiché à 0 franc. Aucun revenu d'un côté,
+// la moitié des chauffeurs à l'arrêt de l'autre.
+// Trois règles maintenant :
+//   1. Prix à zéro = rien à devoir. On ne suspend pas, et on relâche.
+//   2. Un délai de grâce après l'échéance, réglé par l'administration (7 jours
+//      par défaut) : un retard de deux jours n'est pas une fraude.
+//   3. Le compte client entier ne tombe que 72 h APRÈS ce délai — c'est la
+//      sanction la plus lourde, elle vient en dernier.
+// Inchangé : un véhicule volé, non validé, ou suspendu à la main n'est pas
+// concerné. Cette fonction ne relâche QUE ce qu'elle a elle-même suspendu.
+function joursDeGraceMaj() {
+  const g = Number((DB.renouvellement || {}).grace);
+  return (isFinite(g) && g >= 0) ? g : 7;
+}
+function coupureMaj(x, estTaxi) {
+  const e = echeanceMaj(x, estTaxi);
+  if(!e) return null;
+  const c = new Date(e);
+  c.setDate(c.getDate() + joursDeGraceMaj());
+  return c;
+}
+// « Assez en retard pour que le COMPTE ENTIER du propriétaire tombe » : 72 h
+// après la fin du délai de grâce. Un seul calcul, utilisé par verifierMisesAJour
+// et par appliquerMaj — deux calculs différents rouvriraient un compte que la
+// vérification suivante refermerait aussitôt.
+// Un taxi est « volé » quand SON VÉHICULE l'est. Un seul endroit qui le dit,
+// pour que la règle ne puisse pas diverger entre deux écrans.
+function estVoleParSonVehicule(t) {
+  if(!t || !t.motoId) return false;
+  const v = (DB.vehs||[]).find(x => x.id === t.motoId);
+  return !!v && (v.stolen === true || v.statut === 'vole');
+}
+function enRetardLourd(v) {
+  if(!v || v.valide === false || v.stolen || v.statut === 'vole') return false;
+  if(prixMajDe(v, false) <= 0) return false;
+  const c = coupureMaj(v, false);
+  return !!c && (new Date() - c) > 72*3600*1000;
+}
 function verifierMisesAJour() {
+  // ══ v9.634 — ON NE JUGE PAS SUR UN DOSSIER INCOMPLET ══
+  //
+  // Incident du 23/08, reproduit puis corrigé : sur une page ouverte par un
+  // simple visiteur, le registre des véhicules n'est PAS chargé (DB.vehs vaut
+  // 0) alors que les taxis le sont. Cette fonction tournait quand même — et
+  // comme le vol d'un taxi se lit sur son véhicule, elle ne pouvait pas le
+  // voir. Résultat : DEUX TAXIS DONT LA MOTO EST DÉCLARÉE VOLÉE ont été remis
+  // en service, par une page que personne n'avait ouverte en administration.
+  //
+  // Suspendre ou relâcher quelqu'un est une décision. On ne la prend pas avec
+  // la moitié du dossier.
+  //
+  // DEUX CONDITIONS, et il faut les deux :
+  //   • du personnel — un PROPRIÉTAIRE connecté ne reçoit que SES véhicules
+  //     (chargement, ligne 1006), donc lui aussi jugerait sur un registre
+  //     incomplet, sans même que la liste soit vide ;
+  //   • un registre effectivement arrivé.
+  if(!(isAgent() || isSA())) return;
+  if(!(DB.vehs || []).length) return;
+
   let nb = 0;
+  const relacherVeh = v => {
+    if(v.statut === 'suspendu' && v.suspenduAuto) { v.statut = 'actif'; v.suspenduAuto = false; sbSaveVehicule(v); nb++; }
+  };
+  const relacherTaxi = t => {
+    if(t.statut === 'suspendu' && t.suspenduAuto) { t.statut = 'actif'; t.suspenduAuto = false; sbSaveTaxi(t); nb++; }
+  };
+  // Un véhicule ne peut pas décider seul du sort du compte : le propriétaire
+  // peut en avoir plusieurs, et un seul suffit à le maintenir bloqué. On relit
+  // donc TOUS ses véhicules — avec le même calcul que la boucle ci-dessous,
+  // jamais un second.
+  const relacherClient = id => {
+    const cl = (DB.clients||[]).find(c => c.id === id);
+    if(!cl || !cl.suspendu || !cl.suspenduAutoMaj) return;
+    const encoreEnRetard = (DB.vehs||[]).some(v2 => v2.clientId === id && enRetardLourd(v2));
+    if(encoreEnRetard) return;
+    cl.suspendu = false; cl.suspenduAutoMaj = false; sbSaveClient(cl);
+  };
   (DB.vehs||[]).forEach(v => {
     if(v.valide === false || v.stolen || v.statut === 'vole') return;
-    const e = echeanceMaj(v, false); if(!e) return;
+    // Rien à payer : personne ne peut être en retard. On relâche et on sort.
+    if(prixMajDe(v, false) <= 0) { relacherVeh(v); if(v.clientId) relacherClient(v.clientId); return; }
+    const e = coupureMaj(v, false); if(!e) return;
     const retard = new Date() > e;
+    if(!retard) { relacherVeh(v); if(v.clientId) relacherClient(v.clientId); return; }
     if(retard && v.statut !== 'suspendu') { v.statut = 'suspendu'; v.suspenduAuto = true; sbSaveVehicule(v); nb++; }
-    // 72h après l'échéance sans paiement : le compte client lié est suspendu partout
-    if(retard && (new Date() - e) > 72*3600*1000 && v.clientId) {
-      const clMaj = DB.clients.find(c => c.id === v.clientId);
+    // 72h après la fin du délai de grâce : le compte client lié est suspendu partout
+    if(enRetardLourd(v) && v.clientId) {
+      const clMaj = (DB.clients||[]).find(c => c.id === v.clientId);
       if(clMaj && !clMaj.suspendu) {
         clMaj.suspendu = true; clMaj.suspenduAutoMaj = true;
         sbSaveClient(clMaj);
         logMvt('enreg', '⏸️ Compte client suspendu automatiquement (mise à jour non payée +72h) — ' + (clMaj.prenom||'') + ' ' + (clMaj.nom||''), 0, 'Système', clMaj.prenom + ' ' + clMaj.nom);
       }
     }
-    else if(!retard && v.statut === 'suspendu' && v.suspenduAuto) { v.statut = 'actif'; v.suspenduAuto = false; sbSaveVehicule(v); nb++; }
   });
   (DB.taxis||[]).forEach(t => {
     if(t.valide === false || t.statut === 'vole') return;
-    const e = echeanceMaj(t, true); if(!e) return;
+    // ⚠️ v9.634 — LE VOL N'EST PAS ÉCRIT SUR LA FICHE DU TAXI.
+    // Une fiche taxi n'a pas de colonne « volé » : le vol vit sur le VÉHICULE,
+    // qu'on retrouve par motoId. Sans cette ligne, un taxi suspendu dont la
+    // moto est déclarée volée serait remis en service par la règle « prix à
+    // zéro, on ne suspend personne » — une moto volée reprenant des courses
+    // sous la protection d'AfriMoto. Vos deux cas au 23/08 : 1311AS et 1113BP.
+    if(estVoleParSonVehicule(t)) return;
+    if(prixMajDe(t, true) <= 0) { relacherTaxi(t); return; }
+    const e = coupureMaj(t, true); if(!e) return;
     const retard = new Date() > e;
     if(retard && t.statut !== 'suspendu') { t.statut = 'suspendu'; t.suspenduAuto = true; sbSaveTaxi(t); nb++; }
-    else if(!retard && t.statut === 'suspendu' && t.suspenduAuto) { t.statut = 'actif'; t.suspenduAuto = false; sbSaveTaxi(t); nb++; }
+    else if(!retard) relacherTaxi(t);
   });
 }
+// v9.634 — PRÉVENIR AVANT DE COUPER.
+// La ligne disait « EN RETARD » le jour même, et le propriétaire l'apprenait en
+// se retrouvant suspendu. Elle annonce maintenant la date, puis le compte à
+// rebours, puis la date de coupure — dans cet ordre, avant la sanction.
 function infoMajHtml(x, estTaxi) {
   const e = echeanceMaj(x, estTaxi);
   if(!e) return '';
-  const retard = new Date() > e;
-  return '<div style="font-size:10px;color:' + (retard ? '#EF4444;font-weight:800' : 'var(--text2)') + '">🔄 Prochaine mise à jour : ' + e.toLocaleDateString('fr-FR') + (retard ? ' — EN RETARD' : '') + '</div>';
+  if(prixMajDe(x, estTaxi) <= 0)
+    return '<div style="font-size:10px;color:var(--text2)">🔄 Mise à jour : gratuite — rien à payer</div>';
+  const c = coupureMaj(x, estTaxi);
+  const jours = Math.ceil((e - new Date()) / 86400000);
+  let couleur = 'var(--text2)', suite = '';
+  if(new Date() > c) { couleur = '#EF4444;font-weight:800'; suite = ' — EN RETARD, SUSPENDU'; }
+  else if(new Date() > e) { couleur = '#EF4444;font-weight:800'; suite = ' — À PAYER avant le ' + c.toLocaleDateString('fr-FR') + ', sinon suspension'; }
+  else if(jours <= 7) { couleur = '#F59E0B;font-weight:800'; suite = ' — dans ' + jours + ' jour' + (jours>1?'s':''); }
+  return '<div style="font-size:10px;color:' + couleur + '">🔄 Prochaine mise à jour : ' + e.toLocaleDateString('fr-FR') + suite + '</div>';
 }
 function appliquerMaj(x, estTaxi, prix, par) {
   x.derniereMaj = new Date().toISOString();
@@ -23835,10 +23976,8 @@ function appliquerMaj(x, estTaxi, prix, par) {
   if(!estTaxi && x.clientId) {
     const clR = DB.clients.find(c => c.id === x.clientId);
     if(clR && clR.suspendu && clR.suspenduAutoMaj) {
-      const autreRetard = DB.vehs.some(v2 => v2.id !== x.id && v2.clientId === clR.id && (() => {
-        const e2 = echeanceMaj(v2, false);
-        return e2 && (new Date() - e2) > 72*3600*1000;
-      })());
+      // v9.634 — le même calcul que dans verifierMisesAJour, pas une copie.
+      const autreRetard = DB.vehs.some(v2 => v2.id !== x.id && v2.clientId === clR.id && enRetardLourd(v2));
       if(!autreRetard) {
         clR.suspendu = false; clR.suspenduAutoMaj = false;
         sbSaveClient(clR);
@@ -24097,7 +24236,14 @@ async function majStaff(kind, id) {
     if(ag.solde < debit) { toast('⚠️ Solde insuffisant — ' + fmt(debit) + ' requis', true); return; }
   }
   askConfirm('Mettre à jour cet enregistrement ?\n\nPrix client (espèces) : ' + fmt(prix) + (debit ? '\nDébit de votre solde : ' + fmt(debit) : ''), () => {
-    if(ag && debit) { ag.solde -= debit; sbSaveAgent(ag); updateNav(); }
+    if(ag && debit) {
+      ag.solde -= debit; sbSaveAgent(ag); updateNav();
+      // v9.634 — ce débit n'était écrit NULLE PART : le solde de l'agent
+      // baissait sans laisser de trace, et la part société du renouvellement
+      // n'existait dans aucun total.
+      logMvt('enreg','🔄 Mise à jour ' + (estTaxi ? 'taxi ' + (x.plaque||'') : (x.mat||x.vin||'')) + ' — part société',
+             debit, ag.name, 'Société (enregistrement)');
+    }
     appliquerMaj(x, estTaxi, prix, ag ? ag.name : 'Admin');
     if(typeof rGestion === 'function') try { rGestion(); } catch(e) {}
     // v9.603 : la mise a jour vient de lever la suspension — l'ecran des suspendus doit
@@ -24227,6 +24373,15 @@ function staffMajFicheHtml(x, estTaxi) {
     (e ? '<div style="font-size:12px;margin-bottom:8px">Échéance : <b style="color:' + (new Date()>e?'#EF4444':'inherit') + '">' + e.toLocaleDateString('fr-FR') + '</b>' + (new Date()>e ? ' — <b style="color:#EF4444">EN RETARD</b>' : '') + '</div>' : '') +
     '<button class="btn" style="width:100%;padding:11px" onclick="majStaff(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Encaisser la mise à jour — ' + fmt(prixMajDe(x, estTaxi)) + '</button>' +
   '</div>';
+}
+// v9.634 — le délai de grâce vit dans `renouvellement`, à côté des périodes :
+// c'est le même réglage, il n'a pas à être rangé ailleurs.
+function majGraceMaj(val) {
+  DB.renouvellement = DB.renouvellement || {};
+  DB.renouvellement.grace = Math.max(0, parseInt(val) || 0);
+  sbSaveConfig();
+  toast('✅ Délai de grâce : ' + (DB.renouvellement.grace === 0 ? 'aucun, coupure le jour de l\'échéance' : DB.renouvellement.grace + ' jours après l\'échéance'));
+  verifierMisesAJour();
 }
 function majRenouvellementPeriode(type, val) {
   DB.renouvellement = DB.renouvellement || {};
@@ -24579,6 +24734,11 @@ async function toggleClient(id) {
   if(c.suspendu) {
     // RÉTABLIR le client
     c.suspendu = false;
+    // v9.634 — quand un HUMAIN tranche, le drapeau de la machine s'efface.
+    // Sans cela, `suspenduAutoMaj` restait vrai après une décision manuelle :
+    // le drapeau ne voulait plus rien dire, et une remise en service
+    // automatique pouvait blanchir une suspension décidée par vous.
+    c.suspenduAutoMaj = false;
     await sbSaveClient(c);
     toast('✅ Client rétabli');
     rGestion();
@@ -24588,6 +24748,10 @@ async function toggleClient(id) {
     // SUSPENDRE le client - appeler la fonction critique
     askConfirm('Suspendre ' + c.prenom + ' ' + c.nom + ' ?\n\nSes trajets actifs seront annulés et les passagers notifiés.', async () => {
       c.suspendu = true;
+      // v9.634 — c'est VOTRE décision, pas celle de la machine : le drapeau
+      // automatique s'efface, sinon la vérification des échéances relâcherait
+      // ce client dès que ses véhicules seraient à jour.
+      c.suspenduAutoMaj = false;
       await sbSaveClient(c);
       // 🔧 ANNULER TRAJETS + NOTIFIER
       await annulerTrajetsClientAvecNotif(id, 'suspension');
@@ -26820,7 +26984,7 @@ function rTarifs() {
     </div>
 
     <div class="sect">🔄 Mise à jour périodique des enregistrements</div>
-    <div class="info-gold" style="margin-bottom:10px">💡 Sans mise à jour payée avant l'échéance, la moto, la voiture ou le taxi passe automatiquement en statut SUSPENDU. Les périodes ci-dessous sont à votre choix. Le client paie depuis son espace (solde) ou en espèces chez un agent.</div>
+    <div class="info-gold" style="margin-bottom:10px">💡 Sans mise à jour payée avant l'échéance <b>et passé le délai de grâce</b>, la moto, la voiture ou le taxi passe automatiquement en statut SUSPENDU. Les périodes et le délai ci-dessous sont à votre choix. Le client paie depuis son espace (solde) ou en espèces chez un agent.<br><b>⚠️ Une catégorie dont le prix de mise à jour est à 0 ne suspend plus personne</b> — on ne coupe pas quelqu'un pour une dette qui n'existe pas.</div>
     <div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(249,115,22,.1)">
         <div style="font-weight:600;font-size:13px">Période motos / voitures</div>
@@ -26836,6 +27000,15 @@ function rTarifs() {
           <option value="mensuel" ${(DB.renouvellement||{}).taxi!=='6mois'&&(DB.renouvellement||{}).taxi!=='anniversaire'?'selected':''}>Tous les mois</option>
           <option value="6mois" ${(DB.renouvellement||{}).taxi==='6mois'?'selected':''}>Tous les 6 mois</option>
           <option value="anniversaire" ${(DB.renouvellement||{}).taxi==='anniversaire'?'selected':''}>Chaque anniversaire</option>
+        </select>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(249,115,22,.1)">
+        <div>
+          <div style="font-weight:600;font-size:13px">Délai de grâce après l'échéance</div>
+          <div style="font-size:10px;color:var(--text2)">Le temps de passer chez un agent avant d'être suspendu.</div>
+        </div>
+        <select style="width:190px;padding:8px 10px;font-size:13px" onchange="majGraceMaj(this.value)">
+          ${[0,3,7,15,30].map(j=>`<option value="${j}" ${joursDeGraceMaj()===j?'selected':''}>${j===0?'Aucun — coupure le jour même':j+' jours'}</option>`).join('')}
         </select>
       </div>
       <div style="font-weight:700;font-size:11px;margin-bottom:8px;color:var(--text2);letter-spacing:.5px">PRIX DE LA MISE À JOUR (GNF) — fixé par catégorie</div>
@@ -26893,7 +27066,12 @@ function addTarif() {
   DB.tarifs.push({id:gid(),label,prix});
   // Nouvelle catégorie → aussi dans la table 'categories' (clé étrangère des véhicules)
   const _nt = DB.tarifs[DB.tarifs.length - 1];
+  // ⚠️ v9.634 — cette table n'est pas celle que la clé étrangère des véhicules
+  // interroge : c'est `tarifs`, protégée en écriture (voir le commentaire au
+  // chargement). Une catégorie créée ici doit être ajoutée à `tarifs` par SQL,
+  // sinon aucun véhicule ne pourra la porter. Le message ci-dessous le dit.
   if(_nt) sbUpsertSouple('categories', { id: _nt.id, nom: _nt.label || '', prix: _nt.prix || 0 }, { nom: 'label' });
+  if(_nt) toast('⚠️ Catégorie créée. Elle ne pourra être attribuée à un véhicule qu\'une fois ajoutée à la table « tarifs » — demandez la mise à jour.', true);
   sbSaveConfig();
   toast('✅ Tarif ajouté !'); rTarifs();
 }
