@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.637';
+window.AFRIMOTO_VERSION = 'v9.638';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -24199,8 +24199,18 @@ async function rSuspendus() {
                  'onclick="majStaff(&#39;' + it.kind + '&#39;,&#39;' + it.id + '&#39;)">\uD83D\uDD04 Mettre \u00e0 jour' +
                  (prix ? ' \u00b7 ' + fmt(prix) : '') + '</button>';
     }
-    boutons += '<button class="btn-ghost" style="flex:1;padding:10px;font-size:12px;border-color:rgba(34,197,94,.5);color:#22C55E" ' +
-               'onclick="leverSuspension(&#39;' + it.kind + '&#39;,&#39;' + it.id + '&#39;)">\u2705 Lever la suspension</button>';
+    // \u2550\u2550 v9.638 \u2014 UN V\u00c9HICULE VOL\u00c9 NE SE \u00ab L\u00c8VE \u00bb PAS D'UN CLIC \u2550\u2550
+    // Le bouton s'affichait aussi sur les vol\u00e9s. Un clic, et la moto repassait \u00ab actif \u00bb :
+    // au registre public, elle redevenait \u00ab en r\u00e8gle, non vol\u00e9e \u00bb \u2014 le voleur pouvait la
+    // pr\u00e9senter au prochain contr\u00f4le. Un vol ne se l\u00e8ve que par le propri\u00e9taire, avec
+    // \u00ab Ma moto a \u00e9t\u00e9 retrouv\u00e9e \u00bb.
+    if(!vole) {
+      boutons += '<button class="btn-ghost" style="flex:1;padding:10px;font-size:12px;border-color:rgba(34,197,94,.5);color:#22C55E" ' +
+                 'onclick="leverSuspension(&#39;' + it.kind + '&#39;,&#39;' + it.id + '&#39;)">\u2705 Lever la suspension</button>';
+    } else {
+      boutons += '<div style="flex:1;font-size:11.5px;color:var(--text2);line-height:1.5">' +
+                 '\ud83d\udd12 Se l\u00e8ve seulement quand le propri\u00e9taire d\u00e9clare \u00ab Ma moto a \u00e9t\u00e9 retrouv\u00e9e \u00bb.</div>';
+    }
 
     return '<div class="card" style="margin-bottom:8px;border-left:3px solid ' + (auto && !vole ? '#EAB308' : '#EF4444') + '">' +
       '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">' + it.etiquette + '</div>' +
@@ -24240,6 +24250,21 @@ async function leverSuspension(kind, id) {
   const estTaxi = kind === 'taxi';
   const x = await _ficheSuspendue(kind, id);
   if(!x) { toast('Élément introuvable', true); return; }
+
+  // ══ v9.638 — JAMAIS SUR UN VÉHICULE VOLÉ ══
+  // Ni la fiche elle-même, ni le taxi d'une moto volée : lever sa suspension le remettrait
+  // au travail avec un véhicule que son propriétaire cherche encore.
+  let _vole = (x.statut === 'vole' || x.stolen === true);
+  if(!_vole && estTaxi && x.motoId) {
+    try {
+      const _moto = await _ficheSuspendue('veh', x.motoId);
+      _vole = !!(_moto && (_moto.statut === 'vole' || _moto.stolen === true));
+    } catch(e) {}
+  }
+  if(_vole) {
+    toast('⛔ Véhicule déclaré volé : la suspension ne se lève que lorsque le propriétaire déclare « Ma moto a été retrouvée ».', true);
+    return;
+  }
 
   // ══ LE CAS QU'IL NE FAUT PAS LAISSER PASSER ══
   // Une suspension automatique due a une mise a jour en retard ne se leve pas a la main :
