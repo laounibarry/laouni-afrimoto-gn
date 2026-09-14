@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.634';
+window.AFRIMOTO_VERSION = 'v9.637';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -6084,14 +6084,39 @@ const SEC = {
   },
 
   // Bloquer le clic droit et F12 (dissuasion — pas une vraie protection)
+  //
+  // ══ v9.637 — DEUX TROUS DANS UNE PORTE DEJA FERMEE ══
+  //
+  //  1. « Ctrl+U » — afficher le code source — passait toujours. La regle
+  //     testait la lettre « U » MAJUSCULE, alors qu'une touche pressee sans
+  //     Majuscule renvoie « u » minuscule. La porte etait fermee sur le papier
+  //     et grande ouverte en pratique. On compare desormais sans tenir compte
+  //     de la casse, et on ferme aussi Ctrl+S (enregistrer la page) et les
+  //     raccourcis de Firefox (Ctrl+Maj+K, Ctrl+Maj+E).
+  //
+  //  2. Le clic droit etait bloque PARTOUT, champs de saisie compris. Sur
+  //     telephone, l'appui long dans un champ EST le clic droit : le bloquer
+  //     empechait de COLLER. Quelqu'un qui recoit son code d'acces par SMS ne
+  //     pouvait plus le coller dans le formulaire — il devait le recopier a la
+  //     main, chiffre par chiffre. On protege la page, pas le clavier des gens.
   hardenUI() {
-    // Désactiver clic droit
+    // Désactiver clic droit — sauf là où l'on écrit.
     document.addEventListener('contextmenu', e => {
-      if(!DB.user || DB.user.role !== 'admin') e.preventDefault();
+      if(DB.user && DB.user.role === 'admin') return;
+      var c = e.target && e.target.closest
+        ? e.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+        : null;
+      if(c) return; // appui long dans un champ : couper / copier / coller restent possibles
+      e.preventDefault();
     });
-    // Bloquer F12, Ctrl+Shift+I/J/C/U
+    // Bloquer F12, Ctrl+Shift+I/J/C/K/E, Ctrl+U, Ctrl+S
     document.addEventListener('keydown', e => {
-      if(e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
+      var k = (e.key || '').toUpperCase();
+      var interdit =
+        k === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I','J','C','K','E'].includes(k)) ||
+        (e.ctrlKey && !e.shiftKey && (k === 'U' || k === 'S'));
+      if(interdit) {
         if(!DB.user || DB.user.role !== 'admin') {
           e.preventDefault();
           this.log('DEVTOOLS_ATTEMPT', 'Tentative ouverture DevTools', 'warn');
@@ -6675,7 +6700,20 @@ async function doLogin() {
       // suspendue pour une mise à jour non payée ne se règle pas comme une suspension
       // décidée par l'administration, ni comme un véhicule déclaré volé.
       // ══════════════════════════════════════════════════════════════════════
-      if(v.statut === 'suspendu' || v.statut === 'vole' || v.stolen) {
+      // ⚠️ 28/08 — LE VOL NE FERME PLUS CET ESPACE.
+      //
+      // Le proprietaire l'a tranche : « l'acces proprietaire peut etre bloque
+      // seulement si le vehicule concerne est suspendu ou supprime ».
+      //
+      // Un homme dont la moto vient d'etre volee est celui qui a le PLUS
+      // besoin de cet espace : c'est la qu'il voit qui a croise sa moto, ou,
+      // quand, et les photos envoyees par les citoyens. Le fermer, c'est
+      // eteindre la lumiere au moment ou on cherche.
+      //
+      // La branche « vole » ci-dessous reste en place mais devient
+      // inatteignable par ce chemin : on ne la supprime pas, pour ne rien
+      // casser ailleurs.
+      if(v.statut === 'suspendu') {
         console.log('🚫 BLOQUE: Véhicule', v.statut);
         let _titre, _raison, _etapes;
 
@@ -10882,12 +10920,26 @@ function rClient() {
       '<button onclick="openChangerMdp(\'client\',\'' + cl.id + '\')" style="width:100%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">🔑 Changer mon mot de passe</button>' +
     '</div>' +
 
-    // Alerte sonore réservations/annulations/courses (vibration toujours active)
-    '<div class="card" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">' +
-      '<div><div style="font-weight:700;font-size:13px">' + (sonReservationActif() ? '🔔' : '🔕') + ' Alerte sonore réservations & courses</div>' +
-      '<div style="font-size:11px;color:var(--text2);margin-top:2px">Nouvelles réservations, annulations, demandes de course. La vibration reste toujours active.</div></div>' +
+    // ══ v9.635 — ON NE PARLE PAS DE RÉSERVATIONS À QUI N'A QUE DES MOTOS ══
+    //
+    // Relevé le 24/08/2026 sur la fiche d'OUMOU SOW, qui possède deux motos
+    // taxi et rien d'autre : l'écran lui proposait de régler l'alerte sonore
+    // des « réservations », et lui annonçait « nouvelles réservations,
+    // annulations ». Or on ne réserve pas une place sur une moto : les
+    // réservations n'existent que pour les trajets Voyager, qui se publient
+    // avec une VOITURE.
+    //
+    // Le réglage reste — c'est le même interrupteur, et il commande bien le son
+    // des demandes de course, qui la concerne. Seuls les MOTS changent : on ne
+    // promet pas un service qu'elle ne peut pas avoir.
+    (function() {
+      var _peutTrajet = clientPeutProposerTrajet(cl);
+      return '<div class="card" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">' +
+      '<div><div style="font-weight:700;font-size:13px">' + (sonReservationActif() ? '🔔' : '🔕') + ' Alerte sonore ' + (_peutTrajet ? 'réservations & courses' : 'des demandes de course') + '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + (_peutTrajet ? 'Nouvelles réservations, annulations, demandes de course.' : 'Demandes de course qui vous sont proposées.') + ' La vibration reste toujours active.</div></div>' +
       '<button class="btn' + (sonReservationActif() ? '' : '-ghost') + '" style="padding:8px 14px;font-size:12px;flex-shrink:0" onclick="toggleSonReservation()">' + (sonReservationActif() ? 'ON' : 'OFF') + '</button>' +
-    '</div>' +
+    '</div>';
+    })() +
 
     // Tabs
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">' +
