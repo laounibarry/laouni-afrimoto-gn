@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.638';
+window.AFRIMOTO_VERSION = 'v9.639';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1348,6 +1348,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.renouvellement) DB.renouvellement = Object.assign({moto:'anniversaire', taxi:'mensuel'}, cfg.renouvellement);
         DB.motosRetrouvees = cfg.motos_retrouvees || cfg.motosRetrouvees || 0;
         if(cfg.tarifs_maj) DB.tarifsMaj = Object.assign({taxi:25000}, cfg.tarifs_maj);
+        // 15/09 — les prix TELS QUE LUS EN BASE, sans les 25 000 GNF écrits en dur ci-dessus.
+        // Le verrou de service (prixMajConnu) ne juge que sur ceux-là : tant que la config
+        // n'est pas arrivée, ou qu'une clé y manque, il ne bloque personne.
+        if(cfg.tarifs_maj && typeof cfg.tarifs_maj === 'object') window._tarifsMajLus = cfg.tarifs_maj;
         if(cfg.trajet_unique_desactive !== undefined) DB.trajetUniqueDesactive = cfg.trajet_unique_desactive;
         if(cfg.verrou_app_actif !== undefined) { DB.verrouAppActif = cfg.verrou_app_actif; try { majDisponibiliteVerrou(); } catch(e) {} }
         if(cfg.tri_note_actif !== undefined) DB.triNoteActif = cfg.tri_note_actif;
@@ -2972,8 +2976,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <!-- Choix rôle : espace public (Owner/Client/Passager) -->
     <div id="login-roles-public" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">
       <button class="btn" onclick="setRole('owner')" id="rl-owner" style="flex:1;font-size:11px;padding:8px 6px">🏍️ Proprio</button>
-      <button class="btn-ghost" onclick="setRole('client')" id="rl-client" style="flex:1;font-size:11px;padding:8px 6px">👤 Client</button>
-      <button class="btn-ghost" onclick="setRole('passager')" id="rl-passager" style="flex:1;font-size:11px;padding:8px 6px">🏍️ Taxi moto / VTC</button>
+      <!-- v9.639 : les espaces portent le nom de ceux qui y entrent (demandé par le propriétaire du projet).
+           Seuls les NOMS changent : les rôles « client » et « passager », les numéros CLT-/PSG- et les mots de passe restent les mêmes. -->
+      <button class="btn-ghost" onclick="setRole('client')" id="rl-client" style="flex:1;font-size:11px;padding:8px 6px">👤 Chauffeur</button>
+      <button class="btn-ghost" onclick="setRole('passager')" id="rl-passager" style="flex:1;font-size:11px;padding:8px 6px">🧍 Espace passager</button>
     </div>
     <!-- Choix rôle : espace staff (Agent/Sous-agent), accessible uniquement via l'accès dédié caché -->
     <div id="login-roles-staff" style="display:none;gap:5px;flex-wrap:wrap;margin-bottom:14px">
@@ -3004,10 +3010,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <!-- Espace CLIENT : numéro unique + mot de passe + (optionnel) matricule/châssis pour lier un véhicule -->
     <div id="login-client" style="display:none">
       <div class="qr-note-txt" style="background:rgba(249,115,22,.04);border:1px solid rgba(249,115,22,.15);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
-        👤 Connectez-vous avec votre numéro unique client
+        👤 Connectez-vous avec votre numéro unique (CLT-XXXXX) et votre mot de passe
       </div>
       <div class="fld">
-        <div class="lbl">N° Unique client *</div>
+        <div class="lbl">N° Unique chauffeur (CLT-XXXXX) *</div>
         <input type="text" id="lid-client" autocomplete="off" placeholder="CLT-XXXXX"/>
       </div>
     </div>
@@ -17185,6 +17191,32 @@ function _motifSuspension(t) {
       if(mv) return mv;
     }
   } catch(e) {}
+  // ══════════════════════════════════════════════════════════════════════════
+  // ══ 15/09 — L'ÉCRAN DISAIT « SUSPENDU », LE VERROU LAISSAIT ROULER ══
+  //
+  // Taxi 0405AS : « ⏸️ SUSPENDU » en rouge sur sa carte, et « Vous êtes en service »
+  // juste en dessous. Ce verrou ne lisait que « statut = suspendu » en base ; or la
+  // suspension pour mise à jour impayée n'y est écrite QUE lorsqu'un agent ouvre le
+  // site (verifierMisesAJour). Entre-temps, un véhicule que l'écran déclarait coupé
+  // pouvait prendre des courses.
+  //
+  // On juge donc aussi sur le calcul lui-même — etatMaj, le même que la carte :
+  // prix dû (lu en base, > 0) ET délai de grâce dépassé. Pour la fiche taxi et pour
+  // le véhicule lié. Tout le reste passe : prix à zéro (le cas de 0405AS et de tous
+  // les chauffeurs au 15/09), encore dans le délai, config pas encore lue, véhicule
+  // volé ou fiche non validée (déjà traités au-dessus, ou hors de cette règle).
+  // Un chauffeur en règle bloqué à tort serait pire que le défaut corrigé.
+  // ══════════════════════════════════════════════════════════════════════════
+  try {
+    var _motifMaj = 'Ce véhicule est suspendu : la mise à jour de son enregistrement n\'a pas été payée.';
+    var st = etatMaj(t, true);
+    if(st && st.cas === 'coupe') return _motifMaj;
+    var vm = t.motoId ? (DB.vehs || []).find(function(x){ return x.id === t.motoId; }) : null;
+    if(vm) {
+      var sv = etatMaj(vm, false);
+      if(sv && sv.cas === 'coupe') return _motifMaj;
+    }
+  } catch(e) {}
   return '';
 }
 
@@ -23912,6 +23944,91 @@ function coupureMaj(x, estTaxi) {
   c.setDate(c.getDate() + joursDeGraceMaj());
   return c;
 }
+// ══ 15/09 — L'ÉCRAN DISAIT « SUSPENDU », LE CHAUFFEUR ROULAIT QUAND MÊME ══
+// Taxi 0405AS (Lamine Yamal) : sa carte « Mise à jour taxi » affichait en rouge
+// « ⏸️ SUSPENDU — mise à jour requise depuis le 23/08/2026 », et juste en dessous
+// « Vous êtes en service ». Le propriétaire : « un véhicule suspendu doit pas
+// passer en service ».
+// En base, le taxi n'était PAS suspendu : sa mise à jour coûte 0 GNF, et la
+// règle du 23/08 (ci-dessus) ne coupe personne pour une dette de zéro. C'était
+// l'AFFICHAGE qui mentait : il disait « SUSPENDU » dès que la date était passée,
+// sans regarder ni le prix ni le délai de grâce. Et dans l'autre sens, quand un
+// prix est dû et le délai dépassé, la suspension n'est écrite en base que si un
+// agent ouvre le site — entre-temps le verrou de service, qui ne lit que la base,
+// laissait rouler un véhicule que l'écran annonçait suspendu.
+// Coût : un chauffeur en règle qui se croit coupé, un propriétaire qui ne peut
+// plus croire ce que dit l'écran — et un verrou qui ne tenait pas sa promesse.
+// Maintenant UN SEUL jugement, etatMaj, sert à la carte, au rappel du
+// propriétaire ET au verrou de service. Ils ne peuvent plus se contredire.
+//
+// Le prix du jugement : celui LU EN BASE, jamais la valeur écrite en dur dans ce
+// fichier (DB.tarifsMaj vaut { taxi: 25000 } tant que la config n'est pas
+// arrivée). Config absente, clé absente, montant illisible = 0 : dans le doute,
+// on ne bloque personne.
+function prixMajConnu(x, estTaxi) {
+  try {
+    const lus = window._tarifsMajLus;
+    if(!lus || typeof lus !== 'object') return 0;
+    const cle = estTaxi ? 'taxi' : (x && (x.cat || x.catId));
+    if(!cle || !Object.prototype.hasOwnProperty.call(lus, cle)) return 0;
+    const p = Number(prixMajDe(x, estTaxi));
+    return (isFinite(p) && p > 0) ? p : 0;
+  } catch(e) { return 0; }
+}
+// Rend { e: échéance, c: coupure, prix, cas } — ou null si aucune date.
+//   'suspendu' a) la fiche est suspendue en base
+//   'a_venir'  e) l'échéance n'est pas passée
+//   'gratuit'  b) échéance passée, rien à payer
+//   'coupe'    d) prix dû et délai de grâce dépassé : suspendu, même si la base dit encore « actif »
+//   'a_payer'  c) prix dû, encore dans le délai de grâce
+// Un véhicule volé ou une fiche non validée n'est jamais « coupé » par la date :
+// verifierMisesAJour ne les suspend pas, l'écran ne doit pas le prétendre.
+// Pour un taxi, le vol se lit sur SON véhicule (estVoleParSonVehicule), comme
+// dans verifierMisesAJour — la fiche taxi n'a pas de colonne « volé ».
+function etatMaj(x, estTaxi) {
+  if(!x) return null;
+  const e = echeanceMaj(x, estTaxi);
+  if(!e) return null;
+  const c = coupureMaj(x, estTaxi);
+  const prix = prixMajConnu(x, estTaxi);
+  const maintenant = new Date();
+  let voleParVehicule = false;
+  try { voleParVehicule = !!estTaxi && estVoleParSonVehicule(x); } catch(err) {}
+  const horsRegle = (x.statut === 'vole' || x.stolen === true || x.valide === false || voleParVehicule);
+  let cas;
+  if(x.statut === 'suspendu')               cas = 'suspendu';
+  else if(!(maintenant > e))                cas = 'a_venir';
+  else if(prix <= 0)                        cas = 'gratuit';
+  else if(!horsRegle && c && maintenant > c) cas = 'coupe';
+  else                                      cas = 'a_payer';
+  return { e: e, c: c, prix: prix, cas: cas };
+}
+// La ligne d'état, identique sur la carte de mise à jour et sur le rappel du propriétaire.
+// Deux phrases que l'écran ne doit jamais écrire, parce qu'elles seraient fausses :
+//   • « mise à jour requise DEPUIS le » une date encore à venir — une fiche suspendue
+//     en base pour une autre raison (décision de l'administration) n'a pas d'échéance
+//     dépassée : on dit « SUSPENDU » et la prochaine échéance, sans inventer la cause ;
+//   • « à payer AVANT le » une date déjà passée, « sinon le véhicule sera suspendu » —
+//     une fiche non validée ou un véhicule volé n'est pas coupé par la date.
+function ligneEtatMajHtml(s) {
+  const maintenant = new Date();
+  const ech = s.e.toLocaleDateString('fr-FR');
+  if(s.cas === 'suspendu' && !(maintenant > s.e))
+    return '<b style="color:#EF4444">⏸️ SUSPENDU</b> — prochaine échéance de mise à jour : <b>' + ech + '</b>';
+  if(s.cas === 'suspendu' || s.cas === 'coupe')
+    return '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + ech + '</b>';
+  if(s.cas === 'gratuit')
+    return '🔄 Échéance passée le <b>' + ech + '</b> — la mise à jour est gratuite.';
+  if(s.cas === 'a_payer' && s.c && maintenant > s.c)
+    return '<b style="color:#EF4444">⛔ Échéance dépassée le ' + ech + ' — mise à jour à payer.</b>';
+  if(s.cas === 'a_payer')
+    return '<b style="color:#EF4444">⛔ Échéance dépassée le ' + ech + ' — à payer avant le ' +
+           (s.c ? s.c.toLocaleDateString('fr-FR') : ech) + ', sinon le véhicule sera suspendu.</b>';
+  return 'Prochaine échéance : <b>' + ech + '</b>';
+}
+function etatMajEnRouge(s) {
+  return !!s && (s.cas === 'suspendu' || s.cas === 'coupe' || s.cas === 'a_payer');
+}
 // « Assez en retard pour que le COMPTE ENTIER du propriétaire tombe » : 72 h
 // après la fin du délai de grâce. Un seul calcul, utilisé par verifierMisesAJour
 // et par appliquerMaj — deux calculs différents rouvriraient un compte que la
@@ -24353,18 +24470,31 @@ function majClient(kind, id) {
   });
 }
 // Espace proprio : simple rappel (le paiement se fait dans l'espace client ou chez un agent)
+// ══ 15/09 — LE MÊME MENSONGE, CÔTÉ PROPRIÉTAIRE ══
+// Ce rappel écrivait lui aussi « SUSPENDU » d'après la seule date, comme la carte
+// du taxi 0405AS : un propriétaire dont la mise à jour est gratuite, ou encore
+// dans son délai de grâce, se lisait suspendu sans l'être. Il suit etatMaj.
 function majRappelProprioHtml(v) {
-  const e = echeanceMaj(v, false);
-  if(!e) return '';
-  const retard = new Date() > e;
-  const bientot = !retard && (e - new Date()) < 30*24*3600*1000; // moins de 30 jours
-  if(!retard && !bientot) return '';
-  return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (retard ? '#EF4444' : 'rgba(234,179,8,.4)') + '">' +
+  const s = etatMaj(v, false);
+  if(!s) return '';
+  const e = s.e;
+  // Quand montrer ce rappel : comme avant le 15/09, d'après la DATE seule — échéance
+  // passée, ou à moins de 30 jours. Juger sur « cas » faisait surgir une carte neuve sur
+  // une fiche suspendue en base (souvent par l'administration) dont l'échéance est à
+  // des mois : « Faites-la depuis votre espace client », alors que la mise à jour n'y
+  // est pas encore ouverte (majClient la refuse avant l'échéance).
+  const passee = new Date() > e;
+  const bientot = !passee && (e - new Date()) < 30*24*3600*1000; // moins de 30 jours
+  if(!passee && !bientot) return '';
+  const rouge = etatMajEnRouge(s);
+  return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (rouge ? '#EF4444' : 'rgba(234,179,8,.4)') + '">' +
     '<div class="sect" style="margin-top:0">🔄 Mise à jour de l\'enregistrement</div>' +
-    '<div style="font-size:12px">' + (retard
-      ? '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + e.toLocaleDateString('fr-FR') + '</b>'
-      : '⏰ Échéance proche : <b>' + e.toLocaleDateString('fr-FR') + '</b>') + '</div>' +
-    '<div style="font-size:11px;color:var(--text2);margin-top:6px">💳 Payez depuis votre <b>espace client</b> (onglet Mes véhicules) ou en espèces chez un agent agréé.</div>' +
+    '<div style="font-size:12px">' + (s.cas === 'a_venir'
+      ? '⏰ Échéance proche : <b>' + e.toLocaleDateString('fr-FR') + '</b>'
+      : ligneEtatMajHtml(s)) + '</div>' +
+    '<div style="font-size:11px;color:var(--text2);margin-top:6px">' + (s.prix > 0
+      ? '💳 Payez depuis votre <b>espace client</b> (onglet Mes véhicules) ou en espèces chez un agent agréé.'
+      : '🔄 Faites-la depuis votre <b>espace client</b> (onglet Mes véhicules) ou chez un agent agréé — rien à payer.') + '</div>' +
   '</div>';
 }
 // ════════════════════════════════════════════════════════════════════════════
@@ -24419,19 +24549,24 @@ function majTaxisRestantsHtml(mesTaxis) {
 }
 
 // Le bloc, sorti de « majProprioHtml » pour servir aux deux endroits.
+// ══ 15/09 — « SUSPENDU » SUR UN TAXI QUI NE L'ÉTAIT PAS (0405AS) ══
+// Cette carte disait « SUSPENDU » dès que la date d'échéance était passée, sans
+// regarder le prix (0 GNF) ni le délai de grâce : le chauffeur lisait « suspendu »
+// et se voyait « en service » sur le même écran. Elle suit maintenant etatMaj, le
+// même jugement que le verrou de service. Et un prix à zéro s'écrit « gratuit »,
+// plus « 0 GNF » qui ressemblait à une somme à payer.
 function majBlocUn(x, estTaxi, titre) {
-  const e = echeanceMaj(x, estTaxi); if(!e) return '';
+  const s = etatMaj(x, estTaxi); if(!s) return '';
   window._majRendus[x.id] = true;
-  const retard = new Date() > e;
-  const prix = prixMajDe(x, estTaxi);
-  return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (retard ? '#EF4444' : 'rgba(249,115,22,.25)') + '">' +
+  const e = s.e;
+  const rouge = etatMajEnRouge(s);
+  const montant = s.prix > 0 ? fmt(s.prix) : 'gratuit';
+  return '<div class="card" style="margin-bottom:14px;border:2px solid ' + (rouge ? '#EF4444' : 'rgba(249,115,22,.25)') + '">' +
     '<div class="sect" style="margin-top:0">🔄 ' + esc(titre) + '</div>' +
-    '<div style="font-size:12px;margin-bottom:8px">' + (retard
-      ? '<b style="color:#EF4444">⏸️ SUSPENDU — mise à jour requise depuis le ' + e.toLocaleDateString('fr-FR') + '</b>'
-      : 'Prochaine échéance : <b>' + e.toLocaleDateString('fr-FR') + '</b>') + '</div>' +
+    '<div style="font-size:12px;margin-bottom:8px">' + ligneEtatMajHtml(s) + '</div>' +
     (new Date() >= e
-      ? '<button class="btn" style="width:100%;padding:11px" onclick="majClient(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Mettre à jour maintenant — ' + fmt(prix) + '</button>'
-      : '<button class="btn" disabled style="width:100%;padding:11px;opacity:.45;cursor:not-allowed">🔒 Mise à jour disponible le ' + e.toLocaleDateString('fr-FR') + ' — ' + fmt(prix) + '</button>') +
+      ? '<button class="btn" style="width:100%;padding:11px" onclick="majClient(\'' + (estTaxi?'taxi':'veh') + '\',\'' + x.id + '\')">🔄 Mettre à jour maintenant — ' + montant + '</button>'
+      : '<button class="btn" disabled style="width:100%;padding:11px;opacity:.45;cursor:not-allowed">🔒 Mise à jour disponible le ' + e.toLocaleDateString('fr-FR') + ' — ' + montant + '</button>') +
     '<div class="qr-note-txt" style="font-size:10px;margin-top:6px">Payable avec votre solde, ou en espèces chez un agent.</div>' +
   '</div>';
 }
