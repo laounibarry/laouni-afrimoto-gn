@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.639';
+window.AFRIMOTO_VERSION = 'v9.640';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -874,6 +874,56 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   const PLAFOND_LIGNES = 1000;   // au-dela, le serveur tronque sans prevenir
   let _tablesTronquees = [];
 
+  // ══ 15/09 — LE CODE D'ACCES ET L'EMPREINTE DU MOT DE PASSE NE DESCENDENT PLUS ══
+  //
+  // FUITE CONFIRMEE le 15/09 : avec la seule clef publique de ce fichier, n'importe qui
+  // lisait « vehicules.code » (31 lignes sur 31) et « clients.pass_hash ». Le code est la
+  // SEULE clef de l'espace proprietaire : declarer un vol, « ma moto a ete retrouvee »,
+  // la visibilite, le QR protege. Celui qui le lit peut blanchir une moto volee.
+  //
+  // Le site lisait ces deux colonnes parce qu'il demandait « select('*') » : tout, secrets
+  // compris. On demande desormais les colonnes UNE PAR UNE, sans les deux secrets.
+  // Ces listes ont ete relevees en production le 17/09 (59 colonnes de vehicules moins
+  // « code », 19 de clients moins « pass_hash »).
+  //
+  // ⚠️ Une colonne ajoutee plus tard en base n'arrivera pas ici tant qu'on ne l'ajoute
+  // pas a la liste. C'est voulu : un nouveau secret ne doit pas fuir tout seul.
+  // ⚠️ Ne JAMAIS remettre « code » ou « pass_hash » : apres la fermeture de ces colonnes
+  // cote serveur, la requete ENTIERE serait refusee (pas seulement la colonne).
+  // mapVehicule et mapClient tolerent l'absence : le secret vaut simplement ''.
+  const COLONNES_VEHICULES =
+    'id,num,type,client_id,mat,vin,brand,model,color,year,owner,phone,addr,secours,' +
+    'lien_secours,gilet,cg,dachat,statut,cat_id,agent_id,stolen,vol_crime,vol_type_crime,' +
+    'vol_date,reg_date,photo,photo_proprietaire,valide,vis_owner,vis_phone,vis_addr,vis_vin,' +
+    'vis_photo,vis_photo_proprietaire,created_at,carte_grise,date_achat,vol_ville,vole,' +
+    'photo_piece_url,date_naissance,lieu_naissance,derniere_maj,suspendu_auto,nationalite,' +
+    'type_piece,num_piece,profession,nom_pere,nom_mere,en_vente,retrouvee_comptee,vis,' +
+    'photo_facture_url,photo_cg_url,photo_piece_verso_url,historique_proprietaires';
+  const COLONNES_CLIENTS =
+    'id,auth_user_id,num,prenom,nom,tel,email,user_login,permis,solde,suspendu,' +
+    'chauffeur_bloque,created_at,suspendu_auto_maj,avertissements,appreciations,' +
+    'details_avertissements,details_appreciations';
+
+  // ══ 21/09 — LA CORBEILLE GARDAIT LA PORTE OUVERTE JUSTE A COTE ══
+  //
+  // Fermer « code » et « pass_hash » sur vehicules et clients ne sert a rien si la copie
+  // de la fiche SUPPRIMEE, elle, reste lisible : la corbeille garde dans sa colonne
+  // « data » un instantane COMPLET de la ligne effacee — code et empreinte compris — et
+  // ce n'est pas une colonne de vehicules ni de clients, donc la fermeture serveur de
+  // l'etape 4 ne la touchera pas. Or le site telechargeait cette colonne « data » pour
+  // TOUT LE MONDE, visiteurs compris (chargement au demarrage, connexion client,
+  // connexion proprietaire), uniquement pour repondre a une question : « l'identifiant
+  // X est-il dans la corbeille ? ».
+  //
+  // Hors du personnel, on ne demande donc plus l'instantane : seulement l'identifiant
+  // qu'il contient (« data->>id »). Tous les controles de connexion ne lisent que
+  // « c.data.id » — le reste ne leur a jamais servi. L'ecran Corbeille du personnel, lui,
+  // continue de tout recevoir : il doit pouvoir restaurer la fiche.
+  // Verifie en production le 21/09 : cette ecriture « alias:colonne->>clef » est acceptee
+  // par le serveur et renvoie bien la valeur (essai sur une autre colonne jsonb).
+  const COLONNES_CORBEILLE_PUBLIQUE =
+    'id,type,label,liste_origine,date_suppr,supprime_par,data_id:data->>id';
+
   function _roleEnregistre() {
     try {
       const s = JSON.parse(localStorage.getItem('afrimoto_session') || 'null');
@@ -981,9 +1031,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // Le ministere vise un million d'enregistrements : cette liste ne peut pas partir
         // sur chaque telephone, et au-dela de mille lignes elle serait de toute facon
         // tronquee sans que personne ne le sache.
-        _perso ? supabaseClient.from('clients').select('*').limit(PLAFOND_LIGNES)
+        // 15/09 : colonnes explicites, SANS « pass_hash » (voir COLONNES_CLIENTS).
+        _perso ? supabaseClient.from('clients').select(COLONNES_CLIENTS).limit(PLAFOND_LIGNES)
                : (_roleEnregistre() === 'client' && _idEnregistre()
-                   ? supabaseClient.from('clients').select('*').eq('id', _idEnregistre()).limit(1)
+                   ? supabaseClient.from('clients').select(COLONNES_CLIENTS).eq('id', _idEnregistre()).limit(1)
                    : Promise.resolve({ data: [] })),
         // v9.525 : LA TABLE DES PASSAGERS N'EST PLUS TELECHARGEE PAR TOUT LE MONDE.
         // Elle ne servait qu'a trois choses : se connecter, verifier qu'un identifiant
@@ -1003,9 +1054,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // la recherche cote serveur (chercher_registre), qui range la fiche trouvee dans la
         // liste locale au moment ou on en a besoin. Un proprietaire garde ses propres
         // vehicules, pour pouvoir les gerer et les mettre en vente.
-        _perso ? supabaseClient.from('vehicules').select('*').limit(PLAFOND_LIGNES)
+        // 15/09 : colonnes explicites, SANS « code » (voir COLONNES_VEHICULES).
+        _perso ? supabaseClient.from('vehicules').select(COLONNES_VEHICULES).limit(PLAFOND_LIGNES)
                : (_roleEnregistre() === 'client' && _idEnregistre()
-                   ? supabaseClient.from('vehicules').select('*')
+                   ? supabaseClient.from('vehicules').select(COLONNES_VEHICULES)
                        .eq('client_id', _idEnregistre()).limit(PLAFOND_LIGNES)
                    : Promise.resolve({ data: [] })),
         supabaseClient.from('taxis').select('*'),
@@ -1023,8 +1075,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // v9.515 : la corbeille entiere n'est utile qu'a l'ecran du personnel. Mais deux
         // controles de CONNEXION la consultent (compte supprime, vehicule supprime) : on garde
         // donc ces deux categories pour tout le monde, et rien d'autre.
+        // 21/09 : hors du personnel, l'instantane complet de la fiche supprimee ne descend
+        // plus — il portait « code » et « pass_hash » (voir COLONNES_CORBEILLE_PUBLIQUE).
         _perso ? supabaseClient.from('corbeille').select('*').limit(PLAFOND_LIGNES)
-               : supabaseClient.from('corbeille').select('*')
+               : supabaseClient.from('corbeille').select(COLONNES_CORBEILLE_PUBLIQUE)
                    .in('liste_origine', ['clients', 'vehicules']).limit(PLAFOND_LIGNES),
         supabaseClient.from('demandes_course').select('*'),
         Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
@@ -1146,8 +1200,9 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         try {
           if(role === 'client') {
             const [{ data: c }, { data: v }] = await Promise.all([
-              supabaseClient.from('clients').select('*').eq('id', id).limit(1),
-              supabaseClient.from('vehicules').select('*').eq('client_id', id).limit(PLAFOND_LIGNES),
+              // 15/09 : sans « pass_hash » ni « code » — voir COLONNES_CLIENTS / COLONNES_VEHICULES.
+              supabaseClient.from('clients').select(COLONNES_CLIENTS).eq('id', id).limit(1),
+              supabaseClient.from('vehicules').select(COLONNES_VEHICULES).eq('client_id', id).limit(PLAFOND_LIGNES),
             ]);
             if(c && c.length) {
               const m = mapClient(c[0]);
@@ -1167,7 +1222,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
             }
           } else if(role === 'owner') {
             // Le proprietaire se connecte par son vehicule : c'est « id » qui porte la fiche.
-            const { data: v } = await supabaseClient.from('vehicules').select('*').eq('id', id).limit(1);
+            // 15/09 : sans « code ». L'espace proprietaire n'a jamais besoin du code en memoire.
+            const { data: v } = await supabaseClient.from('vehicules').select(COLONNES_VEHICULES).eq('id', id).limit(1);
             if(v && v.length) {
               const m = mapVehicule(v[0]);
               const i = DB.vehs.findIndex(x => x.id === m.id);
@@ -1242,21 +1298,21 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       _triDate(DB.transferts, 'date'); // 💳 TRI TRANSFERTS
 
       // Traitement du lien de réinitialisation (après chargement complet)
+      // ══ 15/09 — LE LIEN DE REINITIALISATION N'EST PLUS FABRIQUE PAR LE NAVIGATEUR ══
+      // L'ancien lien etait un simple texte base64 { identifiant, typeCompte, exp } : n'importe
+      // qui pouvait en ecrire un pour le compte de son choix, administrateur compris, et
+      // changer son mot de passe. Le jeton est desormais delivre ET verifie par le serveur
+      // (identifiant_par_email, reinitialiser_mot_de_passe). La fenetre s'ouvre au chargement
+      // de la page (_afficherResetPage) ; on ne l'ouvre plus une deuxieme fois ici.
       if(window._pendingReset) {
         const _pr = window._pendingReset; window._pendingReset = null;
         try {
-          const _rtData = decodeResetToken(_pr);
-          console.log('Reset token decoded:', _rtData);
-          if(_rtData && _rtData.exp && Date.now() < _rtData.exp) {
-            const _ud2=JSON.parse(localStorage.getItem('reset_used_done')||'[]');
-            const _done=_rtData.nonce&&_ud2.includes(_rtData.nonce);
-            if(!_done) { const _bf2=document.getElementById('_btn-reset-flottant'); if(_bf2)_bf2.remove(); setTimeout(()=>ouvrirModalResetDepuisLien(_rtData.identifiant,_rtData.typeCompte,_pr),300); }
-            else { setTimeout(()=>toast('⚠️ Ce lien a déjà été utilisé.',true),300); }
-          } else {
+          if(!document.getElementById('_reset-overlay') && typeof window._afficherResetPage === 'function'
+             && typeof _jetonResetValable === 'function' && _jetonResetValable(_pr)) {
             const _bf2=document.getElementById('_btn-reset-flottant'); if(_bf2)_bf2.remove();
-            setTimeout(() => toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.', true), 300);
+            setTimeout(window._afficherResetPage, 300);
           }
-        } catch(e) { console.warn('Reset link error:', e); toast('⚠️ Lien invalide. Faites une nouvelle demande.', true); }
+        } catch(e) { console.warn('Reset link error:', e); }
       }
 
       // ⚠️ v9.634 — LA SUSPENSION AUTOMATIQUE A ÉTÉ DÉPLACÉE PLUS BAS.
@@ -1600,8 +1656,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     return { 
       id: r.id, 
       type: r.type || 'unknown',
-      listeOrigine: r.liste_origine || 'unknown', 
-      data: r.data || {}, 
+      listeOrigine: r.liste_origine || 'unknown',
+      // 21/09 : hors du personnel, le serveur ne renvoie plus l'instantane entier mais le
+      // seul identifiant qu'il contient (voir COLONNES_CORBEILLE_PUBLIQUE). Les controles
+      // « c.data.id » continuent de fonctionner ; la restauration, reservee au personnel,
+      // recoit toujours « data » en entier.
+      data: r.data || ((r.data_id !== undefined && r.data_id !== null) ? { id: r.data_id } : {}),
       label: r.label || '', 
       dateSuppr: r.date_suppr || new Date().toISOString(), 
       supprimePar: r.supprime_par || 'Système'
@@ -1877,17 +1937,44 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   const sbSaveSousAgent = sbIgnoreErr(_sbSaveSousAgent, 'sbSaveSousAgent');
 
   async function _sbSaveClient(cl) {
+    // ══ 15/09 — « pass_hash » NE PART PLUS DANS CETTE SAUVEGARDE ══
+    // Les fiches clients ne recoivent plus l'empreinte du mot de passe (fuite du 15/09).
+    // Si on la renvoyait quand meme, deux degats :
+    //   • avant la fermeture : « cl.pass » vaut '' sur une fiche relue -> pass_hash:null
+    //     EFFACERAIT le mot de passe du client a la premiere sauvegarde (solde, permis...) ;
+    //   • apres la fermeture : l'upsert qui ecrit pass_hash est REFUSE en entier
+    //     (prouve sur PostgreSQL : permission denied for table clients).
+    // Une colonne absente de l'upsert n'est jamais touchee : l'empreinte en base reste.
+    // Changer un mot de passe passe par le serveur : changer_mon_mot_de_passe,
+    // changer_mdp_compte, reinitialiser_mot_de_passe.
     const row = { id:cl.id, num:cl.num||'', prenom:cl.prenom||'', nom:cl.nom||'',
       telephone:cl.tel||null, email:cl.email||null, user_login:cl.user||null, solde:cl.solde||0,
       permis:cl.permis||null, vehicule_id:cl.vid||null, suspendu:cl.suspendu||false,
-      suspendu_auto_maj:cl.suspenduAutoMaj||false, pass_hash:cl.pass||null,
+      suspendu_auto_maj:cl.suspenduAutoMaj||false,
       avertissements:cl.avertissements||0, // ⚠️
       appreciations:cl.appreciations||0, // 👍
       details_avertissements:cl.detailsAvertissements||[], // 📋
       details_appreciations:cl.detailsAppreciations||[] // 📋
     };
     const alts = { telephone:'tel', user_login:'login', vehicule_id:'veh_id' };
-    await sbUpsertSouple('clients', row, alts);
+    const ok = await sbUpsertSouple('clients', row, alts);
+    // Seul cas ou le navigateur ecrit encore une empreinte : le compte qu'il VIENT de creer
+    // (saveMoto, marque « _mdpInitial »). La ligne existe maintenant ; on pose le mot de
+    // passe par une mise a jour ciblee, qui ne demande AUCUN droit de lecture sur
+    // pass_hash et ne relit rien. Une fiche chargee depuis le serveur n'a jamais ce drapeau.
+    if(ok === true && cl._mdpInitial === true && cl.pass) {
+      try {
+        const { error } = await supabaseClient.from('clients')
+          .update({ pass_hash: cl.pass }).eq('id', cl.id);
+        if(error) {
+          console.error('❌ Mot de passe initial du client non enregistré:', error.message);
+          if(typeof toast === 'function') toast('⚠️ Compte créé, mais son mot de passe n\'a pas été enregistré — redonnez-le depuis Gestion → Mots de passe.', true);
+        } else {
+          cl._mdpInitial = false;
+        }
+      } catch(e) { console.warn('Mot de passe initial client:', e && e.message); }
+    }
+    return ok;
   }
   const sbSaveClient = sbIgnoreErr(_sbSaveClient, 'sbSaveClient');
 
@@ -1929,7 +2016,15 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       couleur:v.color||null, annee:v.year||v.annee||null,
       categorie_id:v.cat||v.catId||null,   // saveMoto stocke 'cat', le rechargement produit 'catId'
       statut:v.statut||'actif', vole:v.stolen||false,
-      code:v.code||'', client_id:v.clientId||null,
+      // ══ 15/09 — « code » NE PART PLUS DANS CETTE SAUVEGARDE ══
+      // Les fiches ne recoivent plus le code (fuite du 15/09) : « v.code » vaut '' sur une
+      // fiche relue, et code:'' EFFACERAIT la clef de l'espace proprietaire a la moindre
+      // modification. Apres la fermeture, l'upsert qui ecrit « code » est meme REFUSE en
+      // entier (prouve : permission denied for table vehicules).
+      // Un vehicule NEUF recoit son code du serveur (declencheur : numero du client) ; un
+      // vehicule existant garde le sien, puisque la colonne n'est plus dans l'upsert.
+      // Changer un code : definir_code_vehicule (administration) ou changer_proprietaire.
+      client_id:v.clientId||null,
       agent_id:v.agId||v.agentId||null,    // saveMoto stocke 'agId'
       permis:v.permis||null, gilet:v.gilet||null,
       frais_enregistrement:v.fraisEnreg||0,
@@ -4954,8 +5049,39 @@ const EMAILJS_CONFIG = {
   templateRecapId: 'template_6uq04fr',   // modèle confirmations/récapitulatifs (variables : to_email, titre, contenu)
   publicKey:  'awxu35zCxrmJzkyOZ'
 };
+// ══ 15/09 — LA REINITIALISATION PAR LIEN PASSE PAR LE SERVEUR ══
+//
+// FUITE / FAILLE : l'ancien lien « ?reset= » etait un texte base64 fabrique par le
+// navigateur, sans signature : { identifiant, typeCompte, exp }. N'importe qui pouvait en
+// ecrire un pour le compte de son choix — administrateur compris — et lui donner un
+// nouveau mot de passe. En plus, l'ecriture passait par sbSaveClient, qui n'envoie plus
+// l'empreinte depuis la fermeture de « clients.pass_hash » : le changement se serait
+// perdu EN SILENCE, et la personne n'aurait plus pu se connecter.
+//
+// Desormais : le serveur delivre un jeton a usage unique (identifiant_par_email), le
+// garde chez lui, et le verifie au moment d'ecrire (reinitialiser_mot_de_passe). Le
+// navigateur ne connait ni le compte ni l'empreinte.
+function _jetonResetValable(jeton) {
+  return /^[0-9a-f]{40,128}$/i.test(String(jeton || ''));
+}
+function _messageRefusReset(raison) {
+  if(raison === 'mdp_trop_court') return '⚠️ Minimum 6 caractères.';
+  if(raison === 'jeton_utilise') return '⚠️ Ce lien a déjà été utilisé. Faites une nouvelle demande.';
+  if(raison === 'jeton_expire') return '⚠️ Ce lien a expiré. Faites une nouvelle demande.';
+  if(raison === 'introuvable') return '⚠️ Compte introuvable. Contactez un agent.';
+  return '⚠️ Lien invalide. Faites une nouvelle demande.';
+}
+async function _reinitialiserParServeur(jeton, nouveau) {
+  if(!_jetonResetValable(jeton)) return { ok:false, raison:'jeton_invalide' };
+  try {
+    const { data, error } = await supabaseClient.rpc('reinitialiser_mot_de_passe', {
+      p_jeton: String(jeton), p_nouveau: nouveau
+    });
+    if(error) return { ok:false, raison:'serveur', message: error.message };
+    return data || { ok:false, raison:'serveur' };
+  } catch(e) { return { ok:false, raison:'serveur', message: (e && e.message) || '' }; }
+}
 async function _validerReset() {
-  const _d = window._resetData;
   const token = window._resetToken;
   const p1 = (document.getElementById('_rst-p1')||{}).value||'';
   const p2 = (document.getElementById('_rst-p2')||{}).value||'';
@@ -4963,21 +5089,16 @@ async function _validerReset() {
   if(p1.length < 6) { err.textContent='⚠️ Minimum 6 caractères.'; err.style.display='block'; return; }
   if(p1 !== p2) { err.textContent='⚠️ Les mots de passe ne correspondent pas.'; err.style.display='block'; return; }
   try {
-    const hash = await hashPw(p1);
-    let ok = false;
-    const sauver = (arr, save) => { const x = arr.find(a => a.num===_d.identifiant||a.user===_d.identifiant); if(x){x.pass=hash;x.pass_hash=hash;save(x);ok=true;} };
-    if(_d.typeCompte==='admin') { DB.adminPass=hash; sbSaveConfig(); ok=true; }
-    else if(_d.typeCompte==='agent') sauver(DB.agents, sbSaveAgent);
-    else if(_d.typeCompte==='sousagent') sauver(DB.sousAgents, sbSaveSousAgent);
-    else if(_d.typeCompte==='client') sauver(DB.clients, sbSaveClient);
-    else if(_d.typeCompte==='passager') sauver(DB.passagers, sbSavePassager);
-    if(ok) {
-      try { if(_d.nonce){const u=JSON.parse(localStorage.getItem('reset_used_done')||'[]');u.push(_d.nonce);localStorage.setItem('reset_used_done',JSON.stringify(u.slice(-50)));} } catch(e){}
-      document.getElementById('_reset-overlay').remove();
+    const r = await _reinitialiserParServeur(token, p1);
+    if(r && r.ok === true) {
+      const ov = document.getElementById('_reset-overlay'); if(ov) ov.remove();
       toast('✅ Mot de passe réinitialisé ! Reconnexion...');
       setTimeout(()=>{ try{clearSession();}catch(e){} location.reload(); }, 2000);
+    } else if(r && r.raison === 'serveur') {
+      err.textContent='⚠️ Serveur injoignable pour le moment. Réessayez dans un instant.';
+      err.style.display='block';
     } else {
-      err.textContent='⚠️ Compte introuvable dans la base de données. Contactez un agent.';
+      err.textContent = _messageRefusReset(r && r.raison);
       err.style.display='block';
     }
   } catch(e) { err.textContent='⚠️ Erreur: '+e.message; err.style.display='block'; }
@@ -5018,20 +5139,16 @@ async function validerResetMdp(identifiant, typeCompte, token) {
   const err = document.getElementById('rst-err');
   if(p1.length < 6) { err.textContent='⚠️ Minimum 6 caractères.'; err.style.display='block'; return; }
   if(p1 !== p2) { err.textContent='⚠️ Les mots de passe ne correspondent pas.'; err.style.display='block'; return; }
-  const hash = await hashPw(p1);
-  let ok = false;
-  const sauver = (arr, save) => { const x = arr.find(a => a.num===identifiant||a.user===identifiant); if(x) { x.pass=hash; x.pass_hash=hash; save(x); ok=true; } };
-  if(typeCompte==='admin') { DB.adminPass=hash; sbSaveConfig(); ok=true; }
-  else if(typeCompte==='agent') sauver(DB.agents, sbSaveAgent);
-  else if(typeCompte==='sousagent') sauver(DB.sousAgents, sbSaveSousAgent);
-  else if(typeCompte==='client') sauver(DB.clients, sbSaveClient);
-  else if(typeCompte==='passager') sauver(DB.passagers, sbSavePassager);
-  if(ok) {
-    try { const _tkd=decodeResetToken(token); if(_tkd&&_tkd.nonce){const _ud=JSON.parse(localStorage.getItem('reset_used_done')||'[]');_ud.push(_tkd.nonce);localStorage.setItem('reset_used_done',JSON.stringify(_ud.slice(-50)));} } catch(e) {}
-    document.getElementById('m-chg-mdp-reset').remove();
+  // 15/09 : le jeton seul fait foi, verifie par le serveur. « identifiant » et « typeCompte »
+  // ne servent plus qu'a l'affichage : ils ne designent plus le compte a modifier.
+  const r = await _reinitialiserParServeur(token, p1);
+  if(r && r.ok === true) {
+    const m = document.getElementById('m-chg-mdp-reset'); if(m) m.remove();
     toast('✅ Mot de passe réinitialisé ! Reconnexion dans 2 secondes…');
     setTimeout(() => { try{clearSession();}catch(e){} location.reload(); }, 2000);
-  } else toast('⚠️ Compte introuvable. Contactez un agent.', true);
+  } else if(r && r.raison === 'serveur') {
+    toast('⚠️ Serveur injoignable pour le moment. Réessayez dans un instant.', true);
+  } else toast(_messageRefusReset(r && r.raison), true);
 }
 
 async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, instruction) {
@@ -5079,72 +5196,41 @@ async function rechercherCompteParEmail() {
     return;
   }
 
-  let identifiant = null;
-  let typeCompte = null;
-  if(nrm(DB.adminEmail||'') === nrm(email)) {
-    identifiant = DB.adminId;
-    typeCompte = 'admin';
-  } else {
-    // v9.525 : cette recherche parcourait les tables telechargees. Or on retrouve son
-    // identifiant quand on est DECONNECTE — et la table des passagers n'est plus
-    // telechargee dans ce cas. Sans cette requete ciblee, un passager n'aurait jamais
-    // pu recuperer son identifiant. On demande donc directement au serveur.
-    const _parEmail = async (table, convertir) => {
-      try {
-        const { data } = await supabaseClient.from(table).select('*').ilike('email', email).limit(1);
-        return (data && data[0]) ? convertir(data[0]) : null;
-      } catch(e) { return null; }
-    };
-    const cl = DB.clients.find(c => nrm(c.email||'') === nrm(email))
-            || await _parEmail('clients', mapClient);
-    const ps = !cl ? (DB.passagers.find(p => nrm(p.email||'') === nrm(email))
-            || await _parEmail('passagers', mapPassager)) : null;
-    const ag = !cl && !ps ? DB.agents.find(a => nrm(a.email||'') === nrm(email)) : null;
-    const sa = !cl && !ps && !ag ? DB.sousAgents.find(s => nrm(s.email||'') === nrm(email)) : null;
-    const compte = cl || ps || ag || sa;
-    identifiant = compte ? (compte.num || compte.code) : null;
-    typeCompte = cl ? 'client' : ps ? 'passager' : ag ? 'agent' : sa ? 'sousagent' : null;
-  }
-
-  if(!identifiant) {
-    // Message volontairement neutre : ne révèle pas si l'email existe ou non, par sécurité
-    resultat.innerHTML =
-      '<div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:12px;font-size:12px">' +
-      'Si cette adresse correspond à un compte, vous recevrez un email avec votre numéro unique et la marche à suivre. Vérifiez aussi vos courriers indésirables.' +
-      '</div>';
-    resultat.style.display = 'block';
-    return;
-  }
-
-  // L'instruction de récupération diffère selon qui peut réellement réinitialiser le mot de passe de ce compte
-  const instruction = typeCompte === 'admin'
-    ? 'Si vous avez encore une session admin ouverte ailleurs, changez le mot de passe depuis Gestion → Mots de passe. Sinon, contactez votre développeur.'
-    : (typeCompte === 'agent' || typeCompte === 'sousagent')
-    ? 'Contactez l\'administration avec cet identifiant pour réinitialiser votre mot de passe.'
-    : 'Contactez un agent ou l\'administration avec cet identifiant pour réinitialiser votre mot de passe.';
-
-  // SÉCURITÉ : l'identifiant n'est JAMAIS affiché à l'écran (sinon n'importe qui connaissant
-  // l'email d'un client pourrait obtenir son numéro unique). Il est envoyé UNIQUEMENT par email.
+  // ══ 15/09 — LA RECHERCHE PAR E-MAIL SE FAIT SUR LE SERVEUR, ET NE REVIENT PAS ══
+  //
+  // FUITE : cette fonction lisait « select('*').ilike('email') » sur clients et passagers
+  // avec la clef publique — donc la fiche entiere, empreinte du mot de passe comprise, de
+  // quiconque dont on connaissait l'adresse. Et si l'envoi echouait, elle AFFICHAIT le
+  // numero unique… qui est aussi le code de l'espace proprietaire (31 vehicules sur 31).
+  // Enfin le lien envoye etait fabrique ici, sans signature : n'importe qui pouvait en
+  // ecrire un pour n'importe quel compte.
+  //
+  // Desormais le serveur (identifiant_par_email) cherche le compte, fabrique un jeton a
+  // usage unique, envoie lui-meme l'e-mail — et NE RENVOIE RIEN au navigateur. La reponse
+  // a l'ecran est la meme que l'adresse existe ou non.
   resultat.innerHTML =
     '<div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:12px;font-size:12px">⏳ Vérification en cours...</div>';
   resultat.style.display = 'block';
 
-  // Encoder identifiant + typeCompte + expiration directement dans l'URL (fonctionne sur n'importe quel appareil)
-  const payload = JSON.stringify({identifiant, typeCompte, exp: Date.now() + 3600000});
-  const token = btoa(unescape(encodeURIComponent(payload)));
-  const lienReset = 'https://laouni-securite-ultime.com?reset=' + encodeURIComponent(token);
-  const instructionFull = instruction + '\n\nOu cliquez sur ce lien pour réinitialiser directement votre mot de passe (valable 1 heure) :\n' + lienReset;
-  const envoye = await envoyerEmailRecuperation(email, identifiant, typeCompte, instructionFull);
+  let joint = false;
+  try {
+    const { error } = await supabaseClient.rpc('identifiant_par_email', { p_email: email });
+    joint = !error;
+    if(error) { try { addDebugLog('RECUPERATION par e-mail indisponible : ' + error.message); } catch(e) {} }
+  } catch(e) {
+    try { addDebugLog('RECUPERATION par e-mail : ' + ((e && e.message) || e)); } catch(er) {}
+  }
 
-  if(envoye) {
+  if(joint) {
     resultat.innerHTML =
       '<div class="qr-note-txt" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;font-size:12px">' +
-      '📧 <b>Email envoyé !</b> Si cette adresse correspond à un compte, vous y trouverez votre numéro unique et la marche à suivre. Pensez à vérifier vos courriers indésirables.' +
+      '📧 <b>Demande enregistrée.</b> Si cette adresse correspond à un compte, vous recevrez un email avec votre numéro unique, la marche à suivre et un lien de réinitialisation (valable 1 heure). Pensez à vérifier vos courriers indésirables.' +
       '</div>';
   } else {
+    // Aucun identifiant a l'ecran, jamais : on renvoie vers un agent.
     resultat.innerHTML =
       '<div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:12px;font-size:12px">' +
-      '⚠️ Envoi impossible momentanément. Votre identifiant : <b>' + identifiant + '</b>.' + (typeCompte==='admin' ? ' Allez dans Gestion → Mots de passe pour changer votre mot de passe.' : typeCompte==='agent'||typeCompte==='sousagent' ? ' Contactez l\'administration.' : ' Contactez un agent pour réinitialiser votre mot de passe.') + ' (Lien de réinitialisation indisponible pour l\'instant)' +
+      '⚠️ Envoi impossible momentanément. Réessayez plus tard, ou présentez-vous chez un agent agréé avec une pièce d\'identité pour réinitialiser votre mot de passe.' +
       '</div>';
   }
 }
@@ -5560,6 +5646,31 @@ async function restaurerCorbeille(corbeilleId) {
   // rechargement suivant, et rien ne le signalait. La fonction d'enregistrement existait
   // pourtant déjà ; elle n'était simplement pas branchée ici.
   const sbFnMap = {agents:sbSaveAgent,sousAgents:sbSaveSousAgent,clients:sbSaveClient,passagers:sbSavePassager,vehs:sbSaveVehicule,taxis:sbSaveTaxi,trajets:sbSaveTrajet,annonces:sbSaveAnnonce,alertes:sbSaveAlerte,demandesCourse:sbSaveDemandeCourse};
+
+  // ══ ⚠️ 21/09 — RESTITUER NE REMET PLUS LE SECRET : IL FAUT LE DIRE ══
+  //
+  // Supprimer EFFACE vraiment la ligne (envoyerCorbeille → sbDeleteItem →
+  // supprimer_element) ; restituer la RECREE par sbSaveClient / sbSaveVehicule.
+  // Or, depuis la v9.640, sbSaveClient n'envoie plus « pass_hash » et sbSaveVehicule
+  // n'envoie plus « code » : la fiche revient donc SANS mot de passe et SANS code
+  // d'acces. Verifie sur PostgreSQL : apres cette sequence, les deux colonnes sont
+  // NULLES. La personne ne peut plus entrer, et l'ecran disait simplement « Restaure ».
+  //
+  // Deux reponses, aucune ne fait redescendre un secret :
+  //   • si l'instantane porte encore l'empreinte (fiche supprimee AVANT la v9.640),
+  //     on la repose par la mise a jour CIBLEE deja prevue pour un compte neuf
+  //     (drapeau « _mdpInitial » lu par sbSaveClient) : elle ne demande aucun droit
+  //     de lecture sur pass_hash et ne relit rien ;
+  //   • sinon — et toujours pour un vehicule, dont le code ne se reecrit plus jamais
+  //     depuis le navigateur — on le DIT, avec le geste exact a faire ensuite.
+  let _secretPerdu = '', _ouLeRefaire = '';
+  if(entree.listeOrigine === 'clients') {
+    if(entree.data && entree.data.pass) entree.data._mdpInitial = true;
+    else { _secretPerdu = 'mot de passe'; _ouLeRefaire = 'Gestion → Mots de passe'; }
+  } else if(entree.listeOrigine === 'vehs' || entree.listeOrigine === 'vehicules') {
+    _secretPerdu = 'code d\'accès propriétaire'; _ouLeRefaire = 'Gestion → Code accès propriétaires';
+  }
+
   if(sbFnMap[entree.listeOrigine]) {
     await sbFnMap[entree.listeOrigine](entree.data);  // ✅ AWAIT!
     addDebugLog('💾 Sauvegardé dans Supabase');
@@ -5577,8 +5688,14 @@ async function restaurerCorbeille(corbeilleId) {
   await sbDeleteCorbeille(corbeilleId);  // ✅ AWAIT!
   
   addDebugLog('✅ RESTAURATION OK');
-  
-  toast('♻️ Restauré : ' + entree.label);
+
+  if(_secretPerdu) {
+    addDebugLog('⚠️ RESTAURATION : ' + _secretPerdu + ' NON restauré (' + entree.label + ')');
+    toast('♻️ « ' + entree.label + ' » restauré, mais SANS son ' + _secretPerdu +
+          ' — redonnez-le depuis ' + _ouLeRefaire + ', sinon cette personne ne pourra plus entrer.', true);
+  } else {
+    toast('♻️ Restauré : ' + entree.label);
+  }
   rGestion();
 }
 function supprimerDefinitivement(corbeilleId) {
@@ -6454,6 +6571,98 @@ async function redemanderJeton() {
   return null;
 }
 
+// ══ 15/09 — LE CODE D'ACCES ET LES MOTS DE PASSE PASSENT PAR LE SERVEUR ══
+//
+// Depuis la fuite du 15/09, le code d'un vehicule et l'empreinte d'un mot de passe client
+// ne descendent plus sur les appareils. Les ecrans du personnel qui les affichaient ou les
+// modifiaient demandent donc au serveur, preuve d'identite a l'appui :
+//   • le JETON du personnel (code_du_vehicule, definir_code_vehicule) ;
+//   • ou l'identifiant + le MOT DE PASSE redemande sur place (changer_mdp_compte,
+//     changer_proprietaire), comme le fait deja l'application.
+
+// L'identifiant de connexion du membre du personnel, tel qu'il l'a tape en entrant.
+function _identifiantPersonnel() {
+  try {
+    const o = JSON.parse(localStorage.getItem('afrimoto_jeton') || 'null');
+    if(o && o.id) return String(o.id);
+  } catch(e) {}
+  if(!DB.user) return '';
+  if(DB.user.role === 'admin') return DB.adminId || '';
+  if(DB.user.role === 'agent') {
+    const a = (DB.agents || []).find(x => x.id === DB.user.agId);
+    return a ? String(a.num || a.code || '') : '';
+  }
+  return '';
+}
+
+// Appelle une fonction « a jeton » ; si la session a expire, redemande le mot de passe
+// une seule fois et recommence.
+async function _rpcAvecJeton(nom, params) {
+  const tenter = async (jeton) => {
+    const { data, error } = await supabaseClient.rpc(nom, Object.assign({ p_jeton: jeton || '' }, params));
+    if(error) throw new Error(error.message);
+    return data || {};
+  };
+  let r = await tenter(jetonPersonnel());
+  if(r.ok !== true && r.raison === 'session_invalide') {
+    const neuf = await redemanderJeton();
+    if(neuf) r = await tenter(neuf);
+  }
+  return r;
+}
+
+// Le code d'acces d'un vehicule, pour le personnel uniquement. Chaque lecture est inscrite
+// au journal des acces sensibles par le serveur. Rend '' si refuse ou indisponible.
+async function codeDuVehicule(vehId) {
+  if(!vehId || !(isAdmin() || isAgent())) return '';
+  try {
+    const r = await _rpcAvecJeton('code_du_vehicule', { p_vehicule_id: vehId });
+    return (r && r.ok === true && r.code) ? String(r.code) : '';
+  } catch(e) {
+    try { addDebugLog('CODE vehicule indisponible : ' + ((e && e.message) || e)); } catch(er) {}
+    return '';
+  }
+}
+
+// Bouton « Afficher » : le code n'est demande qu'au moment ou on le regarde.
+async function afficherCodeVehicule(vehId, elId) {
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = '⏳';
+  const code = await codeDuVehicule(vehId);
+  el.textContent = code || '— (refusé ou indisponible)';
+}
+
+// Redemande le mot de passe du membre du personnel, pour une fonction qui l'exige.
+async function _motDePassePersonnel(titre) {
+  const ident = _identifiantPersonnel();
+  if(!ident) { toast('⛔ Identifiant du personnel introuvable : reconnectez-vous.', true); return null; }
+  const pw = await demanderMotDePasse(titre || 'Confirmez votre identité',
+    'Saisissez VOTRE mot de passe (' + ident + ') : le serveur vérifie qui fait ce changement.');
+  if(!pw) return null;
+  return { num: ident, pw: pw };
+}
+
+function _messageRefusMdp(raison) {
+  const m = {
+    mdp_trop_court: 'Le mot de passe doit contenir au moins 6 caractères.',
+    mdp_identique: 'Le nouveau mot de passe est identique à l\'ancien.',
+    identifiants: 'Mot de passe actuel incorrect.',
+    ancien_refuse: 'Mot de passe actuel incorrect.',
+    compte_refuse: 'Votre mot de passe du personnel est incorrect.',
+    agent_refuse: 'Votre mot de passe du personnel est incorrect.',
+    reserve_admin: 'Réservé à l\'administration.',
+    suspendu: 'Ce compte est suspendu.',
+    non_valide: 'Ce compte n\'est pas encore validé.',
+    introuvable: 'Compte introuvable.',
+    session_invalide: 'Session expirée : reconnectez-vous.',
+    reserve_personnel: 'Réservé à l\'administration.',
+    code_invalide: 'Code invalide (4 à 32 caractères, lettres, chiffres ou tirets).',
+    code_deja_pris: 'Ce code est déjà utilisé par un autre propriétaire.'
+  };
+  return m[raison] || ('Refusé par le serveur' + (raison ? ' (' + raison + ')' : '') + '.');
+}
+
 function clearSession() {
   try { localStorage.removeItem('afrimoto_session'); } catch(e) {}
   // v9.560 : le jeton du personnel meurt avec la session. On le dit aussi au serveur, pour
@@ -6503,13 +6712,17 @@ async function doLogin() {
       });
     };
     const _corbeilleUtile = async () => {
-      const { data } = await supabaseClient.from('corbeille').select('*')
+      // 21/09 : sans l'instantane de la fiche supprimee (il portait « code » et
+      // « pass_hash ») — voir COLONNES_CORBEILLE_PUBLIQUE. Seul « data.id » sert ici.
+      const { data } = await supabaseClient.from('corbeille').select(COLONNES_CORBEILLE_PUBLIQUE)
         .in('liste_origine', ['clients', 'vehicules']);
       if (data) _fusionner(DB.corbeille, data, mapCorbeille);
     };
 
     if(curRole === 'client') {
-      const { data } = await supabaseClient.from('clients').select('*').eq('num', id).limit(1);
+      // 15/09 : sans « pass_hash ». Le mot de passe est compare par le serveur
+      // (verifier_connexion), jamais sur l'appareil.
+      const { data } = await supabaseClient.from('clients').select(COLONNES_CLIENTS).eq('num', id).limit(1);
       _fusionner(DB.clients, data, mapClient);
       await _corbeilleUtile();
       // Un compte mis a la corbeille ne doit plus pouvoir se connecter.
@@ -6527,28 +6740,56 @@ async function doLogin() {
       _fusionner(DB.agents, data, mapAgent);
       await _corbeilleUtile();
     }
-    else if(curRole === 'sousagent') { 
-      const { data } = await supabaseClient.from('sous_agents').select('*'); 
+    else if(curRole === 'sousagent') {
+      const { data } = await supabaseClient.from('sous_agents').select('*');
       if(data && data.length > 0) DB.sousAgents = data.map(mapSousAgent);
-      
+
       // 🔧 FIX: Recharger corbeille pour vérifier si sous-agent supprimé
-      const { data: corbeilleData } = await supabaseClient.from('corbeille').select('*');
-      if(corbeilleData && corbeilleData.length > 0) DB.corbeille = corbeilleData.map(mapCorbeille);
+      // ══ ⚠️ 21/09 — LA TROISIEME PORTE, ET LA PLUS OUVERTE DES TROIS ══
+      //
+      // Ce « select('*') » partait SANS AUCUN FILTRE et — c'est le point — AVANT que le
+      // mot de passe ne soit verifie : il suffisait d'ouvrir l'onglet « sous-agent » de
+      // l'ecran de connexion et d'appuyer sur le bouton. N'importe qui recevait alors
+      // l'instantane COMPLET de chaque fiche supprimee, garde dans « corbeille.data » :
+      // le code des vehicules effaces et l'empreinte du mot de passe des clients effaces.
+      // Ce n'est pas l'ecran Corbeille du personnel (celui-la charge tout, ligne 1080,
+      // apres la connexion) : ici, personne n'est encore identifie.
+      // Et l'etape 4 n'y changera rien : « data » est une colonne de corbeille, pas de
+      // clients ni de vehicules.
+      //
+      // Ce controle ne lit qu'une chose — « ce sous-agent est-il dans la corbeille ? » —
+      // et pour cela il ne lui faut que la categorie et l'identifiant. On demande donc la
+      // meme liste etroite qu'aux deux autres portes (COLONNES_CORBEILLE_PUBLIQUE), et
+      // seulement les lignes de sous-agents. On COMPLETE la corbeille au lieu de la
+      // remplacer : ce qui avait ete charge au demarrage reste en place.
+      const { data: corbeilleData } = await supabaseClient.from('corbeille')
+        .select(COLONNES_CORBEILLE_PUBLIQUE)
+        .in('liste_origine', ['sous_agents', 'sousAgents', 'sousagents']);
+      if(corbeilleData) _fusionner(DB.corbeille, corbeilleData, mapCorbeille);
     }
   } catch(e) { }
 
   // 🔄 Recharger données Supabase AVANT vérification (comme pour client)
   try {
-    if(curRole === 'owner') { 
-      const { data: clientsData } = await supabaseClient.from('clients').select('*'); 
-      if(clientsData && clientsData.length > 0) {
-        // Garder les clients complets (même supprimés/suspendus) pour la vérification
-        const clientsComplets = clientsData.map(mapClient);
-        var _clientsForOwnerAuth = clientsComplets;
-      }
-      
+    if(curRole === 'owner') {
+      // ══ 15/09 — LA TABLE DES CLIENTS N'EST PLUS TELECHARGEE POUR OUVRIR UN ESPACE ══
+      // Ici partait « from('clients').select('*') » SANS AUCUN FILTRE : a chaque tentative
+      // de connexion proprietaire, la table entiere — numeros, telephones, e-mails ET
+      // empreintes de mot de passe de tous les clients — arrivait sur l'appareil de
+      // n'importe quel visiteur. C'etait le pire chemin de la fuite du 15/09.
+      // Elle ne servait qu'a comparer le numero client saisi : c'est maintenant le serveur
+      // qui le fait (verifier_code_proprietaire, plus bas).
+
       // 🔧 FIX: Recharger corbeille au login owner aussi pour vérifier client supprimé
-      const { data: corbeilleData } = await supabaseClient.from('corbeille').select('*');
+      // ⚠️ 21/09 — ET LA CORBEILLE REFERMAIT CETTE PORTE TROIS LIGNES PLUS BAS.
+      // Ce « select('*') » partait sans aucun filtre : la corbeille garde dans « data » un
+      // instantane COMPLET de chaque fiche supprimee — donc le code des vehicules effaces
+      // et l'empreinte du mot de passe des clients effaces. N'importe quel visiteur qui
+      // tentait une connexion proprietaire les recevait, alors meme qu'on venait de retirer
+      // le meme secret des tables vivantes. Et l'etape 4 n'y changera rien : « data » est
+      // une colonne de corbeille, pas de clients ni de vehicules.
+      // Ce controle ne lit que « c.data.id » : on ne demande plus que celui-la.
+      const { data: corbeilleData } = await supabaseClient.from('corbeille').select(COLONNES_CORBEILLE_PUBLIQUE);
       if(corbeilleData && corbeilleData.length > 0) DB.corbeille = corbeilleData.map(mapCorbeille);
     }
   } catch(e) { }
@@ -6670,15 +6911,17 @@ async function doLogin() {
     if(!v && id2 && typeof supabaseClient !== 'undefined' && supabaseClient) {
       try {
         const _col = (ownerTab === 'vin') ? 'vin' : 'mat';
+        // 15/09 : « code » retire de la liste. Il ne descend plus jamais : la comparaison
+        // se fait sur le serveur (verifier_code_proprietaire).
         const { data: _dv } = await supabaseClient.from('vehicules')
-          .select('id,mat,vin,statut,suspendu_auto,derniere_maj,code,client_id,owner,type')
+          .select('id,mat,vin,statut,suspendu_auto,derniere_maj,client_id,owner,type')
           .ilike(_col, String(id2).trim()).limit(1);
         if(_dv && _dv.length) {
           const _r = _dv[0];
           // On construit la fiche a la main : « mapVehicule » vit dans une autre portee.
           v = { id:_r.id, mat:_r.mat, vin:_r.vin, statut:_r.statut,
                 suspenduAuto:_r.suspendu_auto === true, derniereMaj:_r.derniere_maj,
-                code:_r.code, clientId:_r.client_id, owner:_r.owner, type:_r.type,
+                clientId:_r.client_id, owner:_r.owner, type:_r.type,
                 stolen: _r.statut === 'vole' };
         }
       } catch(e) {}
@@ -6774,23 +7017,54 @@ async function doLogin() {
       
       console.log('✅ Véhicule OK, cherche mot de passe...');
       
-      // ✅ Sinon, procéder à la vérification normale
+      // ══ 15/09 — LE SERVEUR COMPARE LE CODE, L'APPAREIL NE LE VOIT JAMAIS ══
+      //
+      // Avant : « v.code === pw » et « client.num === pw », compares ICI. Pour comparer
+      // sur l'appareil, il fallait y faire descendre le code de la moto et la table
+      // entiere des clients — c'est exactement ce qui fuyait le 15/09.
+      //
+      // Maintenant l'appareil envoie ce qui a ete tape ; verifier_code_proprietaire accepte
+      // les MEMES deux clefs (code du vehicule, ou numero du client proprietaire) et ne
+      // repond que ok / refus. Ni le code ni le numero client ne quittent le serveur.
+      // On envoie le matricule (ou le chassis) de la fiche trouvee, pour que la recherche
+      // du serveur tombe sur le meme vehicule que celle d'ici.
       let authenticated = false;
-      
-      // ✅ Essayer avec le code du véhicule
-      if(v.code === pw) {
-        authenticated = true;
+      let _refusServeur = '';
+      try {
+        const _identVeh = (ownerTab === 'vin') ? (v.vin || id2) : (v.mat || id2);
+        const { data: _vc, error: _vcErr } = await supabaseClient.rpc('verifier_code_proprietaire', {
+          p_identifiant: String(_identVeh || '').trim(), p_code: pw
+        });
+        if(_vcErr) {
+          _refusServeur = 'serveur';
+          try { addDebugLog('CODE PROPRIETAIRE serveur indisponible : ' + _vcErr.message); } catch(e) {}
+        } else if(_vc && _vc.ok === true) {
+          authenticated = true;
+          // Le serveur renvoie la fiche SANS le code : on la range pour l'espace proprietaire.
+          try {
+            if(_vc.vehicule && _vc.vehicule.id && typeof mapVehicule === 'function') {
+              const _m = mapVehicule(_vc.vehicule);
+              const _i = DB.vehs.findIndex(x => x.id === _m.id);
+              if(_i >= 0) DB.vehs[_i] = _m; else DB.vehs.push(_m);
+            }
+          } catch(e) {}
+        } else {
+          _refusServeur = (_vc && _vc.raison) || 'code_incorrect';
+        }
+      } catch(e) {
+        _refusServeur = 'serveur';
+        try { addDebugLog('CODE PROPRIETAIRE erreur : ' + ((e && e.message) || e)); } catch(er) {}
       }
-      
-      // ✅ OU: Essayer avec num+pw du client
-      if(!authenticated && v.clientId && pw && _clientsForOwnerAuth) {
-        const clientComplet = _clientsForOwnerAuth.find(c => c.id===v.clientId && c.num===pw);
-        if(clientComplet) authenticated = true;
-      }
-      
+
       if(authenticated) {
         console.log('✅ LOGIN OWNER ACCEPTÉ!');
         user = {role:'owner', name:v.owner, vid:v.id};
+      } else if(_refusServeur === 'serveur') {
+        // Plus de comparaison de secours sur l'appareil : elle exigerait de faire redescendre
+        // le code. On dit la vraie raison plutot que « identifiants incorrects ».
+        err.textContent = '⚠️ Vérification impossible pour le moment (serveur injoignable). Réessayez dans un instant.';
+        err.style.display = 'block';
+        return;
       } else {
         console.log('❌ Mot de passe incorrect');
       }
@@ -6800,6 +7074,9 @@ async function doLogin() {
   } else if(curRole==='client') {
     // v9.511 : le serveur tranche en premier. Il ne renvoie jamais d'empreinte de mot de
     // passe, et repond pareil pour un compte inexistant ou un mot de passe faux.
+    // 15/09 : sans repli local, un seul echec reseau passe ne doit pas condamner toutes les
+    // tentatives suivantes de cette page : on redonne sa chance au serveur a chaque essai.
+    _connexionServeurDisponible = null;
     const _sv = await connexionServeur('client', id, pw);
     if(_sv && _sv.ok === false && _sv.raison === 'suspendu') {
       err.innerHTML = "⛔ <b>Compte suspendu.</b> Rendez-vous chez l'agent agréé le plus proche pour régulariser votre situation (mise à jour d'enregistrement ou autre).";
@@ -6809,11 +7086,13 @@ async function doLogin() {
     // 🔧 FIX: Vérifier si client est dans la corbeille (supprimé)
     const isInCorbeille = DB.corbeille.some(c => c.listeOrigine === 'clients' && c.data && c.data.id === id);
     
-    // Client suspendu avec bons identifiants : message dédié (pas "identifiants incorrects")
-    // Repli local : seulement si le serveur n'a pas repondu.
-    const clSusp = DB.clients.find(c => c.num===id && c.suspendu);
-    if(!_sv && clSusp && await verifyPw(pw, clSusp.pass)) {
-      err.innerHTML = '⛔ <b>Compte suspendu.</b> Rendez-vous chez l\'agent agréé le plus proche pour régulariser votre situation (mise à jour d\'enregistrement ou autre).';
+    // ══ 15/09 — PLUS DE REPLI LOCAL SUR L'EMPREINTE DU MOT DE PASSE ══
+    // Le repli « serveur muet -> on compare ici » exigeait de faire descendre pass_hash sur
+    // l'appareil : c'est la fuite du 15/09. Sans empreinte en memoire, il refuserait de toute
+    // facon tout le monde. Si le serveur ne repond pas, on le DIT, au lieu de laisser croire
+    // a un mauvais mot de passe.
+    if(!_sv) {
+      err.textContent = '⚠️ Connexion impossible pour le moment (serveur injoignable). Réessayez dans un instant.';
       err.style.display = 'block';
       return;
     }
@@ -6846,7 +7125,8 @@ async function doLogin() {
       // Ils ont ete compares : ils donnent le meme resultat. Garder ce filet reviendrait
       // desormais a ignorer un vrai refus du serveur — c'est-a-dire a ne plus rien
       // verifier du tout. Il ne reste que le repli quand le serveur est INJOIGNABLE.
-      const _ok = _sv ? (_sv.ok === true) : await verifyPw(pw, cl.pass);
+      // 15/09 : le serveur seul tranche (voir plus haut : sans reponse, on s'est deja arrete).
+      const _ok = !!(_sv && _sv.ok === true);
       if(_ok) user = {role:'client', name:cl.prenom+' '+cl.nom, id:cl.id};
     } else if(_sv && _sv.ok === true) {
       // Le serveur reconnait ce compte alors qu'il n'est pas dans la memoire locale.
@@ -12672,7 +12952,7 @@ function openChgProp(vid) {
   openModal('m-chgprop');
 }
 
-function saveChgProp() {
+async function saveChgProp() {
   if(!canEdit()) { toast('⛔ Le transfert de propriété est réservé aux agents et à l\'administration', true); return; }
   const v = DB.vehs.find(x=>x.id===chgPropVid);
   if(!v) return;
@@ -12717,18 +12997,61 @@ function saveChgProp() {
     return;
   }
 
+  // ══ 15/09 — LE TRANSFERT PASSE PAR LE SERVEUR, QUI FABRIQUE LE NOUVEAU CODE ══
+  //
+  // Avant : le code « MS-xxxx » etait tire ICI, range dans « v.code » puis envoye par
+  // sbSaveVehicule. Depuis la fuite du 15/09, cette sauvegarde n'envoie plus jamais le
+  // code (elle l'effacerait, puis serait refusee apres la fermeture) : le nouveau code ne
+  // serait donc jamais arrive en base, et l'ANCIEN aurait continue d'ouvrir l'espace.
+  //
+  // changer_proprietaire (deja en production, utilisee par l'application) fait tout le
+  // transfert d'un seul coup : memes refus anti-vol (vendu obligatoire, vole, suspendu),
+  // pieces obligatoires, code NEUF et verifie unique, rattachement de l'ancien proprietaire
+  // COUPE, historique et trace nominative. Elle exige l'identifiant et le mot de passe de
+  // l'agent ou de l'administration : on le redemande ici.
+  const auth = await _motDePassePersonnel('Transfert de propriété');
+  if(!auth) return;
+
   const ancienProprio = {nom:v.owner, tel:v.phone, depuis:v.reg};
-
-  // Générer nouveau code d'accès (aléatoire cryptographiquement sécurisé)
-  const nouveauCode = 'MS-' + (Array.from(crypto.getRandomValues(new Uint32Array(1)))[0] % 9000 + 1000);
-
-  // Ajouter ancien proprio à l'historique
-  if(!v.hist) v.hist = [];
-  v.hist.push({nom:v.owner, tel:v.phone, depuis:v.reg, jusquau:new Date().toISOString().split('T')[0], attestation:attestVente});
-
-  // Mettre à jour le véhicule
   const ancienOwner = v.owner;
-  v.owner = (prenom ? prenom+' ' : '') + nom;
+  let rep = null;
+  try {
+    const { data, error } = await supabaseClient.rpc('changer_proprietaire', {
+      p_num: auth.num, p_mot_de_passe: auth.pw, p_vehicule_id: v.id,
+      p_donnees: {
+        prenom: prenom, nom: nom, tel: tel, piece: photoPieceNouv, attestation: attestVente,
+        addr: addr, secours: secours, lien_secours: lien,
+        date_naissance: dnais, lieu_naissance: lnais, nationalite: nat, profession: prof,
+        nom_pere: npere, nom_mere: nmere, type_piece: tpiece, num_piece: npiece
+      }
+    });
+    if(error) { err.textContent = '⚠️ Serveur injoignable : ' + error.message; err.style.display='block'; return; }
+    rep = data || {};
+  } catch(e) { err.textContent = '⚠️ Serveur injoignable. Réessayez.'; err.style.display='block'; return; }
+
+  if(rep.ok !== true) {
+    const raisons = {
+      agent_refuse: '⛔ Votre mot de passe est incorrect.',
+      pas_marque_vendu: '🔒 <b>TRANSFERT BLOQUÉ</b> — Le propriétaire actuel doit d\'abord marquer cette moto comme <b>VENDUE</b> depuis son espace propriétaire.',
+      vehicule_vole: '🚨 <b>TRANSFERT IMPOSSIBLE</b> — Cette moto est déclarée <b>VOLÉE</b>.',
+      vehicule_suspendu: '⏸️ <b>TRANSFERT BLOQUÉ</b> — L\'enregistrement de ce véhicule est <b>SUSPENDU</b>.',
+      identite_manquante: '⚠️ Nom et téléphone du nouveau propriétaire obligatoires.',
+      piece_manquante: '⚠️ La photo de la pièce d\'identité du nouveau propriétaire est obligatoire.',
+      attestation_manquante: '⚠️ La photo de l\'attestation de vente est obligatoire.',
+      introuvable: '⚠️ Véhicule introuvable sur le serveur.',
+      code_introuvable: '⚠️ Aucun code libre trouvé, réessayez.'
+    };
+    err.innerHTML = raisons[rep.raison] || ('⚠️ Transfert refusé par le serveur (' + esc(String(rep.raison || '?')) + ').');
+    err.style.display='block';
+    return;
+  }
+  const nouveauCode = String(rep.code || '');
+
+  // La fiche locale suit ce que le serveur vient d'ecrire — SANS le code, qui ne reste
+  // jamais en memoire.
+  if(!v.hist) v.hist = [];
+  v.hist.push({nom:ancienOwner, tel:ancienProprio.tel, depuis:v.reg, jusquau:new Date().toISOString().split('T')[0], attestation:attestVente});
+  v.owner = rep.proprietaire || ((prenom ? prenom+' ' : '') + nom);
   v.photoPiece = photoPieceNouv;   // pièce d'identité du nouveau propriétaire
   v.photoP = null;                 // l'ancienne photo de profil ne correspond plus
   if(dnais) v.dateNaissance=dnais; if(lnais) v.lieuNaissance=lnais;
@@ -12737,28 +13060,52 @@ function saveChgProp() {
   if(tpiece) v.typePiece=tpiece; if(npiece) v.numPiece=npiece;
   v.phone = tel;
   v.addr = addr || v.addr;
-  v.secours = secours;
-  v.lienSecours = lien;
-  v.code = nouveauCode;
+  if(secours) v.secours = secours;
+  if(lien) v.lienSecours = lien;
+  v.code = '';
+  v.clientId = null;               // le serveur a coupe le rattachement de l'ancien
   v.reg = new Date().toISOString().split('T')[0];
   v.vis = {owner:true,phone:false,addr:false,vin:false,photo:false,photoP:false};
   v.enVente = false; // le marqueur « vendu » est consommé — le nouveau proprio est protégé à son tour
+  // La visibilite est remise a zero pour le nouveau proprietaire (le serveur ne le fait
+  // pas) : le telephone de l'acheteur ne doit pas devenir public parce que le vendeur
+  // avait choisi d'afficher le sien. Mise a jour CIBLEE, qui ne touche ni au code ni au reste.
+  //
+  // ⚠️ 21/09 — ET AVEC ELLE, CE QUE « changer_proprietaire » NE RECOIT PAS.
+  // Jusqu'a la v9.639, sbSaveVehicule reecrivait TOUTE la fiche apres un transfert. La
+  // v9.640 retire cette sauvegarde (elle effacerait le code) et confie l'ecriture au
+  // serveur — mais le contrat de « changer_proprietaire », celui qu'emploie deja
+  // l'application, ne porte que : prenom, nom, tel, piece, attestation, addr, secours,
+  // lien_secours, type_piece, num_piece. Six champs d'identite du NOUVEAU proprietaire
+  // (naissance, nationalite, profession, noms du pere et de la mere) et la photo de
+  // l'ANCIEN ne seraient donc plus ecrits nulle part : l'ecran les affiche, la base ne les
+  // a pas — et le visage du vendeur resterait colle a la moto de l'acheteur. On les pose
+  // ici, dans la MEME mise a jour ciblee : elle n'envoie ni « code » ni empreinte et ne
+  // relit rien (eprouve sur PostgreSQL, elle passe encore apres la fermeture de l'etape 4).
+  // Si le serveur les ecrit deja, ce sont exactement les memes valeurs : rien ne change.
+  try {
+    const _majFiche = { vis: v.vis, photo_proprietaire: null };
+    if(dnais) _majFiche.date_naissance = dnais;
+    if(lnais) _majFiche.lieu_naissance = lnais;
+    if(nat)   _majFiche.nationalite = nat;
+    if(prof)  _majFiche.profession = prof;
+    if(npere) _majFiche.nom_pere = npere;
+    if(nmere) _majFiche.nom_mere = nmere;
+    const { error: _ev } = await supabaseClient.from('vehicules').update(_majFiche).eq('id', v.id);
+    if(_ev) {
+      console.warn('Transfert : fiche du nouveau propriétaire incomplète :', _ev.message);
+      toast('⚠️ Transfert enregistré, mais la fiche du nouveau propriétaire n\'a pas été complétée (visibilité, identité) — vérifiez-la dans le registre.', true);
+    }
+  } catch(e) {}
 
   // Mettre à jour le client lié (si existe)
   const ancienClient = DB.clients.find(c=>c.tel===ancienProprio.tel||c.vid===v.id);
   if(ancienClient && ancienClient.vid===v.id) {
     ancienClient.vid = null; // retirer véhicule de l'ancien proprio
+    sbSaveClient(ancienClient);
   }
-
-  // Sauvegarde Supabase (BUG CORRIGÉ : le transfert n'était jamais persisté)
-  sbSaveVehicule(v);
-  if(ancienClient && ancienClient.vid === null) sbSaveClient(ancienClient);
-
-  // Log mouvement
-  logMvt('enreg',
-    '🔄 Transfert ' + v.mat + ' : ' + ancienOwner + ' → ' + nom,
-    0, DB.user?DB.user.name:'Agent', nom
-  );
+  // La trace nominative du transfert est ecrite par le serveur (mouvements) : on ne la
+  // double plus ici.
 
   closeModal('m-chgprop');
   rVehs(); rHome();
@@ -13415,17 +13762,36 @@ async function rafraichirVehiculesEtTaxis(terme) {
     if(brut) {
       const sur = brut.replace(/[,()*]/g, ' ').trim(); // ces caracteres ont un sens pour le serveur
       const estUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(brut);
+      // ══ 15/09 — PLUS DE RECHERCHE PAR CODE, PLUS DE CODE DANS LA REPONSE ══
+      // « code.ilike.*X* » laissait n'importe qui essayer des morceaux de code et recevoir
+      // jusqu'a 50 fiches COMPLETES, code compris : un moyen de deviner la clef de l'espace
+      // proprietaire. Le QR porte « num|mat|vin », le code n'y a jamais servi.
       const qv = estUuid
-        ? supabaseClient.from('vehicules').select('*').eq('id', brut).limit(1)
-        : supabaseClient.from('vehicules').select('*')
+        ? supabaseClient.from('vehicules').select(COLONNES_VEHICULES).eq('id', brut).limit(1)
+        : supabaseClient.from('vehicules').select(COLONNES_VEHICULES)
             .or(['mat.ilike.*' + sur + '*', 'vin.ilike.*' + sur + '*',
-                 'code.ilike.*' + sur + '*', 'num.ilike.*' + sur + '*'].join(','))
+                 'num.ilike.*' + sur + '*'].join(','))
             .limit(50);
+      // ══ 21/09 — LE REPLI NE CHERCHAIT AUCUN TAXI : LA REQUETE ETAIT REFUSEE ══
+      //
+      // Cette ligne demandait « code.ilike.*X* » sur la table des taxis. Or cette table
+      // N'A PAS de colonne « code » (verifie en production : les 37 colonnes s'appellent
+      // id, nom, plaque, gilet, zone, tel... et « code » n'en fait pas partie). Le serveur
+      // refusait donc la requete ENTIERE — « column taxis.code does not exist », HTTP 400 —
+      // et pas seulement ce morceau : le repli ne ramenait plus AUCUN taxi, ni par plaque
+      // ni par numero de gilet. L'echec etait invisible, parce que « (taxis || []) » plus
+      // bas avale tranquillement la reponse vide.
+      //
+      // C'est le chemin de secours de la VERIFICATION anti-vol : celui qu'on emprunte quand
+      // chercher_registre n'a rien trouve. Repondre « inconnu » sans avoir regarde, c'est
+      // rassurer a tort sur un vehicule peut-etre vole — exactement ce que le repli existe
+      // pour eviter. On retire le morceau impossible ; la plaque et le gilet cherchent a
+      // nouveau. (Meme raison que pour le code des vehicules, retire juste au-dessus : ici
+      // ce n'est pas un secret, c'est une colonne qui n'existe pas.)
       const qt = estUuid
         ? supabaseClient.from('taxis').select('*').eq('id', brut).limit(1)
         : supabaseClient.from('taxis').select('*')
-            .or(['plaque.ilike.*' + sur + '*', 'gilet.ilike.*' + sur + '*',
-                 'code.ilike.*' + sur + '*'].join(','))
+            .or(['plaque.ilike.*' + sur + '*', 'gilet.ilike.*' + sur + '*'].join(','))
             .limit(50);
       const [{data: vehs}, {data: taxis}] = await Promise.all([qv, qt]);
       (vehs  || []).forEach(l => _ranger(DB.vehs,  l, mapVehicule));
@@ -13473,10 +13839,12 @@ function processSearch(qn) {
   }
 
   // Chercher véhicule
+  // 15/09 : la recherche publique PAR CODE est retiree. Elle confirmait a un inconnu qu'un
+  // code devine etait le bon (fiche trouvee = code juste). Le QR porte « num|mat|vin » :
+  // « qCode » est le numero du registre, toujours cherche ci-dessous.
   let v = DB.vehs.find(v =>
     nrm(v.mat)===qMat || nrm(v.mat)===qn ||
     nrm(v.vin)===qn ||
-    nrm(v.code)===qCode || nrm(v.code)===qn ||
     nrm(v.num||'')===qCode || nrm(v.num||'')===qn
   );
   // SÉCURITÉ : un véhicule non validé n'est pas vérifiable publiquement (QR, matricule ou VIN).
@@ -14152,6 +14520,26 @@ async function validerChangerMdp() {
   if(type==='client')    obj = DB.clients.find(c=>c.id===id);
   if(type==='passager')  obj = DB.passagers.find(p=>p.id===id);
   if(!obj){err.textContent='⚠️ Compte introuvable.';err.style.display='block';return;}
+  // ══ 15/09 — LE CLIENT CHANGE SON MOT DE PASSE PAR LE SERVEUR ══
+  // La fiche client ne porte plus l'empreinte (fuite du 15/09) : « obj.pass » vaut '', la
+  // comparaison locale refuserait tout, et sbSaveClient n'ecrit plus pass_hash — le nouveau
+  // mot de passe se serait perdu EN SILENCE. changer_mon_mot_de_passe verifie l'ancien et
+  // ecrit le nouveau cote serveur, sans jamais renvoyer d'empreinte.
+  if(type==='client') {
+    try {
+      const { data, error } = await supabaseClient.rpc('changer_mon_mot_de_passe', {
+        p_role: 'client', p_num: obj.num, p_ancien: ancien, p_nouveau: nv
+      });
+      if(error) { err.textContent='⚠️ Serveur injoignable. Réessayez dans un instant.'; err.style.display='block'; return; }
+      if(!data || data.ok !== true) {
+        err.textContent = '❌ ' + _messageRefusMdp(data && data.raison);
+        err.style.display='block'; return;
+      }
+    } catch(e) { err.textContent='⚠️ Serveur injoignable. Réessayez dans un instant.'; err.style.display='block'; return; }
+    closeModal('m-chg-mdp');
+    toast('✅ Mot de passe changé avec succès !');
+    return;
+  }
   // Vérifier ancien MDP
   const ancienOk = await verifyPw(ancien, obj.pass);
   if(!ancienOk){err.textContent='❌ Ancien mot de passe incorrect.';err.style.display='block';return;}
@@ -14159,7 +14547,6 @@ async function validerChangerMdp() {
   obj.pass = await hashPw(nv);
   if(type==='agent')     sbSaveAgent(obj);
   if(type==='sousagent') sbSaveSousAgent(obj);
-  if(type==='client')    sbSaveClient(obj);
   if(type==='passager')  sbSavePassager(obj);
   closeModal('m-chg-mdp');
   toast('✅ Mot de passe changé avec succès !');
@@ -15047,7 +15434,10 @@ function showVeh(id) {
   const tf = DB.tarifs.find(t=>t.id===v.cat);
   const rows = [
     ...(isAdmin() ? [['N° Registre',v.num]] : []),
-    ...(isAdmin() ? [['Code accès',v.code]] : []),
+    // 15/09 : le code n'est plus en memoire. Il est demande au serveur (code_du_vehicule,
+    // jeton du personnel, lecture inscrite au journal) seulement si on clique « Afficher ».
+    ...(isAdmin() ? [['Code accès','<span id="veh-code-acces-' + esc(v.id) + '" style="font-family:monospace">••••••</span> ' +
+      '<button class="btn-ghost" style="padding:2px 8px;font-size:11px" onclick="afficherCodeVehicule(\'' + esc(v.id) + '\',\'veh-code-acces-' + esc(v.id) + '\')">👁️ Afficher</button>']] : []),
     ['Matricule',v.mat],
     ['VIN / Châssis',v.vin||'—'],
     ['N° Carte grise',v.cg||'—'],
@@ -15422,9 +15812,15 @@ async function envoyerEmailRecapEnregistrement(v) {
     const email = cl && cl.email;
     if(!email) return false;
     const tf = DB.tarifs.find(t => t.id === (v.cat || v.catId));
+    // 15/09 : le code ne vit plus dans la memoire du navigateur. On le demande au serveur
+    // (code_du_vehicule, personnel authentifie, lecture journalisee). A la creation, la
+    // fiche peut ne pas etre encore relue : le code pose par le serveur est alors le
+    // numero du client, que l'on connait deja.
+    let _codeAcces = await codeDuVehicule(v.id);
+    if(!_codeAcces) _codeAcces = v.code || (cl && cl.num) || '';
     const lignes = [
       'NUMÉRO UNIQUE : ' + v.num,
-      'Code d\'accès client : ' + v.code,
+      'Code d\'accès client : ' + (_codeAcces || '— (demandez-le à votre agent)'),
       cl && cl.user ? 'Identifiant de connexion client : ' + cl.user : null,
       '',
       '── PROPRIÉTAIRE ──',
@@ -15782,7 +16178,10 @@ async function saveMoto() {
     while(DB.clients.some(c => nrm(c.user) === ownerUser)) { suffixe++; ownerUser = nrm(np.prenom) + '.' + nrm(np.nom) + suffixe; }
     const newClient = {
       id: gid(), num: genNumPersonne('client', DB.clients, np.nom, np.prenom), prenom: np.prenom, nom: np.nom, tel: phone, email: np.email,
-      user: ownerUser, pass: await hashPw(np.ownerPass), permis: '', solde: 0, vid: null
+      user: ownerUser, pass: await hashPw(np.ownerPass), permis: '', solde: 0, vid: null,
+      // 15/09 : sbSaveClient n'ecrit plus pass_hash. Ce drapeau lui dit que ce compte VIENT
+      // d'etre cree ici : il pose alors ce premier mot de passe par une mise a jour ciblee.
+      _mdpInitial: true
     };
     DB.clients.push(newClient);
     sbSaveClient(newClient);
@@ -22652,7 +23051,7 @@ function rGestion() {
       ${DB.vehs.map(v=>`
         <div class="card" style="margin-bottom:7px">
           <div style="font-weight:700;margin-bottom:3px">${v.mat} <span style="font-size:11px;color:var(--text2)">${esc(v.owner)}</span></div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">ID: <span style="color:#EAB308;font-family:monospace">${v.num}</span> · Code actuel: <span style="font-family:monospace">${v.code}</span></div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">ID: <span style="color:#EAB308;font-family:monospace">${v.num}</span> · Code actuel: <span id="code-actuel-${v.id}" style="font-family:monospace">••••••</span> <button class="btn-ghost" style="padding:1px 7px;font-size:10px" onclick="afficherCodeVehicule('${v.id}','code-actuel-${v.id}')">👁️</button></div>
           <div style="display:flex;gap:8px">
             <input type="text" id="mdp-veh-${v.id}" placeholder="Nouveau code accès" style="flex:1;font-family:monospace"/>
             <button class="btn" style="flex-shrink:0;padding:10px 14px" onclick="changeMdp('veh','${v.id}')">💾</button>
@@ -23829,6 +24228,40 @@ async function changeMdpAdmin() {
   });
 }
 async function changeMdp(type, id) {
+  // ══ 15/09 — CODE D'ACCES ET MOT DE PASSE CLIENT : ECRITS PAR LE SERVEUR ══
+  // sbSaveVehicule n'envoie plus « code » et sbSaveClient n'envoie plus « pass_hash »
+  // (fuite du 15/09). Les ecrire comme avant ne ferait RIEN — en silence : l'ecran dirait
+  // « modifie » et la personne ne pourrait plus entrer. Ces deux cas passent donc par :
+  //   • definir_code_vehicule (jeton du personnel, administration) ;
+  //   • changer_mdp_compte (identifiant + mot de passe du personnel, redemande ici).
+  if(type === 'veh' || type === 'client') {
+    const champId = type === 'veh' ? 'mdp-veh-' + id : 'mdp-cl-' + id;
+    const valeur = ((document.getElementById(champId)||{}).value || '').trim();
+    if(!valeur) { toast('Valeur vide', true); return; }
+    const cible = type === 'veh' ? DB.vehs.find(x=>x.id===id) : DB.clients.find(x=>x.id===id);
+    if(!cible) { toast('Introuvable', true); return; }
+    try {
+      let r = null;
+      if(type === 'veh') {
+        r = await _rpcAvecJeton('definir_code_vehicule', { p_vehicule_id: id, p_code: valeur });
+      } else {
+        if(valeur.length < 6) { toast('⚠️ Le mot de passe doit contenir au moins 6 caractères.', true); return; }
+        const auth = await _motDePassePersonnel('Changer le mot de passe du client');
+        if(!auth) return;
+        const { data, error } = await supabaseClient.rpc('changer_mdp_compte', {
+          p_num: auth.num, p_mot_de_passe: auth.pw, p_cible_type: 'client',
+          p_cible_id: id, p_nouveau: valeur
+        });
+        if(error) throw new Error(error.message);
+        r = data || {};
+      }
+      if(!r || r.ok !== true) { toast('⛔ ' + _messageRefusMdp(r && r.raison), true); return; }
+    } catch(e) { toast('⛔ Serveur injoignable : ' + ((e && e.message) || ''), true); return; }
+    const _champ = document.getElementById(champId); if(_champ) _champ.value = '';
+    toast('✅ ' + (type==='veh'?'Code accès':'Mot de passe') + ' modifié · ' + (cible.prenom||cible.mat||cible.owner||''));
+    rGestion();
+    return;
+  }
   let val, obj, champ='pass';
   if(type==='agent')     { val=(document.getElementById('mdp-ag-'+id)||{}).value?.trim();  obj=DB.agents.find(x=>x.id===id); }
   else if(type==='sousagent') { val=(document.getElementById('mdp-sa-'+id)||{}).value?.trim(); obj=DB.sousAgents.find(x=>x.id===id); }
@@ -24350,8 +24783,9 @@ async function _ficheSuspendue(kind, id) {
                   : (DB.vehs  || []).find(function(v){ return v.id === id; });
   if(x) return x;
   try {
+    // 15/09 : un vehicule se lit sans « code » (COLONNES_VEHICULES) ; un taxi, inchange.
     const { data } = await supabaseClient.from(estTaxi ? 'taxis' : 'vehicules')
-      .select('*').eq('id', id).limit(1);
+      .select(estTaxi ? '*' : COLONNES_VEHICULES).eq('id', id).limit(1);
     if(data && data[0]) {
       x = estTaxi ? mapTaxi(data[0]) : mapVehicule(data[0]);
       if(estTaxi) { DB.taxis = DB.taxis || []; DB.taxis.push(x); }
@@ -25479,8 +25913,20 @@ async function clientChangeMdp() {
   const nv = (document.getElementById('cl-new-pw')||{}).value?.trim();
   if(!nv) { toast('Mot de passe vide', true); return; }
   if(nv.length < 6) { toast('Minimum 6 caractères', true); return; }
-  cl.pass = await hashPw(nv);
-  sbSaveClient(cl); // AUDIT CRITIQUE : le nouveau mot de passe n'était jamais persisté
+  if(!cl) { toast('Compte introuvable', true); return; }
+  // ══ 15/09 — CHANGER SON MOT DE PASSE PASSE PAR LE SERVEUR ══
+  // sbSaveClient n'envoie plus pass_hash (fuite du 15/09) : l'ancienne ecriture ne ferait
+  // plus rien, en silence. changer_mon_mot_de_passe exige l'ANCIEN mot de passe — un
+  // telephone laisse deverrouille ne suffit plus a voler le compte.
+  const ancien = await demanderMotDePasse('Mot de passe actuel', 'Pour changer votre mot de passe, saisissez d\'abord celui que vous utilisez aujourd\'hui.');
+  if(!ancien) return;
+  try {
+    const { data, error } = await supabaseClient.rpc('changer_mon_mot_de_passe', {
+      p_role: 'client', p_num: cl.num, p_ancien: ancien, p_nouveau: nv
+    });
+    if(error) { toast('⚠️ Serveur injoignable. Réessayez dans un instant.', true); return; }
+    if(!data || data.ok !== true) { toast('❌ ' + _messageRefusMdp(data && data.raison), true); return; }
+  } catch(e) { toast('⚠️ Serveur injoignable. Réessayez dans un instant.', true); return; }
   document.getElementById('cl-new-pw').value = '';
   toast('✅ Mot de passe modifié avec succès');
 }
@@ -25502,10 +25948,32 @@ function editClient(id) {
     c.tel=ev('tel')||c.tel; c.email=ev('email')||c.email;
     c.permis=ev('permis');
     c.pieceType=ev('piece_type')||''; c.pieceNum=ev('piece_num')||'';
-    if(ev('pass')) { c.pass = await hashPw(ev('pass')); }
+    // 15/09 : le mot de passe ne part plus avec la fiche (sbSaveClient n'ecrit plus
+    // pass_hash). On le lit ici, et on l'envoie a changer_mdp_compte apres la sauvegarde.
+    const _nouveauMdp = ev('pass');
     c.solde=parseInt(ev('solde'))||0;
     await sbSaveClient(c);
-    closeModal('m-edit'); rGestion(); toast('✅ Client mis à jour'); updateNav();
+    let _avertMdp = '';
+    if(_nouveauMdp) {
+      if(_nouveauMdp.length < 6) { _avertMdp = '⚠️ Fiche enregistrée, mais le mot de passe doit contenir au moins 6 caractères : inchangé.'; }
+      else {
+        const auth = await _motDePassePersonnel('Changer le mot de passe du client');
+        if(!auth) { _avertMdp = '⚠️ Fiche enregistrée — mot de passe INCHANGÉ (confirmation annulée).'; }
+        else {
+          try {
+            const { data, error } = await supabaseClient.rpc('changer_mdp_compte', {
+              p_num: auth.num, p_mot_de_passe: auth.pw, p_cible_type: 'client',
+              p_cible_id: c.id, p_nouveau: _nouveauMdp
+            });
+            if(error) _avertMdp = '⚠️ Fiche enregistrée — mot de passe NON changé (serveur injoignable).';
+            else if(!data || data.ok !== true) _avertMdp = '⚠️ Fiche enregistrée — mot de passe NON changé : ' + _messageRefusMdp(data && data.raison);
+          } catch(e) { _avertMdp = '⚠️ Fiche enregistrée — mot de passe NON changé (serveur injoignable).'; }
+        }
+      }
+    }
+    closeModal('m-edit'); rGestion();
+    if(_avertMdp) toast(_avertMdp, true); else toast('✅ Client mis à jour');
+    updateNav();
   });
 }
 
@@ -27305,9 +27773,17 @@ function genPDF(vid) {
     toast('⚠️ Fenêtre bloquée par le navigateur. Autorisez les pop-ups pour générer le PDF.', true);
     return;
   }
+  // ══ 15/09 — LE CODE D'ACCES NE VIENT PLUS DE LA MEMOIRE DU NAVIGATEUR ══
+  // Il n'y est plus (fuite du 15/09). Pour le personnel, on le demande au serveur
+  // (code_du_vehicule, journalise) et on le recopie dans la fiche des qu'il arrive.
+  // Pour le client proprietaire, son numero client est la clef acceptee par le serveur.
+  const _estPersonnelPDF = isAdmin() || isAgent();
+  const _clPDF = (DB.user && DB.user.role==='client') ? DB.clients.find(c=>c.id===DB.user.id) : null;
+  const _codePDF = _estPersonnelPDF ? '<span id="pdf-code-acces">…</span>'
+                 : esc((_clPDF && _clPDF.num) || '—');
   const rows=[
     ...(isAdmin() ? [['N° Registre',v.num]] : []),
-    ['Code accès',v.code],['Matricule',v.mat],['VIN / Châssis',v.vin||'—'],
+    [_estPersonnelPDF ? 'Code accès' : 'Code accès (N° client)', _codePDF],['Matricule',v.mat],['VIN / Châssis',v.vin||'—'],
     ['N° Carte grise',v.cg||'—'],['Date d\'achat',v.dachat?fd(v.dachat):'—'],
     ['Marque',v.brand],['Modèle',v.model],['Couleur',v.color],['Année',v.year||'—'],
     ['Propriétaire',v.owner],['Téléphone',v.phone],['Adresse',v.addr||'—'],
@@ -27360,6 +27836,15 @@ function genPDF(vid) {
   <button onclick="window.close()" style="background:#eee;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer">Fermer</button>
   </div></div></body></html>`);
   w.document.close();
+  // 15/09 : le code arrive du serveur apres l'ouverture de la fenetre (voir plus haut).
+  if(_estPersonnelPDF) {
+    codeDuVehicule(v.id).then(function(code) {
+      try {
+        const cel = w.document.getElementById('pdf-code-acces');
+        if(cel) cel.textContent = code || '— (non disponible)';
+      } catch(e) {}
+    });
+  }
 }
 
 // ════════════════════════════════════════════════
@@ -28037,21 +28522,23 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
   if(_resetParam) {
     window._pendingReset = _resetParam;
     window.history.replaceState({}, '', window.location.pathname);
+    // ══ 15/09 — LE JETON DU LIEN EST OPAQUE ET VERIFIE PAR LE SERVEUR ══
+    // L'ancien lien se decodait ici (base64 : identifiant, type de compte, expiration) et
+    // n'etait signe par personne : on pouvait en fabriquer un pour n'importe quel compte.
+    // Le jeton est maintenant une suite aleatoire delivree par identifiant_par_email ;
+    // seul reinitialiser_mot_de_passe sait a quel compte il correspond, s'il a expire, et
+    // s'il a deja servi. Un ancien lien (base64) est refuse proprement.
     function _afficherResetPage() {
       try {
-        const _d = decodeResetToken(_resetParam);
-        if(!_d || !_d.exp || !_d.identifiant) { setTimeout(()=>toast('⚠️ Lien invalide.',true),500); return; }
-        if(Date.now() > _d.exp) { setTimeout(()=>toast('⚠️ Ce lien a expiré. Faites une nouvelle demande.',true),500); return; }
-        const _used = JSON.parse(localStorage.getItem('reset_used_done')||'[]');
-        if(_d.nonce && _used.includes(_d.nonce)) { setTimeout(()=>toast('⚠️ Ce lien a déjà été utilisé.',true),500); return; }
-        const old = document.getElementById('_reset-overlay'); if(old) old.remove();
+        if(document.getElementById('_reset-overlay')) return;   // deja affichee : on ne l'efface pas
+        if(!_jetonResetValable(_resetParam)) { setTimeout(()=>toast('⚠️ Lien invalide ou périmé. Faites une nouvelle demande.',true),500); return; }
         const overlay = document.createElement('div');
         overlay.id = '_reset-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
         overlay.innerHTML = '<div style="background:#1C1C1E;border-radius:18px;padding:28px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.8)">'
           + '<div style="text-align:center;margin-bottom:20px"><div style="font-size:40px">🔑</div>'
           + '<div style="font-size:18px;font-weight:900;color:#f97316;margin-top:8px">Nouveau mot de passe</div>'
-          + '<div style="font-size:12px;color:#9CA3AF;margin-top:4px">Compte : <b style="color:#fff">' + _d.identifiant + '</b> (' + _d.typeCompte + ')</div></div>'
+          + '<div style="font-size:12px;color:#9CA3AF;margin-top:4px">Lien reçu par email · valable 1 heure, une seule fois</div></div>'
           + '<div style="margin-bottom:14px"><div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">NOUVEAU MOT DE PASSE *</div>'
           + '<input type="password" id="_rst-p1" placeholder="Minimum 6 caractères" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(249,115,22,.4);background:#2C2C2E;color:#fff;font-size:14px;box-sizing:border-box"/></div>'
           + '<div style="margin-bottom:20px"><div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">CONFIRMER *</div>'
@@ -28060,12 +28547,13 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
           + '<button onclick="_validerReset()" style="width:100%;padding:14px;background:#f97316;color:#fff;border:none;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer;margin-bottom:8px">✅ Valider le nouveau mot de passe</button>'
           + '<button onclick="document.getElementById(&quot;_reset-overlay&quot;).remove()" style="width:100%;padding:12px;background:transparent;color:#9CA3AF;border:1px solid rgba(255,255,255,.1);border-radius:12px;font-size:13px;cursor:pointer">Annuler</button>'
           + '</div>';
-        window._resetData = _d;
+        window._resetData = null;
         window._resetToken = _resetParam;
         document.body.appendChild(overlay);
         setTimeout(()=>{const el=document.getElementById('_rst-p1');if(el)el.focus();},200);
       } catch(err) { console.error('Reset page error:', err); }
     }
+    window._afficherResetPage = _afficherResetPage;
     if(document.readyState === 'complete') setTimeout(_afficherResetPage, 800);
     else window.addEventListener('load', ()=>setTimeout(_afficherResetPage, 800));
   }
@@ -28121,7 +28609,8 @@ setInterval(verifierDemandeEntrante, 3 * 1000);
         try {
           const _id = String(vParam || '').trim();
           if(/^[0-9a-fA-F-]{30,}$/.test(_id)) {
-            const { data } = await supabaseClient.from('vehicules').select('*').eq('id', _id).limit(1);
+            // 15/09 : sans « code » — un scan public n'a aucune raison de le recevoir.
+            const { data } = await supabaseClient.from('vehicules').select(COLONNES_VEHICULES).eq('id', _id).limit(1);
             if(data && data[0]) {
               vehQR = mapVehicule(data[0]);
               const i = DB.vehs.findIndex(x => x.id === vehQR.id);
@@ -29509,6 +29998,48 @@ body.mode-service .nav-inner{display:none!important}
     return o;
   }
 
+  // ══ 15/09 — LES FICHES VEHICULES ET CLIENTS NE SONT PLUS POUSSEES A TOUT LE MONDE ══
+  //
+  // FUITE : les deux abonnements « vehicules » et « clients » n'avaient AUCUN filtre. La
+  // moindre modification d'une fiche (solde, statut, photo...) partait, ligne complete, vers
+  // chaque appareil connecte — visiteurs compris — qui la rangeait en plus dans sa memoire.
+  // La ligne complete contenait le code de l'espace proprietaire et l'empreinte du mot de
+  // passe. Apres la fermeture des colonnes, le serveur temps reel ne devrait plus les
+  // joindre ; mais une fiche d'identite n'a rien a faire chez un inconnu pour autant.
+  //
+  // Regle : le personnel ecoute tout (comme avant) ; les autres n'ecoutent que LEURS fiches.
+  // Quand rien ne les concerne, le filtre vise un identifiant qui n'existe pas : le serveur
+  // n'envoie alors plus rien du tout (ignorer a l'arrivee laisserait passer les donnees).
+  var ID_AUCUN = '00000000-0000-0000-0000-000000000000';
+  function _optionsVehicules(){
+    var o = {event:'*', schema:'public', table:'vehicules'};
+    if(_estDuPersonnel()) return o;
+    var ids = [];
+    try{
+      if(DB.user && DB.user.role === 'owner' && DB.user.vid) ids = [DB.user.vid];
+      else if(DB.user && DB.user.role === 'client'){
+        var cl = DB.clients.find(function(c){ return c.id === DB.user.id; });
+        ids = (DB.vehs || []).filter(function(v){
+          return v.clientId === DB.user.id || (cl && cl.tel && v.phone === cl.tel);
+        }).map(function(v){ return v.id; });
+        if(!ids.length){ o.filter = 'client_id=eq.' + DB.user.id; return o; }
+      } else {
+        // Visiteur ou passager : seulement les vehicules qu'il a lui-meme verifies.
+        ids = (DB.vehs || []).map(function(v){ return v.id; });
+      }
+    }catch(e){ ids = []; }
+    ids = ids.filter(Boolean).slice(0, 100);
+    o.filter = _filtre('id', ids) || ('id=eq.' + ID_AUCUN);
+    return o;
+  }
+  function _optionsClients(){
+    var o = {event:'*', schema:'public', table:'clients'};
+    if(_estDuPersonnel()) return o;
+    if(DB.user && DB.user.role === 'client' && DB.user.id){ o.filter = 'id=eq.' + DB.user.id; return o; }
+    o.filter = 'id=eq.' + ID_AUCUN;
+    return o;
+  }
+
   window._canalTempsReel = window._canalTempsReel || null;
 
   function _demarrerTempsReel(){
@@ -29649,7 +30180,8 @@ body.mode-service .nav-inner{display:none!important}
         // encore d'un rechargement de page. Un seul aide commun ci-dessous : il remplace la
         // ligne dans DB, puis redessine UNIQUEMENT l'ecran affiche — jamais tout le site,
         // pour ne pas faire clignoter ce que l'utilisateur est en train de lire.
-        .on('postgres_changes', {event:'*', schema:'public', table:'clients'}, function(p){
+        // 15/09 : filtre — voir _optionsClients.
+        .on('postgres_changes', _optionsClients(), function(p){
           try{
             var r=p['new']&&p['new'].id ? p['new'] : p['old']; if(!r||!r.id) return;
             _tempsReelRemplacer(DB.clients, r, mapClient, p.eventType);
@@ -29661,7 +30193,8 @@ body.mode-service .nav-inner{display:none!important}
             }
           }catch(e){}
         })
-        .on('postgres_changes', {event:'*', schema:'public', table:'vehicules'}, function(p){
+        // 15/09 : filtre — voir _optionsVehicules.
+        .on('postgres_changes', _optionsVehicules(), function(p){
           try{
             var r=p['new']&&p['new'].id ? p['new'] : p['old']; if(!r||!r.id) return;
             // L'etat precedent est simplement celui qu'on a en memoire, avant remplacement.
