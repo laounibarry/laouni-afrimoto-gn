@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.640';
+window.AFRIMOTO_VERSION = 'v9.641';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1118,13 +1118,21 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       DB.corbeille = (corbeille||[]).map(mapCorbeille);
       
       // 🔧 ANTI-FRAUDE: Charger liste noire réservations
+      // ══ 28/09 — UN BLOCAGE LEVÉ RESTAIT UN BLOCAGE ══
+      // Le SQL 83 n'efface plus la ligne de la liste noire quand l'administration
+      // débloque quelqu'un : la ligne RESTE, avec blocked = false et une date de
+      // fin. Il pose aussi « bloque_jusqu_au » : 30 jours qui prennent fin seuls.
+      // Ces deux colonnes n'étaient pas recopiées ici : le site aurait continué de
+      // refuser la réservation d'une personne que le serveur accepte.
       DB.listeNoireReservations = (listeNoireData||[]).map(r => ({
         id: r.id,
         telephone: r.telephone || '',
         email: r.email || '',
         date_blocage: r.date_blocage,
         raison: r.raison || 'Fraude: 3+ réservations non confirmées',
-        count: r.count || 3
+        count: r.count || 3,
+        blocked: (r.blocked === undefined || r.blocked === null) ? true : !!r.blocked,
+        bloqueJusquAu: r.bloque_jusqu_au || null
       }));
       
       addDebugLog('✅ LOADED: ' + DB.listeNoireReservations.length + ' blocked numbers');
@@ -1280,7 +1288,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           DB.listeNoireReservations = (ln.data||[]).map(r => ({
             id:r.id, telephone:r.telephone||'', email:r.email||'',
             date_blocage:r.date_blocage, raison:r.raison||'Fraude: 3+ réservations non confirmées',
-            count:r.count||3 }));
+            count:r.count||3,
+            // 28/09 : voir le commentaire de la premiere vague — un blocage leve ou
+            // arrive a son terme ne doit plus refuser la reservation.
+            blocked:(r.blocked === undefined || r.blocked === null) ? true : !!r.blocked,
+            bloqueJusquAu:r.bloque_jusqu_au || null }));
           // L'ecran se remplit tout seul : on redessine celui qui est affiche.
           try { if(typeof rAll === 'function') rAll(); } catch(e) {}
           try { addDebugLog('CHARGEMENT : deuxieme vague arrivee'); } catch(e) {}
@@ -1594,7 +1606,17 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   function mapTrajet(r) {
     const t = { id:r.id,
       conducteur:r.conducteur||r.chauffeur||'',
-      tel:r.telephone||r.tel||'',
+      // ══ 28/09 — LE NUMÉRO DU CONDUCTEUR N'ARRIVAIT JAMAIS À L'ÉCRAN ══
+      // On lisait « telephone » puis « tel » : CES DEUX COLONNES N'EXISTENT PAS
+      // dans la table trajets. Elle en a une seule, « conducteur_tel », et elle
+      // est vide sur les 47 trajets — parce que _sbSaveTrajet écrivait, lui
+      // aussi, « telephone » (l'upsert souple retirait la colonne inconnue et
+      // enregistrait la ligne SANS le numéro).
+      // Conséquence : sur toute carte de trajet, « 📞 » ne montrait rien et le
+      // lien WhatsApp était « wa.me/ » tout court. Et depuis le SQL 83, le refus
+      // des 3 heures dit au passager d'APPELER LE CONDUCTEUR : sans ce numéro,
+      // c'est un refus auquel personne ne peut donner suite.
+      tel:r.conducteur_tel||r.telephone||r.tel||'',
       pref:r.pref||'',
       depart:r.depart||'', arrivee:r.arrivee||'',
       dateHeure:r.date_heure||r.dateHeure||r.date_depart||r.created_at||null,
@@ -1617,7 +1639,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       clim:r.clim||false, bagages:r.bagages||false,
       plAvant:r.pl_avant||r.plAvant||0, plMilieu:r.pl_milieu||r.plMilieu||0, plArriere:r.pl_arriere||r.plArriere||0,
       derniereAnnulation:r.derniere_annulation||r.derniereAnnulation||null,
-      agentId:r.agent_id||r.agentId||null, created_at:r.created_at 
+      // 28/09 : ces deux colonnes se LISENT seulement. C'est la quatrieme regle du
+      // proprietaire — frais de publication rendus si le conducteur annule avant
+      // toute reservation — et l'ecran doit pouvoir l'annoncer avant le geste.
+      // Le site ne les ecrit JAMAIS : afri83_annuler_mon_trajet tranche, une fois.
+      fraisPublication:r.frais_publication||0,
+      fraisRendusLe:r.frais_rendus_le||null,
+      agentId:r.agent_id||r.agentId||null, created_at:r.created_at
     };
     // RECALCULER les places à chaque chargement pour s'assurer que c'est exact
     recalculerPlaces(t);
@@ -2104,7 +2132,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     // Modèle voyager complet : réservations, statut, conducteur, places restantes...
     const _dh = tr.dateHeure ? new Date(tr.dateHeure) : null;
     const row = { id:tr.id,
-      conducteur:tr.conducteur||'', telephone:tr.tel||null, pref:tr.pref||'',
+      // 28/09 : la colonne s'appelle « conducteur_tel », pas « telephone » — voir
+      // le commentaire de mapTrajet. On écrivait un nom inexistant, l'upsert
+      // souple le retirait, et le numéro du conducteur n'était JAMAIS enregistré.
+      // Les noms de repli restent dans « alts » pour toute base plus ancienne.
+      conducteur:tr.conducteur||'', conducteur_tel:tr.tel||null, pref:tr.pref||'',
       depart:tr.depart||'', arrivee:tr.arrivee||'',
       date_heure:tr.dateHeure||null,
       // Anciennes colonnes de la table (certaines sont NOT NULL) : on les remplit aussi
@@ -2121,8 +2153,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       pl_avant:tr.plAvant||0, pl_milieu:tr.plMilieu||0, pl_arriere:tr.plArriere||0,
       derniere_annulation:tr.derniereAnnulation||null,
       agent_id:tr.agentId||null };
-    const alts = { telephone:'tel', date_heure:'dateHeure' };
-    await sbUpsertSouple('trajets', row, alts);
+    const alts = { conducteur_tel:'telephone', telephone:'tel', date_heure:'dateHeure' };
+    // 28/09 : on REND le resultat. Sans cela, aucun appelant ne pouvait savoir si
+    // l'ecriture avait ete refusee — et le site annoncait « ✅ » quand meme. Les
+    // declencheurs du SQL 83 refusent desormais certaines ecritures : il faut
+    // pouvoir le dire. `false` = refusee, `undefined` = inconnu (sandbox).
+    return await sbUpsertSouple('trajets', row, alts);
   }
   const sbSaveTrajet = sbIgnoreErr(_sbSaveTrajet, 'sbSaveTrajet');
 
@@ -4119,7 +4155,13 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <label style="flex:1;display:flex;align-items:center;gap:6px;background:var(--gray-50);border:1.5px solid rgba(249,115,22,.25);border-radius:9px;padding:10px;cursor:pointer;font-size:12px">
         <input type="checkbox" id="tr-bagages" style="width:auto"/> 🧳 Bagages volumineux OK</label>
     </div>
-    <div class="lbl" style="margin-bottom:6px">💺 Répartition des places (facultatif)</div>
+    <!-- ══ 28/09 — LE PLAN DES SIÈGES ÉTAIT ANNONCÉ « FACULTATIF », IL EST INDISPENSABLE ══
+         Sans lui, la réservation ne sait désigner aucun siège : 33 trajets sur 47
+         étaient impossibles à réserver alors que leur carte annonçait « 4/4 » et
+         « Réserver ». Et un plan plus grand que le nombre de places vendait un siège
+         qui n'existe pas (2 trajets en production). Le total doit tomber juste. -->
+    <div class="lbl" style="margin-bottom:6px">💺 Répartition des places <span style="color:#EF4444">*</span></div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Obligatoire : le total (avant + milieu + arrière) doit être égal au nombre de places annoncé. Sans ce plan, personne ne peut choisir de siège et votre trajet ne se réserve pas.</div>
     <div class="grid3" style="margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
       <div class="fld" style="margin:0"><div class="lbl" style="font-size:10px">Avant</div><input type="number" id="tr-pl-avant" min="0" placeholder="1"/></div>
       <div class="fld" style="margin:0"><div class="lbl" style="font-size:10px">Milieu</div><input type="number" id="tr-pl-milieu" min="0" placeholder="0"/></div>
@@ -5303,6 +5345,11 @@ function closeModal(id) {
   if(id === 'm-recherche-auto' || id === 'm-course-entrante') {
     try { alarmeCourseStop(); } catch(e) {}
     try { alarmePrixProposeStop(); } catch(e) {}
+  }
+  // 28/09 : la fenêtre de réservation surveille le plan des sièges tant qu'elle est
+  // ouverte. On éteint la surveillance ici, quel que soit le chemin de fermeture.
+  if(id === 'm-reserver-trajet') {
+    try { _rtArreterSurveillancePlaces(); } catch(e) {}
   }
 }
 
@@ -19084,16 +19131,20 @@ function rTrajets() {
         <span style="color:#f97316">💺 ${t.placesDispos}/${t.places}</span>
         <span style="color:#EAB308;font-weight:700">${fmt(t.prix)}</span>
       </div>
-      ${(t.reservations||[]).filter(r => r.confirme).length > 0 ? `
+      ${/* ══ 28/09 — LA CARTE PUBLIQUE NE NOMME PLUS PERSONNE ══
+            Cette carte affichait le PRÉNOM ET LE NOM COMPLET de chaque passager
+            confirmé, à tout visiteur du site, sans aucun compte. On n'annonce
+            plus que le nombre de places prises : c'est la seule chose qui
+            intéresse celui qui cherche une place. */''}
+      ${(() => {
+        const _p83 = places83(t);
+        const _prises = _p83 ? _p83.prises
+          : (t.reservations||[]).filter(r => !r.annule).reduce((s,r) => s + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces||1)), 0);
+        return _prises > 0 ? `
       <div style="font-size:11px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 10px;margin-top:8px">
-        <div style="font-weight:800;color:#22C55E;margin-bottom:5px">✅ Réservations confirmées (${(t.reservations||[]).filter(r => r.confirme).length}):</div>
-        ${(t.reservations||[]).filter(r => r.confirme).map(r => `
-        <div style="font-size:10px;color:var(--text2);padding:2px 0;border-top:1px solid rgba(34,197,94,.15);padding-top:3px">
-          👤 ${esc(r.prenom||'')} ${esc(r.nom||'')} · 💺 ${r.nbPlaces||1} place(s)
-        </div>
-        `).join('')}
-      </div>
-      ` : ''}
+        <div style="font-weight:800;color:#22C55E">💺 ${_prises} place(s) déjà prise(s) sur ce trajet</div>
+      </div>` : '';
+      })()}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         ${t.clim ? '<span style="font-size:11px;background:rgba(96,165,250,.15);color:#60A5FA;border-radius:6px;padding:3px 8px;font-weight:700">❄️ Climatisé</span>' : '<span style="font-size:11px;background:rgba(249,115,22,.08);color:var(--text2);border-radius:6px;padding:3px 8px">🌡️ Non climatisé</span>'}
         ${t.bagages ? '<span style="font-size:11px;background:rgba(34,197,94,.15);color:#22C55E;border-radius:6px;padding:3px 8px;font-weight:700">🧳 Bagages volumineux acceptés</span>' : '<span style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-radius:6px;padding:3px 8px;font-weight:700">🚫 Pas de gros bagages</span>'}
@@ -19108,12 +19159,44 @@ function rTrajets() {
       </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <a href="https://wa.me/${(t.tel||'').replace(/\D/g,'')}" target="_blank" style="display:inline-block;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;text-decoration:none">📲 Contacter via WhatsApp</a>
-        ${t.placesDispos > 0
-          ? `<button class="btn-blue" style="font-size:12px;padding:6px 14px;border-radius:7px" onclick="openReserverTrajet('${t.id}')">🎫 Réserver une place</button>`
-          : `<span style="display:inline-block;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#EF4444;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800">🔒 COMPLET — plus de place</span>`}
+        ${/* ══ 28/09 — ON NE PROPOSE PLUS UN VOYAGE QUI SERA REFUSÉ ══
+              33 trajets sur 47 annonçaient « 4/4 » et « Réserver » alors qu'aucune
+              réservation n'était possible : leur plan des sièges était vide, et la
+              réservation ne sait pas désigner un siège sans plan. Le drapeau
+              « reservable » du 83 le sait déjà : on l'affiche tel quel. */''}
+        ${/* ══ 28/09 — « NON RÉSERVABLE » N'EST PAS TOUJOURS « PLAN MANQUANT » ══
+              Cette carte accusait le conducteur d'un plan incomplet dès que le
+              drapeau tombait à faux. Or le 83 le met aussi à faux quand le trajet
+              est COMPLET, ou quand l'heure annoncée est passée — deux cas prouvés
+              sur un vrai PostgreSQL, plan parfait à l'appui. On lit donc la
+              vraie raison dans le résumé (plan_total, libres) avant de parler. */''}
+        ${(() => {
+          const _p83 = places83(t);
+          if(_p83 && _p83.reservable === false) {
+            const _sansPlan = (_p83.total > 1) && !(_p83.plan_total > 0);
+            const _plein = (_p83.libres === 0);
+            const _txt = _sansPlan
+              ? '⏳ Réservation indisponible — le conducteur doit compléter son plan des sièges'
+              : (_plein
+                  ? '🔒 COMPLET — plus de place'
+                  : '⏳ Réservation indisponible — ce départ n\'est plus ouvert aux réservations');
+            const _coul = _plein
+              ? 'background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#EF4444'
+              : 'background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);color:#EAB308';
+            return '<span style="display:inline-block;' + _coul + ';padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800">' + _txt + '</span>';
+          }
+          return t.placesDispos > 0
+            ? `<button class="btn-blue" style="font-size:12px;padding:6px 14px;border-radius:7px" onclick="openReserverTrajet('${t.id}')">🎫 Réserver une place</button>`
+            : `<span style="display:inline-block;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#EF4444;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800">🔒 COMPLET — plus de place</span>`;
+        })()}
       </div>
     </div>`;
   }).join('') : (!filtreActif ? '<div class="empty">📍<br>Sélectionnez votre préfecture ou ville de départ pour voir les trajets disponibles.</div>' : '<div class="empty">🔍<br>Aucun trajet disponible pour ce critère.</div>');
+  // ══ 28/09 — LE RÉSUMÉ DES PLACES SE RAFRAÎCHIT TOUT SEUL ══
+  // Les nombres affichés viennent du 83 (afri83_places). On les redemande ici,
+  // sans attendre : si quelque chose a changé, majPlaces83 redessine la liste.
+  // Le délai de 4 secondes de majPlaces83 empêche la boucle.
+  try { majPlaces83(); } catch(e) {}
 }
 
 // Étape 1 : le chauffeur clique "Voir les frais et confirmer" — afficher résumé avant publication
@@ -19146,7 +19229,24 @@ function saveTrajet() {
   if(!dh) { toast('⚠️ Sélectionnez une date et heure de départ.', true); return; }
   if(pl < 1) { toast('⚠️ Le nombre de places doit être entre 1 et 8.', true); return; }
   if(prix <= 0) { toast('⚠️ Entrez un prix par place.', true); return; }
-  
+
+  // ══ 28/09 — LE PLAN DES SIÈGES EST OBLIGATOIRE, ET IL DOIT TOMBER JUSTE ══
+  // Il était annoncé « facultatif » : 33 trajets sur 47 sont aujourd'hui
+  // impossibles à réserver faute de plan, et 2 annoncent un plan plus grand que
+  // leur nombre de places — leur carte vend un siège qui n'existe pas.
+  const _plAv = parseInt((document.getElementById('tr-pl-avant')||{}).value) || 0;
+  const _plMi = parseInt((document.getElementById('tr-pl-milieu')||{}).value) || 0;
+  const _plAr = parseInt((document.getElementById('tr-pl-arriere')||{}).value) || 0;
+  const _plan = _plAv + _plMi + _plAr;
+  if(_plan === 0) {
+    toast('⚠️ Dites où sont vos places : avant, milieu, arrière. Le total doit faire ' + pl + '. Sans ce plan, aucun passager ne peut réserver.', true);
+    return;
+  }
+  if(_plan !== pl) {
+    toast('⚠️ Votre plan fait ' + _plan + ' siège(s) et vous annoncez ' + pl + ' place(s). Corrigez l\'un ou l\'autre : les deux doivent être égaux.', true);
+    return;
+  }
+
   // Calculer les frais
   const fraisInfo = calculerFraisTrajet(pref, prix);
 
@@ -19289,15 +19389,97 @@ async function _publierTrajetDefinitif() {
     if(cl && cl.tel) tel = cl.tel; // ← UTILISER LE TEL DU CLIENT!
   }
 
-  // Débit des frais (client uniquement)
-  if(DB.user && DB.user.role==='client' && fraisInfo.montant > 0) {
+  const _plAvantF  = parseInt((document.getElementById('tr-pl-avant')||{}).value)||0;
+  const _plMilieuF = parseInt((document.getElementById('tr-pl-milieu')||{}).value)||0;
+  const _plArriereF= parseInt((document.getElementById('tr-pl-arriere')||{}).value)||0;
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ══ 28/09 — LES FRAIS NE PARTENT QU'APRÈS UNE ÉCRITURE VÉRIFIÉE ══
+  //
+  // Jusqu'ici, le prélèvement se faisait ICI, AVANT l'écriture du trajet — et
+  // l'écriture n'était jamais vérifiée (sbSaveTrajet avale ses erreurs) : un
+  // conducteur pouvait payer pour un trajet qui n'existait nulle part.
+  //
+  // publier_trajet (SQL 83) fait l'inverse : elle écrit, vérifie que la ligne
+  // est là, PUIS prélève — et si le prélèvement échoue, elle efface le trajet
+  // et rien n'est pris. Elle vérifie aussi la voiture, la plaque, la zone, le
+  // solde et le plan des sièges, et son refus arrive en français.
+  //
+  // ⚠️ Ce chemin ne vaut que pour le CONDUCTEUR lui-même : la fonction exige
+  //    SON numéro client et SON mot de passe. Un agent ou l'administration qui
+  //    publie pour quelqu'un d'autre garde l'écriture directe d'aujourd'hui —
+  //    il ne paie aucun frais, et le 83 laisse cette porte ouverte exprès.
+  // ════════════════════════════════════════════════════════════════════════
+  if(DB.user && DB.user.role==='client') {
     const cl = DB.clients.find(x=>x.id===DB.user.id);
-    if(cl) {
-      // v9.539 : les frais arrivent au compte de la societe au lieu de disparaitre.
-      const _f1 = await mouvementSolde('client', cl.id, 'societe', 'societe', fraisInfo.montant, 'Publication trajet');
-      if(_f1 !== true) { cl.solde -= fraisInfo.montant; await sbSaveClient(cl); }
-      logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,fraisInfo.montant,cl.prenom+' '+cl.nom,'Système',{sourceType:'client',sourceId:cl.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
+    const _ident = await _identiteConducteur('Publier votre trajet',
+      'Le serveur enregistre le trajet AVANT de prélever les frais' +
+      (fraisInfo.montant > 0 ? ' de ' + fmt(fraisInfo.montant) : '') +
+      ' : en cas de refus, rien ne vous sera pris.');
+    if(!_ident) return;
+
+    const _vehCl = cl ? (DB.vehs.find(v => (v.clientId===cl.id || v.id===cl.vid || (cl.tel && v.phone===cl.tel)) && v.type==='voiture' && !v.stolen && v.statut!=='suspendu') || null) : null;
+
+    const rep = await _appelTrajet83('publier_trajet', {
+      p_client_num: _ident.num,
+      p_mot_de_passe: _ident.pw,
+      p_donnees: {
+        pref: pref, depart: dep, arrivee: arr,
+        date_heure: dh || null,
+        places: pl, prix: prix,
+        pl_avant: _plAvantF, pl_milieu: _plMilieuF, pl_arriere: _plArriereF,
+        conducteur: cond, tel: tel,
+        veh_desc: _vehCl ? ((_vehCl.brand||'')+' '+(_vehCl.model||'')+(_vehCl.color?' · '+_vehCl.color:'')).trim() : null,
+        veh_mat: _vehCl ? (_vehCl.mat||null) : null,
+        clim: !!(document.getElementById('tr-clim')||{}).checked,
+        bagages: !!(document.getElementById('tr-bagages')||{}).checked
+      }
+    });
+
+    if(rep.ok !== true) {
+      // Aucun frais n'a été prélevé : la fonction prélève APRÈS l'écriture.
+      toast('⛔ Trajet non publié : ' + rep.message + ' Aucun frais n\'a été prélevé.', true);
+      return;
     }
+
+    // Le trajet existe en base : on le relit plutôt que de l'inventer.
+    let _pub = null;
+    try {
+      const { data: _l } = await supabaseClient.from('trajets').select('*').eq('id', rep.id).limit(1);
+      if(_l && _l[0]) { _pub = mapTrajet(_l[0]); DB.trajets.unshift(_pub); }
+    } catch(e) {}
+    if(!_pub) {
+      // Le temps réel l'ajoutera ; on garde de quoi envoyer l'email.
+      _pub = {id:rep.id, conducteur:cond, tel:tel, pref:pref, depart:dep, arrivee:arr,
+              dateHeure:dh, places:rep.places||pl, placesDispos:rep.places||pl, prix:prix,
+              statut:'actif', reservations:[], clientId: DB.user.id,
+              plAvant:_plAvantF, plMilieu:_plMilieuF, plArriere:_plArriereF};
+    }
+    try { await chargerPlaces83Un(rep.id); } catch(e) {}
+
+    // Le solde local et le journal suivent le mouvement RÉELLEMENT fait.
+    const _fraisPris = Number(rep.frais || 0);
+    if(cl && _fraisPris > 0) {
+      cl.solde = Math.max(0, (cl.solde||0) - _fraisPris);
+      logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,_fraisPris,cl.prenom+' '+cl.nom,'Système',{sourceType:'client',sourceId:cl.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
+    }
+
+    try { _envoyerEmailConfirmationTrajet(_pub); } catch(e) {}
+    logMvt('trajet','Trajet '+dep+' → '+arr+' par '+cond,0);
+
+    // Le message vient du serveur : il dit ce qui a VRAIMENT été enregistré
+    // (le nombre de places et le plan, qu'il a pu remettre d'aplomb).
+    toast('✅ ' + rep.message + (_fraisPris > 0 ? ' Frais débités : ' + fmt(_fraisPris) : ''));
+
+    closeModal('m-trajet');
+    ['tr-cond','tr-tel','tr-dep','tr-arr','tr-dh','tr-places','tr-prix','tr-pref','tr-clim','tr-bagages','tr-pl-avant','tr-pl-milieu','tr-pl-arriere'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) { if(el.type === 'checkbox') el.checked = false; else el.value = ''; }
+    });
+    const _cz = document.getElementById('tr-confirm-zone'); if(_cz) _cz.style.display = 'none';
+    rTrajets();
+    rClientContent(); updateNav();
+    return;
   }
 
   let _vehTrajet = null;
@@ -19318,20 +19500,36 @@ async function _publierTrajetDefinitif() {
   
   // Ajouter localement (optimistic update)
   DB.trajets.unshift(newTrajet);
-  
+
   // CRITIQUE: Attendre la sauvegarde en base AVANT de fermer le modal
-  await sbSaveTrajet(newTrajet);
-  
+  // 28/09 : et LIRE sa réponse. L'écriture directe (agent ou administration) peut
+  // désormais être refusée par les déclencheurs du SQL 83 ; le site annonçait
+  // « ✅ Trajet publié » sans jamais le savoir.
+  const _okEcriture = await sbSaveTrajet(newTrajet);
+  if(_okEcriture === false) {
+    DB.trajets = DB.trajets.filter(x => x.id !== newTrajet.id);
+    toast('⛔ Trajet NON publié : le serveur a refusé l\'enregistrement. Rien n\'a été retenu.', true);
+    return;
+  }
+
   // 📧 Envoyer email de confirmation au client
   _envoyerEmailConfirmationTrajet(newTrajet);
-  
+
   // Logging
   logMvt('trajet',`Trajet ${dep} → ${arr} par ${cond}`,0);
   
-  // Afficher le toast IMMÉDIATEMENT
+  // ══ 28/09 — CE CHEMIN ANNONÇAIT DES FRAIS QU'IL NE PRÉLÈVE PAS ══
+  // Il disait « Frais débités : X » alors que ce chemin-là — celui de l'agent et de
+  // l'administration — ne touche AUCUN solde et n'écrit aucun mouvement d'argent :
+  // vérifié ligne à ligne dans cette fonction. Le seul prélèvement réel est celui
+  // que publier_trajet (SQL 83) fait, APRÈS l'écriture, sur le compte du conducteur
+  // lui-même. Ici on annonce le montant comme un montant À RECEVOIR, ce qu'il est.
+  const _fraisDus = (fraisInfo && fraisInfo.montant > 0)
+    ? ' · Frais de publication à encaisser auprès du conducteur : ' + fmt(fraisInfo.montant)
+    : '';
   toast(trajetParent
-    ? '✅ Trajet complémentaire publié (' + pl + ' place(s) prise(s) sur votre trajet en cours)' + (fraisInfo.montant > 0 ? ' · Frais : '+fmt(fraisInfo.montant) : '')
-    : (fraisInfo.montant > 0 ? '✅ Trajet publié ! Frais débités : '+fmt(fraisInfo.montant) : '✅ Trajet publié !'));
+    ? '✅ Trajet complémentaire publié (' + pl + ' place(s) prise(s) sur votre trajet en cours)' + _fraisDus
+    : '✅ Trajet publié !' + _fraisDus);
   
   // Attendre 300ms pour laisser le toast s'afficher, PUIS fermer + rafraîchir
   // Fermer le modal et rafraîchir IMMÉDIATEMENT (pas de délai)
@@ -19361,10 +19559,13 @@ function openReserverTrajet(trajetId) {
   if(!t) return;
   
   // Calculer les places disponibles
-  const totalPlaces = t.places || 0;
-  const reservees = (t.reservations || []).filter(r => !r.annule).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
-  if(reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
-  
+  // 28/09 : le résumé du 83 d'abord — c'est la base qui compte les sièges pris.
+  const _p83o = (typeof places83 === 'function') ? places83(t) : null;
+  const totalPlaces = _p83o ? _p83o.total : (t.places || 0);
+  const reservees = _p83o ? _p83o.prises
+    : (t.reservations || []).filter(r => !r.annule).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
+  if(totalPlaces > 0 && reservees >= totalPlaces) { toast('⛔ Plus de place disponible sur ce trajet', true); return; }
+
   document.getElementById('rt-trajet-id').value = trajetId;
   document.getElementById('rt-trajet-info').innerHTML =
     `<b>${esc(t.depart)} → ${esc(t.arrivee)}</b><br>${t.vehMat ? '🚗 Véhicule : <b>'+esc(t.vehMat)+'</b> · ' : ''}📅 ${fdt(t.dateHeure)} · 💺 ${totalPlaces - reservees} place(s) restante(s) · ${fmt(t.prix)}/place`;
@@ -19380,8 +19581,12 @@ function openReserverTrajet(trajetId) {
   
   // Afficher les places disponibles
   renderPlacesSelection(trajetId);
-  
+
   openModal('m-reserver-trajet');
+  // 28/09 : on relit le résumé du 83 tout de suite, puis on surveille tant que la
+  // fenêtre reste ouverte — le plan ne peut plus mentir sur un siège déjà pris.
+  try { _rtSurveillerPlaces(trajetId); } catch(e) {}
+  try { chargerPlaces83Un(trajetId).then(function(){ try { _rtRedessinerSiChange(trajetId); } catch(e) {} }); } catch(e) {}
 }
 function toggleRtPartagerTel() {
   const inp = document.getElementById('rt-partager-tel');
@@ -19411,26 +19616,54 @@ function getNomPlaceDynamique(zone, numero, totalDansZone) {
   }
 }
 
+// ══ 28/09 — UN SIÈGE EST UN SIÈGE, PAS UNE SUITE DE CARACTÈRES ══
+// Le site écrit « arrière_1 » avec son accent, l'application « arriere_1 », et une
+// vieille ligne « devant_01 » : comparés caractère par caractère, ces noms sont
+// différents et le même siège s'affichait libre alors qu'il était pris. C'est la
+// clé de afri83_siege_cle (SQL 83), recopiée à l'identique : zone sans accent, en
+// minuscules, numéro lu comme un nombre.
+function _cleSiege(s) {
+  const nu = String(s == null ? '' : s).replace(/\s/g, '').toLowerCase()
+    .replace(/[àâä]/g, 'a').replace(/[éèêë]/g, 'e').replace(/[îï]/g, 'i')
+    .replace(/[ôö]/g, 'o').replace(/[ùûü]/g, 'u').replace(/ç/g, 'c');
+  const zone = nu.split('_')[0];
+  const num = nu.split('_')[1] || '';
+  if(['devant', 'milieu', 'arriere'].indexOf(zone) === -1 || !/^[0-9]{1,3}$/.test(num)) return nu;
+  return zone + '_' + parseInt(num, 10);
+}
+
 function renderPlacesSelection(trajetId) {
   const t = DB.trajets.find(x => x.id === trajetId);
   if(!t) return;
-  
+
   const container = document.getElementById('rt-places-container');
-  const reservees = t.reservations || [];
+  // ══ 28/09 — LES SIÈGES PRIS VIENNENT DE LA BASE ══
+  // Le plan se dessinait depuis la copie du navigateur : un siège pris pendant que
+  // la fenêtre était ouverte restait vert, et le passager le choisissait pour rien.
+  // Le résumé du 83 (afri83_places.sieges_pris) fait foi quand il est connu ; la
+  // lecture locale ne reste qu'un repli, le temps qu'il arrive.
+  const _p83 = (typeof places83 === 'function') ? places83(t) : null;
   const placesReservees = [];
-  
-  reservees.forEach(r => {
-    // ✅ FIX: EXCLURE les annulées!
-    if(r.annule) return;
-    if(Array.isArray(r.places_positions)) {
-      placesReservees.push(...r.places_positions);
-    } else if(r.place_position) {
-      placesReservees.push(r.place_position);
-    }
-  });
-  
+  if(_p83 && Array.isArray(_p83.sieges_pris)) {
+    _p83.sieges_pris.forEach(s => { placesReservees.push(s); });
+  } else {
+    (t.reservations || []).forEach(r => {
+      // ✅ FIX: EXCLURE les annulées!
+      if(r.annule) return;
+      if(Array.isArray(r.places_positions)) {
+        placesReservees.push(...r.places_positions);
+      } else if(r.place_position) {
+        placesReservees.push(r.place_position);
+      }
+    });
+  }
+  const _prisesCles = placesReservees.map(_cleSiege);
+  // On garde ce que le passager avait déjà coché : le plan se redessine tout seul
+  // toutes les 5 secondes, et perdre sa sélection à chaque fois serait pire.
+  const _dejaCoches = (typeof getSelectedPlaces === 'function') ? getSelectedPlaces().map(_cleSiege) : [];
+
   let html = '';
-  
+
   const creerPlaces = (zone, nombre) => {
     let html_zone = '<div style="margin-bottom:14px"><div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#EAB308;text-transform:uppercase">' + zone + ' (' + nombre + ')</div>';
     html_zone += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px">';
@@ -19438,12 +19671,13 @@ function renderPlacesSelection(trajetId) {
     for(let idx = 1; idx <= nombre; idx++) {
       const placeId = zone.toLowerCase() + '_' + idx;
       const nomPlace = getNomPlaceDynamique(zone, idx, nombre);
-      const isReserved = placesReservees.includes(placeId);
+      const isReserved = _prisesCles.indexOf(_cleSiege(placeId)) !== -1;
+      const _etaitCoche = !isReserved && _dejaCoches.indexOf(_cleSiege(placeId)) !== -1;
       const checkboxId = 'place_' + placeId;
-      
+
       html_zone += '<label style="display:flex;align-items:center;gap:8px;padding:10px;border-radius:8px;border:2px solid;cursor:' + (isReserved ? 'not-allowed;opacity:0.5' : 'pointer') + ';' +
         (isReserved ? 'background:#999;border-color:#666;color:#fff' : 'background:rgba(96,165,250,.05);border-color:rgba(96,165,250,.2);color:#60A5FA') + '">';
-      html_zone += '<input type="checkbox" id="' + checkboxId + '" value="' + placeId + '"' + (isReserved ? ' disabled' : '') + ' style="width:18px;height:18px;cursor:' + (isReserved ? 'not-allowed' : 'pointer') + '"/>';
+      html_zone += '<input type="checkbox" id="' + checkboxId + '" value="' + placeId + '"' + (isReserved ? ' disabled' : '') + (_etaitCoche ? ' checked' : '') + ' style="width:18px;height:18px;cursor:' + (isReserved ? 'not-allowed' : 'pointer') + '"/>';
       html_zone += '<span style="font-weight:700;font-size:12px">' + nomPlace + (isReserved ? ' (✕)' : '') + '</span>';
       html_zone += '</label>';
     }
@@ -19458,6 +19692,8 @@ function renderPlacesSelection(trajetId) {
   
   if(!html) html = '<div style="color:var(--text2);font-style:italic">Aucune place disponible</div>';
   container.innerHTML = html;
+  // Le compteur du haut de la fenêtre suit le même résumé.
+  try { _rtMajInfoPlaces(t); } catch(e) {}
 }
 
 function getSelectedPlaces() {
@@ -19467,9 +19703,314 @@ function getSelectedPlaces() {
   return Array.from(checkboxes).map(cb => cb.value);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — LE PLAN DES SIÈGES SE RAFRAÎCHIT, FENÊTRE OUVERTE ══
+//
+// Le plan n'était dessiné QU'À L'OUVERTURE de la fenêtre. Un siège pris entre
+// temps par un autre passager restait vert : celui qui le choisissait se faisait
+// refuser sans comprendre. Deux chemins, pour ne dépendre d'aucun :
+//   • le temps réel Supabase — le canal « trajets » existe déjà (v9.500), il
+//     suffit de le faire prévenir cette fenêtre ;
+//   • un repli par relecture toutes les 5 secondes (places_du_trajet du 83), au
+//     cas où le canal serait muet.
+// ⚠️ L'intervalle est gardé dans UNE variable et éteint à la fermeture : remplacer
+//    la fonction ne suffirait pas à arrêter un intervalle déjà posé.
+// ════════════════════════════════════════════════════════════════════════════
+let _rtPlanTimer = null, _rtPlanTrajet = null, _rtPlanEmpreinte = '';
+
+// ══ 28/09 — ON NE REDESSINE QUE SI QUELQUE CHOSE A CHANGÉ ══
+// La surveillance refaisait le plan TOUTES LES 5 SECONDES, même quand rien n'avait
+// bougé : container.innerHTML détruit et recrée les cases à cocher, et un doigt
+// posé pile à cet instant tape dans le vide. C'est la même garde anti-clignotement
+// que la liste publique (_rendreSiChange).
+function _rtEmpreintePlaces(trajetId) {
+  const t = DB.trajets.find(x => x.id === trajetId);
+  const p = (typeof places83 === 'function') ? places83(t) : null;
+  if(p) return JSON.stringify([p.total, p.libres, p.sieges_pris, p.plan_total, p.reservable]);
+  return JSON.stringify(t ? [t.places, t.placesDispos, t.plAvant, t.plMilieu, t.plArriere,
+    (t.reservations||[]).filter(r=>!r.annule).map(r=>r.places_positions||r.nbPlaces||1)] : []);
+}
+function _rtRedessinerSiChange(trajetId) {
+  let e = '';
+  try { e = _rtEmpreintePlaces(trajetId); } catch(x) { e = String(Date.now()); }
+  if(e === _rtPlanEmpreinte) return false;
+  _rtPlanEmpreinte = e;
+  try { renderPlacesSelection(trajetId); } catch(x) {}
+  return true;
+}
+
+function _rtMajInfoPlaces(t) {
+  const info = document.getElementById('rt-trajet-info');
+  if(!info || !t) return;
+  const p = (typeof places83 === 'function') ? places83(t) : null;
+  const total = p ? p.total : (t.places || 0);
+  const libres = p ? p.libres : (t.placesDispos || 0);
+  info.innerHTML = '<b>' + esc(t.depart) + ' → ' + esc(t.arrivee) + '</b><br>' +
+    (t.vehMat ? '🚗 Véhicule : <b>' + esc(t.vehMat) + '</b> · ' : '') +
+    '📅 ' + fdt(t.dateHeure) + ' · 💺 ' + libres + ' place(s) restante(s) sur ' + total +
+    ' · ' + fmt(t.prix) + '/place';
+}
+
+function _rtSurveillerPlaces(trajetId) {
+  _rtArreterSurveillancePlaces();
+  _rtPlanTrajet = trajetId;
+  try { _rtPlanEmpreinte = _rtEmpreintePlaces(trajetId); } catch(e) { _rtPlanEmpreinte = ''; }
+  _rtPlanTimer = setInterval(async function() {
+    const m = document.getElementById('m-reserver-trajet');
+    if(!m || !m.classList.contains('open')) { _rtArreterSurveillancePlaces(); return; }
+    try { await chargerPlaces83Un(_rtPlanTrajet); } catch(e) {}
+    _rtRedessinerSiChange(_rtPlanTrajet);
+  }, 5000);
+}
+
+function _rtArreterSurveillancePlaces() {
+  if(_rtPlanTimer) { try { clearInterval(_rtPlanTimer); } catch(e) {} }
+  _rtPlanTimer = null;
+  _rtPlanTrajet = null;
+  _rtPlanEmpreinte = '';
+}
+
+// Appelée par le canal temps réel « trajets » : redessine à la seconde.
+function _rtPlacesTempsReel(trajetId) {
+  if(!_rtPlanTrajet || _rtPlanTrajet !== trajetId) return;
+  const m = document.getElementById('m-reserver-trajet');
+  if(!m || !m.classList.contains('open')) return;
+  chargerPlaces83Un(trajetId).then(function() {
+    _rtRedessinerSiChange(trajetId);
+  }).catch(function() {
+    _rtRedessinerSiChange(trajetId);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — LE COVOITURAGE PARLE ENFIN AU SERVEUR (SQL 83) ══
+//
+// CE QUI N'ALLAIT PAS, ET QUI EST PROUVÉ :
+//  • saveReservationTrajet n'appelait JAMAIS reserver_trajet : elle poussait la
+//    réservation dans la copie du navigateur et réécrivait TOUTE la ligne du
+//    trajet (sbSaveTrajet). Deux réservations à quelques secondes d'écart : la
+//    seconde effaçait la première, et les deux passagers gardaient un code.
+//  • confirmerAnnulationResa faisait de même ; chauffeurAnnulerReservation
+//    n'écrivait AUCUNE marque « annulé » : la place restait prise pour toujours.
+//  • sbIgnoreErr avale l'erreur et le toast de succès efface celui d'échec : le
+//    site disait « ✅ Réservation confirmée » AVANT de savoir. Le SQL 83 REFUSE
+//    désormais ces écritures : sans ce bloc, un passager lirait « confirmée »
+//    sur un refus de la base.
+//
+// Désormais chaque geste passe par une fonction serveur, on ATTEND sa réponse,
+// et on affiche SA phrase — jamais un succès qu'on n'a pas vérifié.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Appeler une fonction serveur du 83 sans jamais supposer un succès ────────
+// Elle ne lève jamais d'exception et ne rend jamais « ok » par défaut : un
+// serveur injoignable est un REFUS, pas un succès.
+async function _appelTrajet83(nom, params) {
+  try {
+    const { data, error } = await supabaseClient.rpc(nom, params);
+    if(error) {
+      // ⚠️ PGRST202 ne veut pas dire « fonction absente » : une signature qui ne
+      //    correspond pas donne le même code. On montre l'indication du serveur
+      //    telle quelle au lieu d'inventer une cause.
+      if(error.code === 'PGRST202') {
+        return { ok:false, raison:'fonction_absente',
+          message:'Le serveur ne reconnaît pas encore cette opération' +
+            (error.hint ? ' (' + error.hint + ')' : '') +
+            '. Rien n\'a été enregistré : réessayez plus tard ou appelez un agent agréé.' };
+      }
+      // ══ 28/09 — UN REFUS DE DÉCLENCHEUR ARRIVE EN TEXTE, PAS EN JSONB ══
+      // Les déclencheurs (83, mais aussi 46, 50, 75) lèvent une EXCEPTION, pas une
+      // réponse : elle ne passe donc jamais par la lecture de « raison » plus bas.
+      // Leur texte commence toujours par le MOT du refus suivi de « : » —
+      // « ligne_perdue : ce trajet a changé… », « voiture_requise : un trajet
+      // Voyager se publie… » — vérifié sur un vrai PostgreSQL. On garde LEUR
+      // phrase (elle porte les nombres, les dates, le nom du siège) et on retire
+      // seulement le mot technique de devant. Sans cela la personne lisait
+      // « Le serveur a refusé : ligne_perdue : … ».
+      // Et sans mot devant, c'est une panne de la base, dont le texte serait en
+      // anglais : on ne le montre pas, on dit ce qui compte.
+      const _msgBrut = (error && error.message) ? String(error.message) : '';
+      const _mot = (_msgBrut.match(/^\s*([a-z][a-z0-9_]{3,})\s*:/) || [])[1] || '';
+      if(_mot) {
+        const _suite = _msgBrut.replace(/^\s*[a-z][a-z0-9_]{3,}\s*:\s*/, '').trim();
+        return { ok:false, raison:_mot,
+          message:_suite ? (_suite.charAt(0).toUpperCase() + _suite.slice(1)) : _refusTrajet83(_mot) };
+      }
+      return { ok:false, raison:'reseau',
+        message:'Le serveur a refusé l\'enregistrement. Rien n\'a été retenu : rechargez la page et réessayez, ou appelez un agent agréé.' };
+    }
+    const r = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+    if(r.ok === true) return r;
+    return { ok:false, raison:r.raison || 'refus',
+             message:r.message || _refusTrajet83(r.raison), brut:r };
+  } catch(e) {
+    return { ok:false, raison:'reseau',
+      message:'Le serveur n\'a pas répondu. Rien n\'a été enregistré : vérifiez votre connexion et réessayez.' };
+  }
+}
+
+// ── La phrase française d'un refus, quand le serveur n'en envoie pas ────────
+// Le 83 renvoie déjà une phrase prête à afficher avec chaque refus. Ceci ne
+// sert donc que de filet : un serveur plus ancien, ou un refus venu d'un
+// déclencheur (qui remonte en texte brut, pas en jsonb).
+function _refusTrajet83(raison) {
+  const m = {
+    telephone_invalide:'Entrez un numéro de téléphone valide : 8 chiffres au moins.',
+    liste_noire:'Ce numéro ne peut pas réserver en ce moment : trois réservations non honorées ont été enregistrées.',
+    trajet_introuvable:'Ce trajet a disparu de la liste. Rechargez la page.',
+    trajet_ferme:'Ce trajet est fermé aux réservations.',
+    trajet_parti:'Ce trajet est déjà parti : le conducteur a confirmé son départ.',
+    trajet_arrive:'Ce trajet est arrivé à destination : plus aucune annulation possible.',
+    trajet_annule:'Ce trajet a été annulé par le conducteur : votre place ne vous est plus retenue.',
+    date_passee:'La date de départ de ce trajet est passée. Cherchez un départ à venir.',
+    places_invalides:'Ce trajet annonce zéro place : le conducteur doit dire combien il en propose.',
+    plan_manquant:'Ce trajet ne dit pas où sont ses places. Demandez au conducteur de compléter son plan (avant, milieu, arrière) avant de réserver.',
+    plus_de_place:'Plus aucune place libre sur ce trajet.',
+    siege_pris:'Ce siège vient de partir à un autre passager. Choisissez-en un autre.',
+    siege_inconnu:'Ce siège ne figure pas dans cette voiture.',
+    siege_en_double:'Vous avez demandé deux fois le même siège. Choisissez des sièges différents.',
+    reservation_introuvable:'Aucune réservation ne correspond à ce numéro et à ce code.',
+    deja_annulee:'Cette réservation est déjà annulée.',
+    // 28/09 : les neuf refus du 83 qui manquaient encore à ce filet. Ils viennent
+    // des gestes du conducteur au départ (confirmer un passager, constater une
+    // absence, marquer l'arrivée). Le site ne les appelle pas encore, mais un
+    // refus sans phrase se lirait « Refusé par le serveur (code_faux) ».
+    code_manquant:'Demandez au passager son code à 4 chiffres.',
+    code_faux:'Ce code ne correspond pas à cette réservation.',
+    sans_code:'Cette réservation ne porte aucun code : elle passe par un agent agréé.',
+    deja_confirme:'Ce passager est déjà confirmé.',
+    reservation_annulee:'Cette réservation est annulée.',
+    pas_en_cours:'Ce trajet ne roule pas encore : confirmez le départ de vos passagers avant.',
+    trajet_clos:'Ce trajet est déjà clos.',
+    sans_heure:'Ce trajet n\'annonce aucune heure de départ : une absence ne peut pas y être constatée. Annulez la réservation avec un motif — la place revient, et rien n\'est reproché au passager.',
+    trop_tot:'Une absence se constate au départ : ce bouton s\'ouvre une heure avant l\'heure annoncée. Pour refuser un passager maintenant, annulez sa réservation avec un motif — sa place revient, et rien ne lui est reproché.',
+    trop_tard_3h:'Il reste moins de 3 heures avant le départ : le service ne peut plus annuler seul. Appelez directement le conducteur, il décidera avec vous.',
+    compte_refuse:'Numéro client ou mot de passe incorrect.',
+    pas_le_votre:'Ce trajet ne figure pas parmi les vôtres.',
+    deja_parti:'Le départ est déjà confirmé : aucune réservation ne peut plus être annulée.',
+    conducteur_bloque:'Vous avez déjà refusé trois passagers sur ce trajet : contactez un agent agréé.',
+    deja_annule:'Ce trajet est déjà annulé, et vos frais sont déjà réglés.',
+    introuvable:'Cet élément a disparu de la liste. Rechargez la page.',
+    champs_manquants:'Indiquez la zone, le départ et la destination.',
+    prix_manquant:'Indiquez le prix de la place.',
+    plan_incomplet:'Dites où sont vos places : avant, milieu, arrière.',
+    permis_manquant:'Un trajet en voiture demande votre numéro de permis. Passez chez un agent agréé pour le faire enregistrer.',
+    vehicule_suspendu:'Votre voiture est suspendue, déclarée volée ou déclarée vendue : elle ne peut pas transporter de passagers.',
+    vehicule_autrui:'Cette plaque est enregistrée au nom de quelqu\'un d\'autre. Publiez avec votre propre voiture.',
+    zone_bloquee:'Cette zone est fermée à la publication.',
+    solde_insuffisant:'Votre solde ne couvre pas les frais de publication.',
+    service_ferme:'Le service Voyager est fermé en ce moment.',
+    numero_indisponible:'Aucun numéro de trajet disponible. Réessayez dans un instant.',
+    trajet_non_ecrit:'Le trajet ne figure pas en base : aucun frais prélevé, réessayez.',
+    prelevement_refuse:'Le prélèvement des frais a échoué : le trajet reste non publié, et votre solde reste intact.',
+    // Refus des déclencheurs du 83 : ils arrivent en texte, avec leur mot devant.
+    // 28/09 : et ceux des fichiers 46/50, qui gardent le trajet Voyager du côté
+    // des voitures en règle — ils arrivent par le même chemin.
+    voiture_requise:'Un trajet Voyager se publie avec une voiture enregistrée à votre nom, en règle. Une moto ne peut pas transporter de passagers entre deux villes.',
+    vehicule_vole:'Un véhicule déclaré volé ne peut pas servir ici.',
+    ligne_perdue:'Ce trajet a changé depuis que votre écran a chargé la page. Rechargez-la avant de réessayer.',
+    siege_double:'Ce siège est déjà pris par un autre passager. Rechargez la page et choisissez un siège libre.',
+    trop_de_places:'Ce trajet n\'a plus assez de places libres. Rechargez la page.',
+    annulation_effacee:'Ce trajet a changé depuis que votre écran a chargé la page. Rechargez-la.',
+    trajet_modifie:'Ce trajet a changé depuis que votre écran a chargé la page : rechargez-la et choisissez un siège dans la voiture telle quelle.',
+    fonction_absente:'Cette opération n\'est pas disponible sur le serveur pour le moment.',
+    reseau:'Le serveur n\'a pas répondu. Rien n\'a été enregistré.'
+  };
+  return m[raison] || ('Refusé par le serveur' + (raison ? ' (' + raison + ')' : '') + '.');
+}
+
+// ── L'identité du conducteur, prouvée comme partout ailleurs dans le site ────
+// Les fonctions du conducteur du 83 exigent NUMÉRO CLIENT + MOT DE PASSE — la
+// même preuve que clientChangeMdp et changer_proprietaire. Le mot de passe
+// n'est jamais rangé nulle part : il part dans l'appel et meurt avec la
+// variable.
+async function _identiteConducteur(titre, sousTitre) {
+  const cl = (DB.user && DB.user.role === 'client') ? DB.clients.find(x => x.id === DB.user.id) : null;
+  if(!cl || !cl.num) {
+    toast('⛔ Votre numéro client est introuvable : reconnectez-vous avant de continuer.', true);
+    return null;
+  }
+  const pw = await demanderMotDePasse(titre || 'Confirmez votre identité',
+    sousTitre || ('Saisissez le mot de passe de votre compte client (' + cl.num +
+                  ') : le serveur vérifie que ce trajet est bien le vôtre.'));
+  if(!pw) return null;
+  return { num:String(cl.num), pw:pw };
+}
+
+// ── LE RÉSUMÉ DES PLACES VIENT DE LA BASE, PLUS DE L'ÉCRAN ───────────────────
+// Le 83 tient une ligne de résumé par trajet (afri83_places) : total, sièges
+// pris, places libres, plan, et un drapeau « reservable » qui sait déjà qu'un
+// trajet de deux places sans plan ne peut PAS être réservé. Chaque écran
+// calculait sa propre version, et 7 sièges étaient retenus contre personne.
+window._places83 = window._places83 || {};
+let _places83Quand = 0, _places83EnCours = false;
+
+async function chargerPlaces83(pref) {
+  try {
+    const { data, error } = await supabaseClient.rpc('places_des_trajets', { p_pref: pref || null });
+    if(error) return false;
+    const liste = (data && data.trajets) || [];
+    liste.forEach(function(p){ if(p && p.trajet_id) window._places83[p.trajet_id] = p; });
+    return true;
+  } catch(e) { return false; }
+}
+
+// Le résumé d'UN trajet, relu à la demande : c'est le repli du temps réel quand
+// la fenêtre de réservation est ouverte.
+async function chargerPlaces83Un(trajetId) {
+  if(!trajetId) return null;
+  try {
+    const { data, error } = await supabaseClient.rpc('places_du_trajet', { p_trajet_id: trajetId });
+    if(error || !data) return null;
+    if(data.connu === false) return null;
+    window._places83[trajetId] = data;
+    const t = DB.trajets.find(x => x.id === trajetId);
+    if(t) recalculerPlaces(t);
+    return data;
+  } catch(e) { return null; }
+}
+
+// Le résumé déjà connu, ou null tant que le serveur ne l'a pas envoyé.
+function places83(t) {
+  const id = t && t.id ? t.id : t;
+  const p = id ? window._places83[id] : null;
+  return (p && p.libres !== undefined && p.libres !== null) ? p : null;
+}
+
+// Rafraîchit les résumés, puis redessine seulement si quelque chose a changé.
+// Le verrou et le délai empêchent la boucle : rTrajets rappelle cette fonction.
+async function majPlaces83(force) {
+  if(_places83EnCours) return false;
+  if(!force && (Date.now() - _places83Quand) < 4000) return false;
+  _places83EnCours = true;
+  let change = false;
+  try {
+    const avant = JSON.stringify(window._places83);
+    _places83Quand = Date.now();
+    await chargerPlaces83(null);
+    change = JSON.stringify(window._places83) !== avant;
+  } catch(e) {
+  } finally { _places83EnCours = false; }
+  if(change) {
+    (DB.trajets || []).forEach(function(t){ recalculerPlaces(t); });
+    try { rTrajets(); } catch(e) {}
+    try { if(DB.user && DB.user.role === 'client' && typeof rClientContent === 'function') rClientContent(); } catch(e) {}
+  }
+  return change;
+}
+
 // Recalculer les places disponibles en fonction des réservations multi-places
 function recalculerPlaces(trajet) {
   if(!trajet) return;
+  // ══ 28/09 — LES PLACES VIENNENT DE LA BASE ══
+  // Quand le résumé du 83 est connu, c'est LUI qui fait foi : le calcul local
+  // ci-dessous se disputait avec la colonne que la base écrit désormais
+  // elle-même à chaque écriture. Il ne reste qu'un repli, le temps que le
+  // résumé arrive (ou si le 83 n'est pas encore posé).
+  const _p83 = window._places83 ? window._places83[trajet.id] : null;
+  if(_p83 && _p83.libres !== undefined && _p83.libres !== null) {
+    trajet.placesDispos = _p83.libres;
+    return;
+  }
   // Utiliser trajet.places (le vrai total) au lieu de plAvant+plMilieu+plArriere
   const total = trajet.places || 0;
   if(total === 0) return;
@@ -19492,10 +20033,19 @@ function recalculerPlaces(trajet) {
 
 function checkIfReservationBlocked(telephone, email) {
   // 🔧 Vérifier si tel OU email est en liste noire
-  return DB.listeNoireReservations.some(entry => 
-    (entry.telephone && nrm(entry.telephone) === nrm(telephone)) ||
-    (entry.email && nrm(entry.email) === nrm(email))
-  );
+  // ══ 28/09 — ON NE REFUSE PLUS CE QUE LE SERVEUR ACCEPTE ══
+  // Deux règles du propriétaire, écrites dans le SQL 83, manquaient ici :
+  // un blocage LEVÉ garde sa ligne (blocked = false), et un blocage prend fin
+  // tout seul au bout de 30 jours (bloque_jusqu_au). Sans ces deux lectures, le
+  // site refusait la réservation d'une personne redevenue libre — et c'est le
+  // serveur, seul, qui a le dernier mot de toute façon.
+  const maintenant = Date.now();
+  return DB.listeNoireReservations.some(entry => {
+    if(entry.blocked === false) return false;
+    if(entry.bloqueJusquAu && new Date(entry.bloqueJusquAu).getTime() <= maintenant) return false;
+    return (entry.telephone && nrm(entry.telephone) === nrm(telephone)) ||
+           (entry.email && nrm(entry.email) === nrm(email));
+  });
 }
 
 function countAbandonedReservations(telephone, email) {
@@ -19601,16 +20151,35 @@ async function sbSaveListeNoire(entry) {
   }
 }
 
-function saveReservationTrajet() {
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — LA RÉSERVATION PASSE PAR LE SERVEUR, ET ON ATTEND SA RÉPONSE ══
+//
+// CE QUI N'ALLAIT PAS : cette fonction n'appelait JAMAIS reserver_trajet. Elle
+// poussait la réservation dans la copie du navigateur et réécrivait TOUTE la
+// ligne du trajet par sbSaveTrajet — qui avale ses erreurs. Deux réservations à
+// quelques secondes d'écart : la seconde effaçait la première, et les DEUX
+// passagers repartaient avec un code à 4 chiffres valable. Le code lui-même était
+// tiré par le navigateur, là où seul le serveur peut garantir qu'il est unique.
+//
+// Et le site écrivait « ✅ Réservation confirmée » AVANT de savoir : depuis le
+// SQL 83 la base REFUSE ces écritures, et le passager aurait lu « confirmée » sur
+// un refus. Désormais : reserver_trajet décide, on attend, et on affiche SA
+// phrase. Aucun « ✅ » n'est prononcé avant sa réponse.
+// ════════════════════════════════════════════════════════════════════════════
+async function saveReservationTrajet() {
   const trajetId = document.getElementById('rt-trajet-id').value;
   const t = DB.trajets.find(x=>x.id===trajetId);
   const err = document.getElementById('rterr');
   if(!t) { err.textContent='⚠️ Trajet introuvable.'; err.style.display='block'; return; }
-  
-  const totalPlaces = t.places || 0;
-  const reservees = (t.reservations || []).filter(r => !r.annule).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
-  if(reservees >= totalPlaces) { err.textContent='⛔ Plus de place disponible sur ce trajet.'; err.style.display='block'; return; }
-  
+
+  // Les places libres viennent du résumé du 83 quand il est connu : le calcul local
+  // se disputait avec la colonne que la base écrit elle-même.
+  const _p83r = (typeof places83 === 'function') ? places83(t) : null;
+  const totalPlaces = _p83r ? _p83r.total : (t.places || 0);
+  const reservees = _p83r ? _p83r.prises
+    : (t.reservations || []).filter(r => !r.annule).reduce((sum, r) => sum + (Array.isArray(r.places_positions) ? r.places_positions.length : (r.nbPlaces || 1)), 0);
+  if(totalPlaces > 0 && reservees >= totalPlaces) { err.textContent='⛔ Plus de place disponible sur ce trajet.'; err.style.display='block'; return; }
+
   const prenom = document.getElementById('rt-prenom').value.trim();
   const nom = document.getElementById('rt-nom').value.trim();
   const tel = document.getElementById('rt-tel').value.trim();
@@ -19634,58 +20203,95 @@ function saveReservationTrajet() {
   if(placesSelectionnees.length === 0) { err.textContent='⚠️ Sélectionnez au moins une place.'; err.style.display='block'; return; }
   
   // Vérifier qu'aucune place n'est déjà réservée (EXCLURE ANNULÉES)
+  // 28/09 : ce contrôle reste, mais il ne décide plus de rien — c'est le serveur
+  // qui verrouille la ligne et tranche. Il évite juste un aller-retour inutile.
   const placesReservees = [];
-  (t.reservations || []).filter(r => !r.annule).forEach(r => {
-    if(Array.isArray(r.places_positions)) {
-      placesReservees.push(...r.places_positions);
-    } else if(r.place_position) {
-      placesReservees.push(r.place_position);
-    }
-  });
-  
-  const placeConflict = placesSelectionnees.find(p => placesReservees.includes(p));
-  if(placeConflict) { 
-    err.textContent='⛔ Une ou plusieurs places sélectionnées sont déjà réservées. Veuillez choisir d\'autres places.'; 
-    err.style.display='block'; 
-    return; 
+  if(_p83r && Array.isArray(_p83r.sieges_pris)) {
+    _p83r.sieges_pris.forEach(s => placesReservees.push(s));
+  } else {
+    (t.reservations || []).filter(r => !r.annule).forEach(r => {
+      if(Array.isArray(r.places_positions)) {
+        placesReservees.push(...r.places_positions);
+      } else if(r.place_position) {
+        placesReservees.push(r.place_position);
+      }
+    });
   }
-  
+  const _prisesCles2 = placesReservees.map(_cleSiege);
+  const placeConflict = placesSelectionnees.find(p => _prisesCles2.indexOf(_cleSiege(p)) !== -1);
+  if(placeConflict) {
+    err.textContent='⛔ Une ou plusieurs places sélectionnées sont déjà réservées. Veuillez choisir d\'autres places.';
+    err.style.display='block';
+    try { renderPlacesSelection(trajetId); } catch(e) {}
+    return;
+  }
+
   // Email obligatoire pour recevoir la confirmation
   if(!email) { err.textContent='⚠️ Email obligatoire pour recevoir votre confirmation de réservation.'; err.style.display='block'; return; }
-  
+
   const partagerTel = document.getElementById('rt-partager-tel').value === '1';
-  if(!t.reservations) t.reservations = [];
-  
-  const pinDepart = String(Math.floor(1000 + Math.random() * 9000));
-  
-  t.reservations.push({
-    id:gid(), 
-    prenom, 
-    nom, 
-    tel, 
-    email, 
-    partagerTel, 
-    places_positions: placesSelectionnees,
-    confirme:false, 
-    pinDepart, 
-    date:new Date().toISOString()
+
+  // ── LE SERVEUR DÉCIDE, ET LUI SEUL ────────────────────────────────────────
+  // Il verrouille la ligne du trajet, vérifie la liste noire, le statut, la date,
+  // le plan des sièges, chaque siège demandé, et tire le code à 4 chiffres. Tant
+  // qu'il n'a pas répondu, on n'annonce RIEN.
+  const _btnR = document.querySelector('#m-reserver-trajet button.btn-blue');
+  const _libR = _btnR ? _btnR.textContent : '';
+  if(_btnR) { _btnR.disabled = true; _btnR.textContent = '⏳ Le serveur enregistre…'; }
+  err.style.display = 'none';
+
+  const rep = await _appelTrajet83('reserver_trajet', {
+    p_trajet_id: trajetId,
+    p_prenom: prenom,
+    p_nom: nom,
+    p_tel: tel,
+    p_email: email,
+    p_places: placesSelectionnees.length,
+    p_partager_tel: partagerTel,
+    p_positions: placesSelectionnees
   });
-  
-  // Recalculer les places disponibles correctement
-  recalculerPlaces(t);
-  
-  sbSaveTrajet(t);
+
+  if(_btnR) { _btnR.disabled = false; _btnR.textContent = _libR || '✅ Confirmer la réservation'; }
+
+  if(rep.ok !== true) {
+    // Aucune place n'a été prise : on le dit, en français, avec la phrase du
+    // serveur — et on redessine le plan pour montrer l'état réel des sièges.
+    err.textContent = '⛔ ' + rep.message;
+    err.style.display = 'block';
+    try { await chargerPlaces83Un(trajetId); } catch(e) {}
+    try { renderPlacesSelection(trajetId); } catch(e) {}
+    try { rTrajets(); } catch(e) {}
+    return;
+  }
+
+  // ── C'EST ENREGISTRÉ : on relit la ligne au lieu de l'inventer ─────────────
+  const pinDepart = rep.pin || '';
+  const _siegesPris = Array.isArray(rep.sieges) ? rep.sieges : placesSelectionnees;
+  try {
+    const { data: _l } = await supabaseClient.from('trajets').select('*').eq('id', trajetId).limit(1);
+    if(_l && _l[0] && typeof mapTrajet === 'function') {
+      const _m = mapTrajet(_l[0]);
+      const _i = DB.trajets.findIndex(x => x.id === trajetId);
+      if(_i >= 0) DB.trajets[_i] = _m; else DB.trajets.unshift(_m);
+    }
+  } catch(e) {}
+  try { await chargerPlaces83Un(trajetId); } catch(e) {}
+  const _tApres = DB.trajets.find(x => x.id === trajetId) || t;
+
   closeModal('m-reserver-trajet');
   rTrajets();
-  
-  toast('✅ Réservation confirmée pour ' + placesSelectionnees.length + ' place(s) ! Paiement en espèces directement au chauffeur le jour du trajet.');
-  
+
+  // La phrase vient du serveur : c'est lui qui sait ce qui a été enregistré.
+  toast('✅ ' + (rep.message || 'Réservation enregistrée.') +
+        ' Code de départ : ' + pinDepart +
+        ' · Paiement en espèces directement au chauffeur le jour du trajet.');
+
   if(email) {
-    envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, t, placesSelectionnees, pinDepart);
+    envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, _tApres, _siegesPris, pinDepart);
   }
-  
+
   // 📧 ENVOYER EMAIL AU CHAUFFEUR pour qu'il sache qu'il y a une nouvelle réservation
-  envoyerEmailChauffeurReservation(t, prenom, nom, tel, placesSelectionnees);
+  envoyerEmailChauffeurReservation(_tApres, prenom, nom, tel, _siegesPris);
 }
 
 function envoyerEmailChauffeurReservation(trajet, prenom, nom, tel, places_positions) {
@@ -19917,10 +20523,18 @@ function envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, trajet, pla
   lignes.push('  • Soyez courtois(e) avec le chauffeur et les autres passagers');
   lignes.push('');
   
+  // 28/09 : cet e-mail annonçait « jusqu'à 1 heure avant le départ ». La règle du
+  // propriétaire est de TROIS HEURES, et c'est celle que le serveur applique
+  // désormais (annuler_reservation, SQL 83) : au-delà, il refuse. Le passager
+  // lisait donc une promesse que la base ne tient pas.
   lignes.push('⚠️ ANNULATION');
-  lignes.push('  • Vous pouvez annuler jusqu\'à 1 heure avant le départ');
+  lignes.push('  • Vous pouvez annuler librement jusqu\'à 3 HEURES avant le départ');
   lignes.push('  • Pour annuler: rendez-vous dans l\'application');
-  lignes.push('  • Annulation gratuite si effectuée à temps');
+  lignes.push('  • Moins de 3 heures avant le départ : appelez directement le conducteur,');
+  lignes.push('    lui seul peut encore rendre votre place');
+  lignes.push('  • Annulation gratuite : vous n\'avez rien versé, le paiement se fait');
+  lignes.push('    en espèces au conducteur le jour du départ');
+  lignes.push('  • 3 réservations abandonnées : 30 jours sans pouvoir réserver');
   lignes.push('');
   
   lignes.push('═════════════════════════════════════════');
@@ -20013,43 +20627,85 @@ function chercherEtAnnulerReservation() {
   if(zone) { zone.style.display = ''; zone.innerHTML = html; }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — L'ANNULATION DU PASSAGER PASSE PAR LE SERVEUR (RÈGLE DES 3 H) ══
+//
+// CE QUI N'ALLAIT PAS : cette fonction n'appelait pas annuler_reservation. Elle
+// marquait la réservation dans la copie du navigateur et réécrivait TOUTE la ligne
+// du trajet : une réservation prise ailleurs entre temps disparaissait. Les emails
+// partaient AVANT l'écriture, et le toast « ✅ » avant de savoir si la base avait
+// accepté.
+//
+// La règle du propriétaire — libre jusqu'à 3 HEURES avant le départ, ensuite on
+// appelle le conducteur — n'existait NULLE PART : ni ici, ni dans l'application,
+// ni en base. Elle vit maintenant dans annuler_reservation (SQL 83), qui compte
+// aussi les 3 abandons JUSTEMENT (une annulation faite par le conducteur ne
+// compte plus contre le passager) et pose un blocage de 30 jours qui prend fin
+// tout seul. On ne fait plus que lui obéir et afficher sa phrase.
+// ════════════════════════════════════════════════════════════════════════════
 function confirmerAnnulationResa(trajetId, resaId) {
   askConfirm('Confirmez-vous l\'annulation de votre réservation ? Cette action est définitive.', async function() {
     const trouve = DB.trajets.find(t => t.id === trajetId);
     if(!trouve) return;
     const resa = (trouve.reservations||[]).find(x => x.id === resaId);
     if(!resa) return;
-    
-    // 🔧 ANTI-FRAUDE: Sauvegarder tel+email AVANT de marquer annulée
-    const telResa = resa.tel;
-    const emailResa = resa.email;
-    
-    // Notifier le chauffeur AVANT de marquer comme annulée
-    notifierChauffeurAnnulationPassager(trouve, resa);
-    // 📧 Notifier aussi le passager
-    _envoyerEmailAnnulationReservationPassager(trouve, resa);
-    
-    // 🔧 ANTI-FRAUDE: Marquer comme annulée (pas supprimer!) pour que countAbandonedReservations() la trouve
-    resa.annule = true;
-    resa.dateAnnulation = new Date().toISOString();
-    
-    // Ne PAS supprimer - garder pour l'historique et le comptage anti-fraude
-    
-    // 🔧 ANTI-FRAUDE: Compter les abandons de ce tel+email et bloquer si >= 3
-    // IMPORTANT: +1 pour compter CETTE annulation qu'on vient de faire!
-    const countAbandons = countAbandonedReservations(telResa, emailResa) + 1;
-    if(countAbandons >= 3 && !DB.listeNoireReservations.some(x => nrm(x.telephone) === nrm(telResa) && nrm(x.email) === nrm(emailResa))) {
-      await addToBlacklist(telResa, emailResa);
-      addDebugLog(`🚫 BLOCAGE AUTO: ${telResa} (${countAbandons} annulations)`);
+
+    if(!resa.pinDepart) {
+      toast('⛔ Cette réservation n\'a pas de code à 4 chiffres : seul le conducteur peut l\'annuler. Appelez-le' +
+            (trouve.tel ? ' au ' + trouve.tel : '') + '.', true);
+      return;
     }
-    
-    recalculerPlaces(trouve);
-    trouve.derniereAnnulation = new Date().toISOString(); // détectée par le chauffeur pour la sonnerie courte
-    sbSaveTrajet(trouve);
+
+    // ── LE SERVEUR DÉCIDE ───────────────────────────────────────────────────
+    // L'identité du passager est prouvée par TÉLÉPHONE + CODE À 4 CHIFFRES : lui
+    // seul détient le code reçu à la réservation. Le mot « trop_tard_3h » ramène
+    // la phrase qui invite à appeler le conducteur, avec son numéro.
+    const rep = await _appelTrajet83('annuler_reservation', {
+      p_trajet_id: trajetId,
+      p_tel: resa.tel || '',
+      p_code: String(resa.pinDepart)
+    });
+
+    if(rep.ok !== true) {
+      // Rien n'a été annulé : on le dit, sans jamais annoncer un succès.
+      toast('⛔ ' + rep.message, true);
+      return;
+    }
+
+    // ── C'EST ANNULÉ EN BASE : on relit la ligne, puis on prévient ───────────
+    try {
+      const { data: _l } = await supabaseClient.from('trajets').select('*').eq('id', trajetId).limit(1);
+      if(_l && _l[0] && typeof mapTrajet === 'function') {
+        const _i = DB.trajets.findIndex(x => x.id === trajetId);
+        const _m = mapTrajet(_l[0]);
+        if(_i >= 0) DB.trajets[_i] = _m; else DB.trajets.unshift(_m);
+      }
+    } catch(e) {}
+    try { await chargerPlaces83Un(trajetId); } catch(e) {}
+    const _tA = DB.trajets.find(x => x.id === trajetId) || trouve;
+    const _rA = (_tA.reservations||[]).find(x => x.id === resaId) || resa;
+
+    // Les emails partent APRÈS : on ne prévient personne d'une annulation refusée.
+    try { notifierChauffeurAnnulationPassager(_tA, _rA); } catch(e) {}
+    try { _envoyerEmailAnnulationReservationPassager(_tA, _rA); } catch(e) {}
+
+    // Le blocage des 3 abandons est posé PAR LE SERVEUR (afri83_bloquer_reservations).
+    // On ne réécrit rien dans la liste noire : on reflète seulement sa réponse à
+    // l'écran, le temps que la lecture suivante la rapporte.
+    if(rep.bloque_jusqu_au) {
+      try {
+        DB.listeNoireReservations.push({ id:gid(), telephone:resa.tel||'', email:resa.email||'',
+          dateBlocage:new Date().toISOString(), raison:'Trois réservations abandonnées',
+          count:rep.abandons || 3, blocked:true, bloqueJusquAu:rep.bloque_jusqu_au });
+      } catch(e) {}
+    }
+
     closeModal('m-annuler-reservation');
     const zone = document.getElementById('ar-resultat'); if(zone){ zone.style.display='none'; zone.innerHTML=''; }
     rTrajets();
-    toast('✅ Réservation annulée pour le trajet ' + trouve.depart + ' → ' + trouve.arrivee);
+    // La phrase vient du serveur : elle dit aussi le blocage éventuel et sa date.
+    toast('✅ ' + (rep.message || 'Réservation annulée.') +
+          ' (' + _tA.depart + ' → ' + _tA.arrivee + ')');
   });
 }
 
@@ -20270,8 +20926,14 @@ async function _envoyerEmailAnnulationReservationPassager(trajet, passager) {
   if(!passager.email) return;
   
   const nbPlaces = Array.isArray(passager.places_positions) ? passager.places_positions.length : (passager.nbPlaces||1);
-  const montantRembourse = trajet.prix * nbPlaces;
-  
+
+  // ══ 28/09 — CET E-MAIL PROMETTAIT UN REMBOURSEMENT QUI N'EXISTE PAS ══
+  // Il annonçait « Total remboursé : … GNF · Remboursement effectué » alors que le
+  // site n'encaisse RIEN du passager : le prix de la place se paie en espèces au
+  // conducteur le jour du départ, et aucun mouvement d'argent n'a jamais eu lieu.
+  // Il parlait aussi d'« annulation gratuite jusqu'à 1 heure avant le départ » : la
+  // règle du propriétaire est de TROIS HEURES, et elle est écrite dans
+  // annuler_reservation (SQL 83). On dit désormais la vérité, sur les deux points.
   const lignes = [
     '═════════════════════════════════════════',
     '❌ ANNULATION DE RÉSERVATION CONFIRMÉE',
@@ -20292,20 +20954,19 @@ async function _envoyerEmailAnnulationReservationPassager(trajet, passager) {
     '💺 PLACES ANNULÉES',
     '──────────────────',
     'Nombre de places : ' + nbPlaces,
+    'Prix par place qui était annoncé : ' + fmt(trajet.prix) + ' GNF',
     '',
-    '💰 REMBOURSEMENT',
-    '────────────────',
-    'Prix par place : ' + fmt(trajet.prix) + ' GNF',
-    'Nombre de places : ' + nbPlaces,
-    'Total remboursé : ' + fmt(montantRembourse) + ' GNF',
-    'Statut : ✅ Remboursement effectué',
+    '💵 ARGENT',
+    '─────────',
+    'Vous n\'avez rien versé pour cette réservation : le prix de la place se paie',
+    'EN ESPÈCES, directement au conducteur, le jour du départ.',
+    'Il n\'y a donc aucun remboursement à faire, et aucun frais à votre charge.',
     '',
     '📌 CE QUI SE PASSE MAINTENANT',
     '────────────────────────────',
     '✅ Votre réservation a été annulée',
     '✅ Le chauffeur a été notifié',
-    '✅ Votre remboursement a été traité',
-    '✅ Les places sont à nouveau disponibles',
+    '✅ Votre/vos place(s) sont rendues aux autres passagers',
     '',
     '🔄 ALTERNATIVES',
     '───────────────',
@@ -20313,11 +20974,13 @@ async function _envoyerEmailAnnulationReservationPassager(trajet, passager) {
     '• Contactez directement le chauffeur si vous avez des questions',
     '• Consultez les trajets similaires (date, horaire proche)',
     '',
-    '⚠️ CONDITIONS D\'ANNULATION',
+    '⚠️ LES RÈGLES D\'ANNULATION',
     '──────────────────────────',
-    '• Annulation gratuite jusqu\'à 1 heure avant le départ',
-    '• Annulation après ce délai : des frais peuvent s\'appliquer',
-    '• Le remboursement est traité automatiquement',
+    '• Vous annulez librement JUSQU\'À 3 HEURES avant le départ.',
+    '• Moins de 3 heures avant le départ, le service ne peut plus annuler seul :',
+    '  appelez directement le conducteur, il décidera avec vous.',
+    '• 3 réservations abandonnées : votre numéro ne peut plus réserver pendant',
+    '  30 JOURS, puis le blocage prend fin tout seul.',
     '',
     '📞 BESOIN D\'AIDE ?',
     '─────────────────',
@@ -20329,7 +20992,7 @@ async function _envoyerEmailAnnulationReservationPassager(trajet, passager) {
     'L\'équipe Laouni AfriMoto',
     '═════════════════════════════════════════'
   ];
-  
+
   await envoyerEmailConfirmation(passager.email, '❌ Annulation de réservation confirmée - ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
 }
 
@@ -20601,8 +21264,28 @@ function avisCourse(courseId) {
   return { moyenne, total: avis.length, avis };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — CETTE ANNULATION N'ANNULAIT RIEN DU TOUT ══
+//
+// LE DÉFAUT LE PLUS GRAVE DE L'ÉCRAN DU CONDUCTEUR, et il est prouvé : le
+// commentaire annonçait « Marquer annulée » et AUCUNE LIGNE NE SUIVAIT. Le drapeau
+// « annule » n'était jamais écrit. Résultat : la place restait prise POUR
+// TOUJOURS, le passager gardait un code valable — et il recevait quand même un
+// e-mail lui annonçant l'annulation. Le conducteur, lui, lisait « ✅ Réservation
+// annulée ».
+//
+// La fonction qui manquait existe maintenant en base :
+// annuler_une_reservation_conducteur (SQL 83). Elle pose annule + annuleLe +
+// annulePar:conducteur + le motif, laisse la base recalculer les places, ne compte
+// PAS d'abandon contre le passager (c'est le geste du conducteur), et fait monter
+// le compteur de refus DU CONDUCTEUR — la règle « trois passagers refusés sur ce
+// trajet » vivait dans le navigateur, elle vit désormais en base.
+//
+// L'identité est prouvée comme partout ailleurs : NUMÉRO CLIENT + MOT DE PASSE,
+// jamais un identifiant nu, et le mot de passe n'est rangé nulle part.
+// ════════════════════════════════════════════════════════════════════════════
 // ── Annulation par le CHAUFFEUR depuis son espace client (onglet Chauffeur) ──
-function chauffeurAnnulerReservation(trajetId, reservationId, raison) {
+async function chauffeurAnnulerReservation(trajetId, reservationId, raison) {
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   // Sécurité : seul le chauffeur propriétaire du trajet (ou le staff) peut annuler une réservation
@@ -20611,25 +21294,73 @@ function chauffeurAnnulerReservation(trajetId, reservationId, raison) {
   if(t.statut === 'en_cours' || t.statut === 'effectué') { toast('⛔ Le départ est déjà confirmé, impossible d\'annuler une réservation', true); return; }
   const r = (t.reservations||[]).find(x=>x.id===reservationId);
   if(!r) return;
-  // Notifier le passager AVANT de marquer comme annulée
-  notifierPassagerAnnulationReservation(t, r);
-  // ✅ FIX: Marquer annulée au lieu de supprimer (comme le client!)
-  // ✅ FIX: Compter AUSSI dans la liste noire si LE CHAUFFEUR (client) annule trop souvent
-  // (C'est un parasite qui rejette les passagers)
-  const countAnnulationsParChauffeur = (t.reservations||[]).filter(x => x.annule && x.annulee_par === 'chauffeur').length + 1; // +1 pour CETTE annulation
-  const clientId = t.clientId;
-  
-  if(countAnnulationsParChauffeur >= 3) {
-    // Bloquer le CHAUFFEUR (pas le passager!)
-    const chauffeur = DB.clients.find(c => c.id === clientId);
-    if(chauffeur && !DB.listeNoireReservations.some(x => nrm(x.telephone) === nrm(chauffeur.tel) && nrm(x.email) === nrm(chauffeur.email))) {
-      addToBlacklist(chauffeur.tel, chauffeur.email);
-      console.log('🚫 BLOCAGE AUTO (chauffeur parasite): ' + chauffeur.tel + ' (' + countAnnulationsParChauffeur + ' annulations)');
+
+  // ── LE CHEMIN DU CONDUCTEUR : LA FONCTION SERVEUR ───────────────────────────
+  if(DB.user && DB.user.role === 'client') {
+    const _ident = await _identiteConducteur('Annuler la réservation de ' + (r.prenom||'') + ' ' + (r.nom||''),
+      'Le serveur vérifie que ce trajet est bien le vôtre avant de rendre la place.');
+    if(!_ident) return;
+
+    const rep = await _appelTrajet83('annuler_une_reservation_conducteur', {
+      p_num: _ident.num,
+      p_mot_de_passe: _ident.pw,
+      p_trajet_id: trajetId,
+      p_reservation_id: String(reservationId),
+      p_motif: (raison || '').trim() || null
+    });
+
+    if(rep.ok !== true) {
+      toast('⛔ Réservation NON annulée : ' + rep.message, true);
+      return;
     }
+
+    // On relit la ligne : la base vient d'y écrire la marque et les places.
+    try {
+      const { data: _l } = await supabaseClient.from('trajets').select('*').eq('id', trajetId).limit(1);
+      if(_l && _l[0] && typeof mapTrajet === 'function') {
+        const _i = DB.trajets.findIndex(x => x.id === trajetId);
+        const _m = mapTrajet(_l[0]);
+        if(_i >= 0) DB.trajets[_i] = _m; else DB.trajets.unshift(_m);
+      }
+    } catch(e) {}
+    try { await chargerPlaces83Un(trajetId); } catch(e) {}
+    const _tA = DB.trajets.find(x => x.id === trajetId) || t;
+    const _rA = (_tA.reservations||[]).find(x => x.id === reservationId) || r;
+
+    // Le passager est prévenu APRÈS : plus jamais d'e-mail sur une annulation refusée.
+    try { notifierPassagerAnnulationReservation(_tA, _rA); } catch(e) {}
+
+    rClientContent();
+    rTrajets();
+    toast('✅ ' + (rep.message || 'Réservation annulée.') +
+          (raison ? ' · Motif : ' + raison : '') +
+          (rep.refus_sur_ce_trajet >= 2 && !rep.bloque_jusqu_au
+            ? ' ⚠️ ' + rep.refus_sur_ce_trajet + ' passager(s) refusé(s) sur ce trajet : au troisième, vous ne pourrez plus en refuser.'
+            : ''));
+    return;
   }
-  // Recalculer les places disponibles correctement
+
+  // ── LE CHEMIN DU PERSONNEL (agent, administration) ──────────────────────────
+  // La fonction serveur exige un compte client : elle ne convient pas ici. On
+  // écrit donc la marque QUI MANQUAIT — annule, annuleLe, annulePar, motif —
+  // et on ATTEND la réponse de la base avant d'annoncer quoi que ce soit.
+  const _avant = JSON.parse(JSON.stringify(t.reservations || []));
+  r.annule = true;
+  r.annuleLe = new Date().toISOString();
+  r.annulePar = 'conducteur';
+  r.annulee_par = 'chauffeur';
+  r.motif = (raison || '').trim() || null;
   recalculerPlaces(t);
-  sbSaveTrajet(t); // Sauvegarder en Supabase
+  t.derniereAnnulation = new Date().toISOString();
+  const _ok = await sbSaveTrajet(t);
+  if(_ok === false) {
+    t.reservations = _avant;
+    recalculerPlaces(t);
+    toast('⛔ Réservation NON annulée : le serveur a refusé l\'enregistrement. Rien n\'a changé.', true);
+    rClientContent(); rTrajets();
+    return;
+  }
+  try { notifierPassagerAnnulationReservation(t, r); } catch(e) {}
   rClientContent(); // Rafraîchir l'espace chauffeur
   rTrajets(); // Rafraîchir l'espace public (Voyager)
   toast('✅ Réservation de ' + r.prenom + ' ' + r.nom + ' annulée' + (raison ? ' · Motif : ' + raison : ''));
@@ -20713,7 +21444,24 @@ async function rechercherMonTrajet() {
     '</div>';
 }
 
-function chauffeurConfirmerPassager(trajetId, reservationId) {
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — LE DÉPART SE VERROUILLAIT À L'ÉCRAN, PAS EN BASE ══
+//
+// CE QUI N'ALLAIT PAS, ET C'EST PROUVÉ SUR UN VRAI POSTGRESQL : cette fonction
+// écrit TOUTE la ligne du trajet depuis la mémoire du navigateur (sbSaveTrajet),
+// sans attendre ni lire la réponse — et elle annonçait « 🚗 départ RÉEL
+// enregistré » et prévenait les passagers par e-mail AVANT cette écriture.
+//
+// Depuis le SQL 83, cette écriture PEUT ÊTRE REFUSÉE : si un passager a réservé
+// pendant que l'écran du conducteur était ouvert, la ligne qui part effacerait sa
+// réservation, et le déclencheur la refuse (« ligne_perdue »). Le conducteur
+// lisait alors « départ RÉEL enregistré », les passagers recevaient « le trajet
+// a commencé », et la base continuait de vendre des places.
+//
+// On attend donc la réponse, on remet la copie du navigateur d'aplomb si elle est
+// refusée, et AUCUN e-mail ne part pour un départ qui n'a pas été enregistré.
+// ════════════════════════════════════════════════════════════════════════════
+async function chauffeurConfirmerPassager(trajetId, reservationId) {
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
@@ -20738,26 +21486,54 @@ function chauffeurConfirmerPassager(trajetId, reservationId) {
   }
   if(errEl) errEl.style.display='none';
 
+  // 28/09 : de quoi tout remettre en place si la base refuse l'écriture.
+  const _avResas = JSON.parse(JSON.stringify(t.reservations || []));
+  const _avEtat = { statut:t.statut, departConfirmeLe:t.departConfirmeLe,
+                    heureDebut:t.heureDebut, minuteDebut:t.minuteDebut,
+                    placesDispos:t.placesDispos };
+  const _remettre = function() {
+    t.reservations = _avResas;
+    t.statut = _avEtat.statut; t.departConfirmeLe = _avEtat.departConfirmeLe;
+    t.heureDebut = _avEtat.heureDebut; t.minuteDebut = _avEtat.minuteDebut;
+    t.placesDispos = _avEtat.placesDispos;
+    rClientContent();
+  };
+
   r.confirme = true;
   r.confirmeLe = new Date().toISOString();
 
   // Verrouillage automatique : si toutes les réservations sont traitées (confirmées ou annulées)
   const actives = (t.reservations||[]).filter(x => !x.annule);
   if(actives.length > 0 && actives.every(x => x.confirme)) {
-    notifierPassagersTrajet(t, 'debut_trajet');
     t.statut = 'en_cours';
     const maintenant = new Date();
     t.departConfirmeLe = maintenant.toISOString();
     t.heureDebut = maintenant.getHours();
     t.minuteDebut = maintenant.getMinutes();
-    sbSaveTrajet(t);
+    // On ATTEND la base avant d'annoncer et avant de prévenir les passagers.
+    const _okD = await sbSaveTrajet(t);
+    if(_okD === false) {
+      _remettre();
+      toast('⛔ Départ NON enregistré : ' + (r.prenom||'') + ' ' + (r.nom||'') +
+            ' n\'est pas confirmé(e). Une réservation est arrivée depuis que cet écran a chargé la page : ' +
+            'rechargez-la, puis recommencez. Rien n\'a changé et aucun passager n\'a été prévenu.', true);
+      return;
+    }
+    notifierPassagersTrajet(t, 'debut_trajet');
     logMvt('debut_trajet', '🚗 Départ réel du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
     rClientContent();
     toast('🚗 Tous les passagers sont confirmés — départ RÉEL enregistré, bon voyage !');
     return;
   }
   const nonTraites = (t.reservations||[]).filter(x => !x.confirme && !x.annule);
-  sbSaveTrajet(t);
+  const _okC = await sbSaveTrajet(t);
+  if(_okC === false) {
+    _remettre();
+    toast('⛔ ' + (r.prenom||'') + ' ' + (r.nom||'') + ' n\'a PAS été confirmé(e) : le serveur a refusé ' +
+          'l\'enregistrement. Rechargez la page — une réservation a changé depuis qu\'elle a été ouverte — ' +
+          'puis recommencez.', true);
+    return;
+  }
   rClientContent();
   toast('✅ ' + r.prenom + ' ' + r.nom + ' confirmé(e)' + (nonTraites.length ? ' — encore ' + nonTraites.length + ' réservation(s) à traiter.' : '') );
 }
@@ -20768,39 +21544,72 @@ function chauffeurMarquerAbsent(trajetId, reservationId) {
   const r = (t.reservations||[]).find(x=>x.id===reservationId);
   if(!r) return;
   askConfirm('⚠️ Marquer ' + r.prenom + ' ' + r.nom + ' comme absent ? La place sera libérée.', async function() {
+    // ══ 28/09 — « PLACE LIBÉRÉE » ÉTAIT DIT AVANT DE SAVOIR ══
+    // Même défaut que la confirmation du passager : la ligne entière partait depuis
+    // la mémoire du navigateur, personne ne lisait la réponse, et aucun message
+    // d'échec n'existait. Depuis le SQL 83, une réservation arrivée entre-temps fait
+    // REFUSER cette écriture (« ligne_perdue », prouvé sur un vrai PostgreSQL) : le
+    // conducteur lisait « place libérée » et la base n'avait rien changé.
+    // Pire : le blocage de 30 jours était posé sur le passager AVANT l'écriture —
+    // il pouvait donc être banni pour une absence jamais enregistrée.
+    const _avResas = JSON.parse(JSON.stringify(t.reservations || []));
+    const _avEtat = { statut:t.statut, departConfirmeLe:t.departConfirmeLe,
+                      heureDebut:t.heureDebut, minuteDebut:t.minuteDebut,
+                      placesDispos:t.placesDispos };
     r.annule = true;
     r.annuleLe = new Date().toISOString();
-    
+
     // 🔧 DEBUG: Vérifier les valeurs
     addDebugLog(`👤 ABSENT: tel="${r.tel}" | email="${r.email}"`);
-    
-    // 🔧 ANTI-FRAUDE: Compter les abandons de ce tel+email et bloquer si >= 3
-    // IMPORTANT: +1 pour compter CETTE absence qu'on vient de marquer!
-    const countAbandons = countAbandonedReservations(r.tel, r.email) + 1;
-    addDebugLog(`📊 Count abandons: ${countAbandons}`);
-    
-    if(countAbandons >= 3 && !DB.listeNoireReservations.some(x => nrm(x.telephone) === nrm(r.tel) && nrm(x.email) === nrm(r.email))) {
-      await addToBlacklist(r.tel, r.email);
-      addDebugLog(`🚫 BLOCAGE AUTO: ${r.tel} (${countAbandons} absences)`);
-    }
-    
+
     // Recalculer les places correctement
     recalculerPlaces(t);
     // Vérifier si toutes les restantes sont traitées → départ automatique
     const nonTraites = (t.reservations||[]).filter(x => !x.confirme && !x.annule);
-    if(nonTraites.length === 0 && (t.reservations||[]).some(x=>x.confirme)) {
+    const _depart = (nonTraites.length === 0 && (t.reservations||[]).some(x=>x.confirme));
+    let maintenant = null;
+    if(_depart) {
       t.statut = 'en_cours';
-      const maintenant = new Date();
+      maintenant = new Date();
       t.departConfirmeLe = maintenant.toISOString();
       t.heureDebut = maintenant.getHours();
       t.minuteDebut = maintenant.getMinutes();
+    }
+
+    // ON ATTEND LA BASE AVANT D'ANNONCER ET AVANT DE BLOQUER QUI QUE CE SOIT.
+    const _okA = await sbSaveTrajet(t);
+    if(_okA === false) {
+      t.reservations = _avResas;
+      t.statut = _avEtat.statut; t.departConfirmeLe = _avEtat.departConfirmeLe;
+      t.heureDebut = _avEtat.heureDebut; t.minuteDebut = _avEtat.minuteDebut;
+      t.placesDispos = _avEtat.placesDispos;
+      rClientContent();
+      toast('⛔ ' + (r.prenom||'') + ' ' + (r.nom||'') + ' n\'a PAS été marqué(e) absent(e) : le serveur a ' +
+            'refusé l\'enregistrement. Sa place reste prise, et rien ne lui est reproché. ' +
+            'Rechargez la page, puis recommencez.', true);
+      return;
+    }
+
+    // 🔧 ANTI-FRAUDE: Compter les abandons de ce tel+email et bloquer si >= 3
+    // IMPORTANT: +1 pour compter CETTE absence qu'on vient de marquer!
+    const countAbandons = countAbandonedReservations(r.tel, r.email) + 1;
+    addDebugLog(`📊 Count abandons: ${countAbandons}`);
+
+    if(countAbandons >= 3 && !DB.listeNoireReservations.some(x => nrm(x.telephone) === nrm(r.tel) && nrm(x.email) === nrm(r.email))) {
+      await addToBlacklist(r.tel, r.email);
+      addDebugLog(`🚫 BLOCAGE AUTO: ${r.tel} (${countAbandons} absences)`);
+    }
+
+    // Le résumé des places du 83 est relu : le siège rendu doit se voir tout de suite.
+    try { await chargerPlaces83Un(trajetId); } catch(e) {}
+    if(_depart) {
       logMvt('debut_trajet', '🚗 Départ RÉEL du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
       toast('🚗 Départ RÉEL enregistré à ' + ('0'+maintenant.getHours()).slice(-2) + ':' + ('0'+maintenant.getMinutes()).slice(-2) + ' !');
     } else {
       toast('❌ ' + r.prenom + ' ' + r.nom + ' marqué(e) absent(e) — place libérée.');
     }
-    sbSaveTrajet(t);
     rClientContent();
+    try { rTrajets(); } catch(e) {}
   });
 }
 
@@ -20813,8 +21622,10 @@ async function notifierPassagersTrajet(trajet, typeNotif, details) {
   
   const messages = {
     annulation_chauffeur: {
+      // 28/09 : le sujet promettait lui aussi un « remboursement automatique » qui
+      // n'a jamais existé — le passager ne verse rien au site.
       titre: '❌ ANNULATION DU TRAJET - ' + trajet.depart + ' → ' + trajet.arrivee,
-      sujet: 'Trajet annulé (remboursement automatique)'
+      sujet: 'Trajet annulé par le conducteur — rien ne vous est facturé'
     },
     debut_trajet: {
       titre: '🚗 Trajet en cours — ' + trajet.depart + ' → ' + trajet.arrivee,
@@ -20848,8 +21659,13 @@ async function notifierPassagersTrajet(trajet, typeNotif, details) {
       
       if(typeNotif === 'annulation_chauffeur') {
         const nbPlaces = Array.isArray(resa.places_positions) ? resa.places_positions.length : (resa.nbPlaces||1);
-        const montantRembourse = trajet.prix * nbPlaces;
-        
+
+        // ══ 28/09 — CET E-MAIL PROMETTAIT UN REMBOURSEMENT QUI N'EXISTE PAS ══
+        // « Remboursement automatique effectué · Montant remboursé : … GNF » : rien
+        // n'avait jamais été encaissé au passager, et rien n'était versé. Le prix de
+        // la place se paie en espèces au conducteur le jour du départ. Le seul
+        // remboursement qui existe vraiment dans ce service concerne les FRAIS DE
+        // PUBLICATION DU CONDUCTEUR, jamais le passager.
         lignes = [
           '═════════════════════════════════════════',
           '❌ ANNULATION DU TRAJET',
@@ -20872,14 +21688,15 @@ async function notifierPassagersTrajet(trajet, typeNotif, details) {
           '💺 VOTRE RÉSERVATION',
           '───────────────────',
           'Places réservées : ' + nbPlaces,
-          'Prix par place : ' + fmt(trajet.prix) + ' GNF',
-          'Montant total : ' + fmt(montantRembourse) + ' GNF',
+          'Prix par place qui était annoncé : ' + fmt(trajet.prix) + ' GNF',
           '',
-          '💰 REMBOURSEMENT',
-          '────────────────',
-          'Statut : ✅ Remboursement automatique effectué',
-          'Montant remboursé : ' + fmt(montantRembourse) + ' GNF',
-          'Aucun frais n\'a été appliqué',
+          '💵 ARGENT',
+          '─────────',
+          'Vous n\'avez rien versé : le prix de la place se paie EN ESPÈCES,',
+          'directement au conducteur, le jour du départ. Ce voyage n\'aura pas lieu,',
+          'donc vous ne payez rien — et il n\'y a aucun remboursement à attendre.',
+          'Cette annulation ne compte PAS contre vous : votre numéro reste libre de',
+          'réserver un autre trajet tout de suite.',
           '',
           '🔄 QUE FAIRE MAINTENANT ?',
           '────────────────────────',
@@ -20887,11 +21704,13 @@ async function notifierPassagersTrajet(trajet, typeNotif, details) {
           '✅ Consultez les trajets similaires (même date/heure)',
           '✅ Contactez directement un chauffeur si nécessaire',
           '',
-          '📌 POLITIQUE D\'ANNULATION',
+          '📌 LES RÈGLES D\'ANNULATION',
           '──────────────────────────',
-          '• Annulation gratuite (remboursement 100%)',
-          '• Pas de frais supplémentaires appliqués',
-          '• Remboursement automatique et immédiat',
+          '• Aucun frais d\'annulation, dans aucun sens.',
+          '• Vous annulez librement JUSQU\'À 3 HEURES avant un départ ; ensuite,',
+          '  appelez directement le conducteur.',
+          '• 3 réservations abandonnées de votre part : 30 JOURS sans pouvoir',
+          '  réserver, puis le blocage prend fin tout seul.',
           '',
           '📞 BESOIN D\'AIDE ?',
           '─────────────────',
@@ -21057,8 +21876,14 @@ async function notifierPassagerAnnulationReservation(trajet, passager) {
   if(!passager.email) return;
   
   const nbPlaces = Array.isArray(passager.places_positions) ? passager.places_positions.length : (passager.nbPlaces||1);
-  const montantRembourse = trajet.prix * nbPlaces;
-  
+
+  // ══ 28/09 — CET E-MAIL PROMETTAIT UN REMBOURSEMENT QUI N'EXISTE PAS ══
+  // « Total remboursé · Remboursement automatique effectué · Vous avez été
+  // automatiquement remboursé » : trois phrases pour un mouvement d'argent qui n'a
+  // jamais eu lieu, sur une réservation où le passager n'avait rien versé. Pire, il
+  // partait même quand l'annulation ÉCHOUAIT (voir chauffeurAnnulerReservation).
+  // Désormais il dit la vérité, et il dit au passager ce qui compte pour lui : sa
+  // place est libre, ce refus ne compte pas contre son numéro.
   const lignes = [
     '═════════════════════════════════════════',
     '❌ ANNULATION DE VOTRE RÉSERVATION',
@@ -21066,40 +21891,41 @@ async function notifierPassagerAnnulationReservation(trajet, passager) {
     '',
     'Bonjour ' + (passager.prenom||'Passager') + ',',
     '',
-    'Malheureusement, le chauffeur a dû annuler sa réservation.',
+    'Malheureusement, le conducteur a annulé VOTRE RÉSERVATION sur son trajet.',
     'Nous vous présentons nos excuses pour ce désagrément.',
     '',
-    '📍 TRAJET ANNULÉ',
-    '────────────────',
+    '📍 LE TRAJET CONCERNÉ',
+    '─────────────────────',
     'Départ : ' + trajet.depart,
     'Arrivée : ' + trajet.arrivee,
     'Date & Heure : ' + fdt(trajet.dateHeure),
     'Chauffeur : ' + trajet.conducteur,
     'Téléphone chauffeur : ' + trajet.tel,
     '',
-    '💺 PLACES AFFECTÉES',
-    '───────────────────',
+    '💺 PLACES ANNULÉES',
+    '──────────────────',
     'Nombre de places : ' + nbPlaces,
+    'Prix par place qui était annoncé : ' + fmt(trajet.prix) + ' GNF',
     '',
-    '💰 REMBOURSEMENT',
-    '────────────────',
-    'Prix par place : ' + fmt(trajet.prix) + ' GNF',
-    'Nombre de places : ' + nbPlaces,
-    'Total remboursé : ' + fmt(montantRembourse) + ' GNF',
-    'Statut : ✅ Remboursement automatique effectué',
+    '💵 ARGENT',
+    '─────────',
+    'Vous n\'avez rien versé pour cette réservation : le prix de la place se paie',
+    'EN ESPÈCES, directement au conducteur, le jour du départ. Il n\'y a donc',
+    'aucun remboursement à attendre, et aucun frais à votre charge.',
+    'Votre code à 4 chiffres pour ce trajet n\'est plus valable.',
+    '',
+    '✅ CE QUI NE COMPTE PAS CONTRE VOUS',
+    '───────────────────────────────────',
+    'Cette annulation vient du conducteur, pas de vous : elle NE COMPTE PAS',
+    'dans les 3 abandons qui bloquent un numéro pendant 30 jours.',
+    'Votre numéro reste libre de réserver un autre trajet tout de suite.',
     '',
     '🔄 ALTERNATIVES',
     '───────────────',
     'Nous vous proposons de :',
     '• Chercher un autre trajet sur l\'application',
     '• Consulter les trajets similaires',
-    '• Contacter le support si vous avez besoin d\'aide',
-    '',
-    '⚠️ IMPORTANT',
-    '─────────────',
-    '• Vous avez été automatiquement remboursé',
-    '• Pas de frais d\'annulation ne vous seront appliqués',
-    '• Nous avons noté cet incident',
+    '• Appeler le conducteur ci-dessus s\'il s\'agit d\'un malentendu',
     '',
     '📞 SUPPORT CLIENT',
     '─────────────────',
@@ -21111,8 +21937,8 @@ async function notifierPassagerAnnulationReservation(trajet, passager) {
     'À bientôt sur Laouni AfriMoto GN ! 🚗',
     '═════════════════════════════════════════'
   ];
-  
-  await envoyerEmailConfirmation(passager.email, '❌ Annulation du trajet - ' + trajet.depart + ' → ' + trajet.arrivee + ' (remboursement automatique)', lignes);
+
+  await envoyerEmailConfirmation(passager.email, '❌ Votre réservation a été annulée par le conducteur - ' + trajet.depart + ' → ' + trajet.arrivee, lignes);
 }
 
 
@@ -21121,10 +21947,20 @@ function demanderConfirmationAnnulationTrajet(trajetId) {
   if(!t) return;
   
   const nbPassagers = (t.reservations||[]).length;
+  // 28/09 : la quatrième règle du propriétaire s'affiche ici, avant le geste. Les
+  // frais de publication sont RENDUS si personne n'a encore réservé, et ACQUIS dès
+  // qu'un passager a réservé une fois — même s'il a annulé depuis. C'est le serveur
+  // (afri83_annuler_mon_trajet) qui tranche, et une seule fois.
+  const _fraisTxt = (t.fraisPublication > 0 || nbPassagers === 0)
+    ? (nbPassagers === 0
+        ? '\n💰 Personne n\'a encore réservé : vos frais de publication vous seront rendus.'
+        : '\n💰 Un passager a déjà réservé sur ce trajet : vos frais de publication restent acquis.')
+    : '';
   const msg = (nbPassagers ? '💔 Ces ' + nbPassagers + ' passager(s) ont attendu ce trajet avec impatience. Annuler maintenant, c\'est les laisser dans l\'embarras et les forcer à changer leurs plans de dernière minute. Êtes-vous certain(e)?\n\n' : '⚠️ Confirmez l\'annulation de ce trajet?\n\n') +
     '📍 ' + t.depart + ' → ' + t.arrivee + '\n' +
     '📅 ' + fdt(t.dateHeure) + '\n' +
     (nbPassagers ? '👥 ' + nbPassagers + ' passager(s) sera/seront notifié(s) par email\n' : '') +
+    _fraisTxt +
     '\nCette action ne peut pas être annulée.';
   
   askConfirm(msg, function() {
@@ -21140,35 +21976,125 @@ function chauffeurAnnulerTrajet(trajetId) {
   demanderConfirmationAnnulationTrajet(trajetId);
 }
 
-function chauffeurAnnulerTrajetConfirme(trajetId) {
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — ANNULER SON TRAJET : LE SERVEUR TRANCHE, ET REND LES FRAIS ══
+//
+// CE QUI N'ALLAIT PAS : le site réécrivait la ligne entière depuis la mémoire du
+// navigateur et annonçait « ✅ Trajet annulé » sans jamais lire la réponse — alors
+// que les déclencheurs du SQL 83 peuvent désormais refuser cette écriture. Les
+// e-mails partaient AVANT, et la quatrième règle du propriétaire — LES FRAIS DE
+// PUBLICATION SONT RENDUS si le conducteur annule AVANT TOUTE RÉSERVATION —
+// n'existait nulle part : le conducteur perdait ses frais dans tous les cas.
+//
+// afri83_annuler_mon_trajet (SQL 83) fait les deux : elle annule et elle tranche
+// le sort des frais UNE SEULE FOIS (colonne frais_rendus_le), acquis dès qu'un
+// passager a réservé une fois. On affiche SA phrase, qui dit ce qui a été fait de
+// l'argent.
+// ════════════════════════════════════════════════════════════════════════════
+async function chauffeurAnnulerTrajetConfirme(trajetId) {
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
   if(t.statut === 'en_cours' || t.statut === 'effectué') { toast('⛔ Le départ est déjà confirmé, impossible d\'annuler le trajet', true); return; }
-  notifierPassagersTrajet(t, 'annulation_chauffeur');
+
+  // ── LE CHEMIN DU CONDUCTEUR : LA FONCTION SERVEUR ───────────────────────────
+  if(DB.user && DB.user.role === 'client') {
+    const _ident = await _identiteConducteur('Annuler votre trajet',
+      'Le serveur vérifie que ce trajet est bien le vôtre. Si personne n\'a encore réservé, vos frais de publication vous sont rendus.');
+    if(!_ident) return;
+
+    const rep = await _appelTrajet83('afri83_annuler_mon_trajet', {
+      p_num: _ident.num,
+      p_mot_de_passe: _ident.pw,
+      p_trajet_id: trajetId,
+      p_motif: null
+    });
+
+    if(rep.ok !== true) {
+      toast('⛔ Trajet NON annulé : ' + rep.message, true);
+      return;
+    }
+
+    // On relit la ligne, et le solde suit le mouvement RÉELLEMENT fait.
+    try {
+      const { data: _l } = await supabaseClient.from('trajets').select('*').eq('id', trajetId).limit(1);
+      if(_l && _l[0] && typeof mapTrajet === 'function') {
+        const _i = DB.trajets.findIndex(x => x.id === trajetId);
+        const _m = mapTrajet(_l[0]);
+        if(_i >= 0) DB.trajets[_i] = _m; else DB.trajets.unshift(_m);
+      }
+    } catch(e) {}
+    try { await chargerPlaces83Un(trajetId); } catch(e) {}
+    const _tA = DB.trajets.find(x => x.id === trajetId) || t;
+
+    if(rep.frais_etat === 'frais_rendus' && Number(rep.frais || 0) > 0) {
+      const _cl = DB.clients.find(x => x.id === DB.user.id);
+      if(_cl) _cl.solde = (_cl.solde || 0) + Number(rep.frais);
+      try { logMvt('trajet', '↩️ Frais de publication rendus — trajet annulé avant toute réservation',
+                   Number(rep.frais), 'Société', _cl ? (_cl.prenom+' '+_cl.nom) : '',
+                   {cibleType:'client', cibleId: DB.user.id}); } catch(e) {}
+    }
+
+    // Les passagers sont prévenus APRÈS : jamais sur une annulation refusée.
+    try { notifierPassagersTrajet(_tA, 'annulation_chauffeur'); } catch(e) {}
+
+    rClientContent();
+    try { rTrajets(); } catch(e) {}
+    try { updateNav(); } catch(e) {}
+    toast('✅ ' + (rep.message || 'Trajet annulé.') +
+          (rep.passagers > 0 ? ' Les ' + rep.passagers + ' passager(s) ont été prévenus par email.' : ''));
+    return;
+  }
+
+  // ── LE CHEMIN DU PERSONNEL (agent, administration) ──────────────────────────
+  // Écriture directe, mais on ATTEND la réponse : les déclencheurs du 83 peuvent
+  // la refuser, et le site annonçait « ✅ » sans le savoir.
+  const _statutAvant = t.statut, _dispoAvant = t.placesDispos;
   t.statut = 'annulé';
   t.placesDispos = 0;
+  const _ok = await sbSaveTrajet(t);
+  if(_ok === false) {
+    t.statut = _statutAvant; t.placesDispos = _dispoAvant;
+    toast('⛔ Trajet NON annulé : le serveur a refusé l\'enregistrement. Rien n\'a changé.', true);
+    rClientContent();
+    return;
+  }
   if(t.parentId) {
     const parent = DB.trajets.find(x => x.id === t.parentId && x.statut === 'en_cours');
-    if(parent) { parent.placesDispos += (t.places || 0); sbSaveTrajet(parent); }
+    if(parent) { parent.placesDispos += (t.places || 0); await sbSaveTrajet(parent); }
   }
-  sbSaveTrajet(t);
+  notifierPassagersTrajet(t, 'annulation_chauffeur');
   rClientContent();
   toast('✅ Trajet annulé' + ((t.reservations&&t.reservations.length) ? ' · les ' + t.reservations.length + ' passager(s) ont été notifiés par email' : ''));
 }
 // ── Le chauffeur marque son arrivée : termine le trajet (rétention 45 jours côté admin, puis suppression auto) ──
-function chauffeurMarquerArrive(trajetId) {
+// ══ 28/09 — « TRAJET TERMINÉ » ÉTAIT ANNONCÉ SANS RIEN VÉRIFIER ══
+// Les passagers étaient prévenus par e-mail AVANT l'écriture, et l'écriture n'était
+// ni attendue ni lue. Depuis le SQL 83, elle peut être refusée : un trajet que
+// l'administration ou le déclencheur « un trajet suit sa voiture » a fermé entre
+// temps ne peut plus passer de « annulé » à « effectué » (prouvé sur un vrai
+// PostgreSQL). Le conducteur lisait « ✅ Trajet marqué comme terminé », croyait
+// pouvoir publier un nouveau trajet, et la base disait encore autre chose.
+async function chauffeurMarquerArrive(trajetId) {
   const t = DB.trajets.find(x=>x.id===trajetId);
   if(!t) return;
   if(DB.user && DB.user.role==='client' && t.clientId !== DB.user.id) { toast('⛔ Action non autorisée', true); return; }
   if(t.statut !== 'en_cours') { toast('⛔ Ce trajet n\'est pas en cours', true); return; }
-  notifierPassagersTrajet(t, 'fin_trajet');
+  const _avStatut = t.statut, _avArrive = t.arriveLe, _avHF = t.heureFin, _avMF = t.minuteFin;
   t.statut = 'effectué';
   const maintenant = new Date();
   t.arriveLe = maintenant.toISOString();
   t.heureFin = maintenant.getHours();
   t.minuteFin = maintenant.getMinutes();
-  sbSaveTrajet(t);
+  const _okF = await sbSaveTrajet(t);
+  if(_okF === false) {
+    t.statut = _avStatut; t.arriveLe = _avArrive; t.heureFin = _avHF; t.minuteFin = _avMF;
+    rClientContent();
+    toast('⛔ Arrivée NON enregistrée : le serveur a refusé. Ce trajet a changé depuis que cet écran a ' +
+          'chargé la page (il a pu être fermé par l\'administration). Rechargez-la. Aucun passager n\'a été prévenu.', true);
+    return;
+  }
+  notifierPassagersTrajet(t, 'fin_trajet');
   logMvt('fin_trajet', '🏁 Arrivée réelle du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
   rClientContent();
   toast('✅ Trajet marqué comme terminé le ' + fd(maintenant) + ' à ' + ('0'+maintenant.getHours()).slice(-2) + ':' + ('0'+maintenant.getMinutes()).slice(-2) + '. Vous pouvez maintenant proposer un nouveau trajet.');
@@ -22377,7 +23303,10 @@ const _ECRANS_DIRECT = {
     _appliquerChangement(DB.listeNoireReservations, p, function(r) {
       return { id:r.id, telephone:r.telephone||'', email:r.email||'',
                date_blocage:r.date_blocage, raison:r.raison||'Fraude: 3+ réservations non confirmées',
-               count:r.count||3 };
+               count:r.count||3,
+               // 28/09 : le deblocage du 83 garde la ligne (blocked = false).
+               blocked:(r.blocked === undefined || r.blocked === null) ? true : !!r.blocked,
+               bloqueJusquAu:r.bloque_jusqu_au || null };
     });
   }}
 };
@@ -25242,12 +26171,30 @@ async function annulerTrajetsClientAvecNotif(clientId, type) {
   // ════════════════════════════════════════════════════════════════════════════════
   // 1️⃣ ANNULER CHAQUE TRAJET + NOTIFIER LES PASSAGERS
   // ════════════════════════════════════════════════════════════════════════════════
+  // ══ 28/09 — ON PRÉVENAIT LES PASSAGERS AVANT DE SAVOIR ══
+  // Ce chemin annule des trajets de covoiturage et écrit la ligne entière depuis la
+  // mémoire du navigateur, sans jamais lire la réponse : les passagers recevaient
+  // « votre trajet est annulé » même quand la base avait refusé l'écriture, et le
+  // trajet continuait à vendre ses places. Les déclencheurs du SQL 83 refusent
+  // désormais certaines de ces écritures (ligne_perdue, trajet_annule) : on attend
+  // la réponse, et un trajet refusé ne fait partir aucun e-mail.
+  let _nbAnnules = 0, _nbRefuses = 0;
   for(const trajet of trajetsActifs) {
     // Marquer trajet comme annulé
+    const _statutAvant = trajet.statut, _dispoAvant = trajet.placesDispos;
     trajet.statut = 'annulé';
     trajet.placesDispos = 0;
-    await sbSaveTrajet(trajet);
-    
+    const _okAnnul = await sbSaveTrajet(trajet);
+    if(_okAnnul === false) {
+      // Rien n'a changé en base : on remet la copie du navigateur d'aplomb et on ne
+      // prévient personne d'une annulation qui n'a pas eu lieu.
+      trajet.statut = _statutAvant;
+      trajet.placesDispos = _dispoAvant;
+      _nbRefuses++;
+      continue;
+    }
+    _nbAnnules++;
+
     // Notifier les passagers avec message approprié
     if(trajet.reservations && trajet.reservations.length > 0) {
       const lignes = [];
@@ -25265,7 +26212,7 @@ async function annulerTrajetsClientAvecNotif(clientId, type) {
       lignes.push('Bonjour,');
       lignes.push('');
       lignes.push(motifDescription);
-      lignes.push('Votre réservation a été annulée et vous avez été remboursé.');
+      lignes.push('Votre réservation sur son trajet est donc annulée.');
       lignes.push('');
       lignes.push('📍 TRAJET ANNULÉ');
       lignes.push('────────────────');
@@ -25274,10 +26221,26 @@ async function annulerTrajetsClientAvecNotif(clientId, type) {
       lignes.push('Date & Heure : ' + fdt(trajet.dateHeure));
       lignes.push('Chauffeur : ' + trajet.conducteur);
       lignes.push('');
-      lignes.push('💰 REMBOURSEMENT');
-      lignes.push('────────────────');
-      lignes.push('Statut : ✅ Remboursement automatique effectué');
-      lignes.push('Aucun frais n\'a été appliqué');
+      // ══ 28/09 — CET E-MAIL PROMETTAIT UN REMBOURSEMENT QUI N'EXISTE PAS ══
+      // L'audit en comptait trois : il y en avait QUATRE, et celui-ci est le plus
+      // discret parce qu'il part de l'administration, pas du conducteur. Il disait
+      // « vous avez été remboursé · ✅ Remboursement automatique effectué » alors que
+      // le site n'encaisse RIEN du passager : le prix de la place se paie en espèces
+      // au conducteur le jour du départ. Aucun mouvement d'argent n'a jamais eu lieu,
+      // donc il n'y a rien à rendre. On le dit, et on dit ce qui compte vraiment pour
+      // le passager : ce n'est pas lui qui a annulé, son numéro reste libre.
+      lignes.push('💵 ARGENT');
+      lignes.push('─────────');
+      lignes.push('Vous n\'avez rien versé pour cette réservation : le prix de la place se paie');
+      lignes.push('EN ESPÈCES, directement au conducteur, le jour du départ.');
+      lignes.push('Il n\'y a donc aucun remboursement à faire, et aucun frais à votre charge.');
+      lignes.push('Votre code à 4 chiffres pour ce trajet n\'est plus valable.');
+      lignes.push('');
+      lignes.push('✅ CE QUI NE COMPTE PAS CONTRE VOUS');
+      lignes.push('───────────────────────────────────');
+      lignes.push('Cette annulation ne vient pas de vous : elle NE COMPTE PAS dans les');
+      lignes.push('3 abandons qui bloquent un numéro pendant 30 jours.');
+      lignes.push('Votre numéro reste libre de réserver un autre trajet tout de suite.');
       lignes.push('');
       lignes.push('🔄 SUITE');
       lignes.push('────────');
@@ -25336,15 +26299,35 @@ async function annulerTrajetsClientAvecNotif(clientId, type) {
     lignes.push('');
     lignes.push('📋 TRAJETS AFFECTÉS');
     lignes.push('──────────────────');
-    lignes.push(trajetsActifs.length + ' trajet(s) ont été annulé(s)');
+    // 28/09 : on annonce ce qui a VRAIMENT été annulé, pas ce qu'on avait l'intention
+    // d'annuler. Une écriture refusée par la base laisse le trajet ouvert.
+    lignes.push(_nbAnnules + ' trajet(s) ont été annulé(s)');
+    if(_nbRefuses > 0) {
+      lignes.push(_nbRefuses + ' trajet(s) n\'ont pas pu être annulés : ils sont encore ouverts,');
+      lignes.push('signalez-le à un agent agréé.');
+    }
     lignes.push('');
     trajetsActifs.forEach(t => {
-      lignes.push('• ' + t.depart + ' → ' + t.arrivee + ' (' + fdt(t.dateHeure) + ')');
+      lignes.push('• ' + t.depart + ' → ' + t.arrivee + ' (' + fdt(t.dateHeure) + ')'
+        + (t.statut === 'annulé' ? '' : ' — NON ANNULÉ'));
     });
     lignes.push('');
-    lignes.push('💳 REMBOURSEMENTS');
-    lignes.push('─────────────────');
-    lignes.push('Tous les passagers ont été remboursés automatiquement.');
+    // ══ 28/09 — CET E-MAIL PROMETTAIT UN REMBOURSEMENT QUI N'EXISTE PAS ══
+    // « Tous les passagers ont été remboursés automatiquement » : les passagers
+    // n'avaient rien versé — le prix de la place se paie en espèces au conducteur le
+    // jour du départ — donc personne n'a été remboursé de rien. Le seul argent qui
+    // existe vraiment ici, ce sont VOS frais de publication, et la quatrième règle du
+    // propriétaire ne les rend que si VOUS annulez votre trajet avant toute
+    // réservation. Une annulation décidée par l'administration ne passe pas par ce
+    // chemin : on le dit, au lieu de laisser croire à un mouvement d'argent.
+    lignes.push('💵 ARGENT');
+    lignes.push('─────────');
+    lignes.push('Aucun passager n\'avait versé d\'argent : le prix de la place se paie en');
+    lignes.push('espèces, directement au conducteur, le jour du départ. Il n\'y a donc');
+    lignes.push('aucun remboursement à faire envers eux.');
+    lignes.push('Vos frais de publication ne sont pas rendus par cette annulation :');
+    lignes.push('la règle ne les rend que si VOUS annulez vous-même un trajet sur lequel');
+    lignes.push('personne n\'a encore réservé. Parlez-en à un agent agréé.');
     lignes.push('');
     lignes.push('🔑 PROCHAINES ÉTAPES');
     lignes.push('────────────────────');
@@ -25366,10 +26349,15 @@ async function annulerTrajetsClientAvecNotif(clientId, type) {
   }
   
   // 📊 Log
+  // 28/09 : le journal compte les trajets RÉELLEMENT fermés, et nomme les refus.
+  const _suite = _nbAnnules + ' trajet(s) annulé(s)'
+    + (_nbRefuses > 0 ? ' · ' + _nbRefuses + ' refusé(s) par la base, encore ouverts' : '');
   const logMsg = type === 'suspension'
-    ? '⚠️ Suspension du chauffeur ' + cl.prenom + ' ' + cl.nom + ' — ' + trajetsActifs.length + ' trajet(s) annulé(s)'
-    : '❌ Suppression du chauffeur ' + cl.prenom + ' ' + cl.nom + ' — ' + trajetsActifs.length + ' trajet(s) annulé(s)';
+    ? '⚠️ Suspension du chauffeur ' + cl.prenom + ' ' + cl.nom + ' — ' + _suite
+    : '❌ Suppression du chauffeur ' + cl.prenom + ' ' + cl.nom + ' — ' + _suite;
   logMvt('admin', logMsg, 0, DB.user ? DB.user.name : 'Admin', 'SÉCURITÉ');
+  // On REND le compte : l'appelant annonçait « trajets annulés » sans le savoir.
+  return { annules:_nbAnnules, refuses:_nbRefuses };
 }
 
 // 🔧 NOUVELLE VERSION: toggleClient suspend + annule trajets + notifie
@@ -25400,8 +26388,16 @@ async function toggleClient(id) {
       c.suspenduAutoMaj = false;
       await sbSaveClient(c);
       // 🔧 ANNULER TRAJETS + NOTIFIER
-      await annulerTrajetsClientAvecNotif(id, 'suspension');
-      toast('⏸️ Client suspendu — trajets annulés et passagers notifiés');
+      // 28/09 : on lit son compte-rendu. Le site annonçait « trajets annulés » même
+      // quand la base avait refusé de fermer un trajet : il restait en vente.
+      const _bilan = await annulerTrajetsClientAvecNotif(id, 'suspension');
+      if(_bilan && _bilan.refuses > 0) {
+        toast('⏸️ Client suspendu, mais ' + _bilan.refuses + ' de ses trajets n\'ont PAS pu être annulés : ' +
+              'rechargez la page et réessayez, ils sont encore ouverts aux réservations.', true);
+      } else {
+        toast('⏸️ Client suspendu — ' + ((_bilan && _bilan.annules) || 0) +
+              ' trajet(s) annulé(s) et passagers notifiés');
+      }
       rGestion();
       rTrajets();  // 🔧 Rafraîchir l'espace public
       rVehs();     // 🔧 Rafraîchir l'admin (véhicules)
@@ -25414,20 +26410,56 @@ function delClient(id) {
   if(!cl) return;
   envoyerCorbeille('clients', id, 'Client : ' + cl.prenom + ' ' + cl.nom, 'Supprimer ce client (' + cl.prenom + ' ' + cl.nom + ') ? Récupérable pendant 72h dans la corbeille.', async () => {
     // 🔧 ANNULER TRAJETS + NOTIFIER avant de mettre en corbeille
-    await annulerTrajetsClientAvecNotif(id, 'suppression');
+    // 28/09 : un trajet que la base refuse de fermer reste en vente. On le dit.
+    const _bilanS = await annulerTrajetsClientAvecNotif(id, 'suppression');
+    if(_bilanS && _bilanS.refuses > 0) {
+      toast('⚠️ ' + _bilanS.refuses + ' trajet(s) de ce client n\'ont PAS pu être annulés : ' +
+            'ils sont encore ouverts aux réservations. Rechargez la page et fermez-les à la main.', true);
+    }
     rGestion();  // Rafraîchir l'admin
     rTrajets();  // 🔧 Rafraîchir l'espace public (trajets)
     rVehs();     // 🔧 Rafraîchir l'admin (véhicules) - masquer les véhicules du client supprimé
   });
 }
-function toggleTrajet(id) {
+// ════════════════════════════════════════════════════════════════════════════
+// ══ 28/09 — « STATUT MIS À JOUR » ALORS QUE LA BASE AVAIT REFUSÉ ══
+//
+// Ce bouton de l'administration (« ⏸️ Démarrer » / « ✅ Rétablir ») écrivait la
+// ligne entière sans attendre ni lire la réponse, puis annonçait « Statut mis à
+// jour » dans tous les cas.
+//
+// Depuis le SQL 83, le RETOUR est REFUSÉ : un trajet annulé ne se remet pas en
+// vente depuis un écran (prouvé sur un vrai PostgreSQL — le déclencheur lève
+// « trajet_annule »). C'est voulu : c'est ce qui empêchait la voiture déclarée
+// volée de recommencer à vendre des places à la sauvegarde suivante. Mais le site
+// affirmait le contraire, la liste montrait « actif », et personne ne savait que
+// le trajet était toujours fermé.
+//
+// On attend donc la réponse, on remet la liste d'aplomb quand elle est refusée, et
+// on dit ce qu'il faut faire : le conducteur republie son trajet.
+// ════════════════════════════════════════════════════════════════════════════
+async function toggleTrajet(id) {
   const t=DB.trajets.find(x=>x.id===id);
   if(!t) return;
   if(t.statut==='en_cours' || t.statut==='effectué') { toast('⛔ Ce trajet est verrouillé, modification impossible', true); return; }
-  t.statut=t.statut==='annulé'?'actif':'annulé';
-  sbSaveTrajet(t); // AUDIT : statut trajet jamais persisté
-  toast('Statut mis à jour');
+  const _avant = t.statut;
+  const _retablir = (_avant === 'annulé');
+  t.statut = _retablir ? 'actif' : 'annulé';
+  const _ok = await sbSaveTrajet(t); // AUDIT : statut trajet jamais persisté
+  if(_ok === false) {
+    t.statut = _avant;
+    rGestion();
+    toast(_retablir
+      ? '⛔ Ce trajet reste ANNULÉ : la base refuse de remettre en vente un trajet annulé depuis un écran. ' +
+        'C\'est la règle qui empêche un trajet fermé (voiture volée, conducteur suspendu) de rouvrir tout seul. ' +
+        'Demandez au conducteur de publier un nouveau trajet.'
+      : '⛔ Statut NON modifié : le serveur a refusé l\'enregistrement. Rechargez la page et réessayez.', true);
+    return;
+  }
+  toast(_retablir ? '✅ Trajet rétabli — il est de nouveau ouvert aux réservations'
+                  : '⏸️ Trajet annulé — il n\'accepte plus de réservation');
   rGestion();
+  try { rTrajets(); } catch(e) {}
 }
 function delTrajet(id) {
   const t = DB.trajets.find(x=>x.id===id);
@@ -30134,6 +31166,9 @@ body.mode-service .nav-inner{display:none!important}
             }
             // On ne redessine l'espace client que si le trajet touche est le sien.
             if(aMoi){ try{ if(typeof rClientContent==='function') rClientContent(); }catch(e2){} }
+            // 28/09 : et si la fenetre de reservation de CE trajet est ouverte devant
+            // quelqu'un, son plan des sieges se redessine a la seconde.
+            try{ if(typeof _rtPlacesTempsReel==='function') _rtPlacesTempsReel(r.id); }catch(e2){}
             // Liste publique : meme garde anti-clignotement que le sondage de 10 s.
             try{
               var _s=JSON.stringify((DB.trajets||[]).map(function(t){ return [t.id,t.statut,(t.reservations||[]).length,t.placesDispos]; }));
