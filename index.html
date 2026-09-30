@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.641';
+window.AFRIMOTO_VERSION = 'v9.642';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -26154,9 +26154,30 @@ function delVeh(id) {
 async function annulerTrajetsClientAvecNotif(clientId, type) {
   if(!clientId || !type) return;
   
-  const cl = DB.clients.find(c => c.id === clientId);
+  // ⚠️ 30/09 — CETTE FONCTION RESSORTAIT AUSSITÔT, SUR LE CHEMIN QUI COMPTE.
+  //
+  // delClient (26408) confie son travail à envoyerCorbeille et lui passe cette
+  // fonction en « après suppression ». Or envoyerCorbeille retire la fiche de
+  // DB.clients (5453) AVANT d'exécuter ce rappel (5456). Le « find » ci-dessous
+  // ne trouvait donc rien et la fonction sortait ligne suivante — alors que son
+  // propre commentaire, dans delClient, annonce « annuler trajets + notifier
+  // AVANT de mettre en corbeille ».
+  //
+  // Ce que ça coûtait, en vrai : on supprime un conducteur, le site dit
+  // « déplacé vers la corbeille », et ses trajets de covoiturage restent
+  // ACTIFS. Ils continuent de vendre des places. Les passagers déjà inscrits ne
+  // reçoivent aucun courrier. Et l'avertissement ajouté le 28/09 (« N trajets
+  // n'ont pas pu être annulés ») ne pouvait jamais s'afficher, puisque rien
+  // n'était jamais tenté.
+  //
+  // La fiche n'est pas perdue pour autant : envoyerCorbeille l'a déposée dans
+  // la corbeille (5439) AVANT de filtrer. On l'y reprend. Seuls l'e-mail, le
+  // prénom et le nom sont utilisés ensuite : ils y sont tous.
+  const cl = DB.clients.find(c => c.id === clientId)
+          || ((DB.corbeille || []).find(k => k && k.listeOrigine === 'clients'
+                                          && k.data && k.data.id === clientId) || {}).data;
   if(!cl) return;
-  
+
   // 🔍 Trouver TOUS les trajets NON TERMINÉS du client (chauffeur)
   // ✅ Inclure: actif, en_cours, en_attente, etc.
   // ❌ Exclure: effectué, annulé
