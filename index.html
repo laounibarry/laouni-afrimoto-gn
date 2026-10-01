@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.642';
+window.AFRIMOTO_VERSION = 'v9.644';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -1404,6 +1404,21 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.bandeau_texte) DB.bandeauTexte = cfg.bandeau_texte;
         if(cfg.bandeau_vitesse) DB.bandeauVitesse = cfg.bandeau_vitesse;
         if(cfg.photos_enreg) DB.photosEnreg = Object.assign({moto:'optionnel',proprio:'optionnel',facture:'optionnel',cg:'optionnel',piece:'optionnel'}, cfg.photos_enreg);
+        // ══ SQL 82 — LES REGLAGES DU GUICHET PUBLIC, TELS QUE LE SERVEUR LES LIT ══
+        //
+        // Le parcours public a besoin de DEUX reglages AVANT d'envoyer quoi que ce soit :
+        // le guichet est-il ouvert, et le paiement se fait-il en especes ou par Orange
+        // Money (auquel cas il faut demander la reference de la transaction dans le
+        // formulaire). Aucune fonction ouverte au public ne les donne avant le depot :
+        // _dem_reglages() est fermee a anon. On lit donc LA MEME LIGNE que le serveur —
+        // config_admin.enregistrement_public — et rien d'autre. Ce n'est pas une valeur
+        // inventee : c'est la source.
+        //
+        // La cle peut etre absente (le fichier 82 n'est pas encore pose) : dans ce cas
+        // demReglagesPublics() applique les memes defauts que _dem_reglages() en SQL.
+        // Le montant et la liste des photos manquantes affiches APRES le depot viennent
+        // toujours de la reponse du serveur, jamais d'ici.
+        if(cfg.enregistrement_public && typeof cfg.enregistrement_public === 'object') DB.enregistrementPublic = cfg.enregistrement_public;
         // v9.341 : != null et non if(...) — sinon une commission reglee a 0 etait ignoree
         if(cfg.commission_course_taxi != null) DB.commissionCourseTaxi = cfg.commission_course_taxi;
         if(cfg.commission_course_vtc != null) DB.commissionCourseVtc = cfg.commission_course_vtc; // v9.389
@@ -2428,6 +2443,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <!-- v9.603 : les vehicules suspendus etaient dispersés dans les listes, en gris et en
          pointillés. Il fallait les chercher un par un pour savoir qui régulariser. -->
     <button class="tab" id="tab-suspendus" style="display:none" onclick="goPage('suspendus')">⏸️ Suspendus</button>
+    <!-- SQL 82 : le guichet des demandes venues de l'espace public. Agent ET administration —
+         chacun ne voit que ce que le serveur lui accorde (un agent, seulement les dossiers
+         qui lui sont adressés). La visibilité de l'onglet est un confort, pas une protection. -->
+    <button class="tab" id="tab-demandes" style="display:none" onclick="goPage('demandes')">📨 Demandes</button>
   </div>
 </div>
 
@@ -2758,6 +2777,29 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <input type="text" id="sp-recherche" placeholder="🔎 Plaque, nom du propriétaire, téléphone…" oninput="rSuspendus()"/>
   </div>
   <div id="suspendus-contenu"></div>
+</div>
+
+<!-- ══ GUICHET DES DEMANDES D'ENREGISTREMENT (agent et administration) — SQL 82 ══ -->
+<div id="page-demandes" class="page">
+  <div class="h2">📨 Demandes d'enregistrement</div>
+  <div class="qr-note-txt" style="font-size:12px;line-height:1.55;margin-bottom:12px">
+    Ces dossiers viennent de propriétaires qui ont rempli le formulaire depuis l'espace public.
+    <b>Une demande n'est pas un enregistrement</b> : le véhicule entre au registre seulement
+    quand vous validez, après avoir vu les papiers.
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn" id="gd-f-tous"       onclick="setFiltreDemandes('')"           style="font-size:12px;padding:7px 12px">Tous</button>
+    <button class="btn-ghost" id="gd-f-deposee"    onclick="setFiltreDemandes('deposee')"    style="font-size:12px;padding:7px 12px">📨 Déposées</button>
+    <!-- 30/09 : ce filtre manquait. « Remontées » est la file d'attente propre au bureau
+         central : un dossier que l'agent choisi n'a pas traité dans le délai lui revient
+         tout seul. Le serveur le place en tête de liste ; il faut pouvoir l'isoler. -->
+    <button class="btn-ghost" id="gd-f-remontee"   onclick="setFiltreDemandes('remontee')"   style="font-size:12px;padding:7px 12px">⏫ Remontées</button>
+    <button class="btn-ghost" id="gd-f-a_corriger" onclick="setFiltreDemandes('a_corriger')" style="font-size:12px;padding:7px 12px">✏️ À corriger</button>
+    <button class="btn-ghost" id="gd-f-validee"    onclick="setFiltreDemandes('validee')"    style="font-size:12px;padding:7px 12px">✅ Validées</button>
+    <button class="btn-ghost" id="gd-f-refusee"    onclick="setFiltreDemandes('refusee')"    style="font-size:12px;padding:7px 12px">⛔ Refusées</button>
+    <button class="btn-ghost" id="gd-f-abandonnee" onclick="setFiltreDemandes('abandonnee')" style="font-size:12px;padding:7px 12px">🗂️ Abandonnées</button>
+  </div>
+  <div id="demandes-contenu"></div>
 </div>
 
 <!-- GESTION -->
@@ -3160,6 +3202,24 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div id="lhint" class="qr-note-txt" style="font-size:11px;margin-bottom:11px;background:rgba(234,179,8,.05);border:1px solid rgba(234,179,8,.15);border-radius:7px;padding:8px 12px"></div>
     <div id="lerr" class="warn" style="display:none"></div>
     <button class="btn" style="width:100%;padding:13px" onclick="doLogin()">Se connecter →</button>
+    <!-- LA PORTE DE CEUX QUI N'ONT PAS ENCORE DE COMPTE.
+         Elle n'apparait que dans l'espace public (roles Proprio/Chauffeur/Passager) et
+         seulement si l'administration a laisse le guichet public ouvert : c'est
+         demBoutonLoginVisible() qui le decide, en lisant le reglage du serveur. -->
+    <div id="lien-enregistrer-vehicule" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="qr-note-txt" style="font-size:11.5px;margin-bottom:8px;line-height:1.5">
+        Vous n'avez pas encore de compte ? Un compte AfriMoto naît avec l'enregistrement
+        d'un véhicule.
+      </div>
+      <button class="btn-gold" style="width:100%;padding:13px;font-size:13px"
+              onclick="closeModal('m-login');ouvrirDemandeEnregistrement()">
+        🏍️ Je n'ai pas encore de compte — enregistrer mon véhicule
+      </button>
+      <button style="display:block;width:100%;padding:9px;margin-top:6px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer"
+              onclick="closeModal('m-login');ouvrirSuiviDemande()">
+        Suivre une demande déjà déposée
+      </button>
+    </div>
     <button style="display:block;width:100%;padding:10px;margin-top:8px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer" onclick="closeModal('m-login');openModal('m-recuperation')">Identifiant ou mot de passe oublié ?</button>
     <button id="lien-inscription-passager" style="display:none;width:100%;padding:10px;margin-top:8px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer" onclick="closeModal('m-login');openModal('m-inscription-passager')">Pas encore de compte passager ? S'inscrire</button>
   </div>
@@ -3180,6 +3240,299 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div id="recup-resultat" style="display:none"></div>
     <button class="btn" style="width:100%;padding:13px" onclick="rechercherCompteParEmail()">🔍 Rechercher mon compte</button>
   </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     DEMANDE D'ENREGISTREMENT DEPUIS L'ESPACE PUBLIC  (SQL 82)
+
+     Pourquoi cet ecran existe : jusqu'ici, un proprietaire ne pouvait faire
+     enregistrer sa moto qu'en se presentant chez un agent, qui remplissait le
+     formulaire a sa place. Au demarrage il y a peu d'agents ; beaucoup de
+     prefectures n'en ont aucun. Le proprietaire remplit donc lui-meme, choisit
+     qui verifiera (un agent, ou l'administration), et recoit un numero de suivi.
+
+     LA REGLE QUI TIENT TOUT : une demande n'est PAS un enregistrement. Elle ne
+     reserve pas le matricule, ne cree pas de compte, ne debite personne. C'est
+     la VALIDATION par l'agent ou l'administration qui enregistre reellement.
+
+     Un seul formulaire, trois etapes visibles, dans une seule fenetre : les
+     champs sont ecrits en dur ici (et non fabriques en JavaScript) parce qu'une
+     photo deja choisie serait perdue a chaque reconstruction de l'affichage.
+     ════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-dem-parcours" class="modal">
+  <div class="mbox fu">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
+      <div style="font-size:15px;font-weight:900" id="dem-titre">🏍️ Enregistrer mon véhicule</div>
+      <!-- La croix passe par demFermerParcours : elle efface le reçu, le mot de passe et les
+           photos du dossier précédent. Le code à 6 chiffres est un secret, il ne reste pas
+           dans la page après la fermeture. -->
+      <button class="btn-ghost" style="padding:5px 11px;font-size:13px;flex-shrink:0" onclick="demFermerParcours()">✕</button>
+    </div>
+
+    <!-- ══ ÉTAPE 1 : LA PORTE ══ -->
+    <div id="dem-e-porte">
+      <div class="qr-note-txt" style="font-size:12.5px;line-height:1.55;background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.2);border-radius:9px;padding:12px 13px;margin-bottom:14px">
+        Vous remplissez la demande, vous choisissez qui la vérifie, et vous recevez un
+        numéro de suivi. <b>Ce n'est pas encore un enregistrement</b> : le véhicule entre
+        au registre seulement quand l'agent ou l'administration a vérifié vos papiers.
+      </div>
+      <div class="sect" style="margin-top:0">Avez-vous déjà un véhicule enregistré chez AfriMoto ?</div>
+      <button class="btn" style="width:100%;padding:14px;margin-bottom:9px;font-size:13.5px;text-align:left"
+              onclick="demChoisirPorte('non')">
+        ❌ Non, c'est mon premier véhicule
+        <div style="font-size:11px;font-weight:400;opacity:.85;margin-top:3px">Vous remplissez votre identité et le véhicule.</div>
+      </button>
+      <button class="btn-ghost" style="width:100%;padding:14px;font-size:13.5px;text-align:left"
+              onclick="demChoisirPorte('oui')">
+        ✅ Oui, j'en ai déjà un et je veux en ajouter un autre
+        <div style="font-size:11px;font-weight:400;opacity:.85;margin-top:3px">Vous entrez votre numéro d'accès et votre mot de passe. Nous reprenons votre dossier : vous ne remplissez que le nouveau véhicule.</div>
+      </button>
+      <button class="btn-ghost" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px"
+              onclick="closeModal('m-dem-parcours');ouvrirSuiviDemande()">
+        🔎 J'ai déjà déposé une demande — suivre mon dossier
+      </button>
+    </div>
+
+    <!-- ══ ÉTAPE 2 (voie « déjà client ») : LE COMPTE ══ -->
+    <div id="dem-e-compte" style="display:none">
+      <div class="qr-note-txt" style="font-size:12px;line-height:1.55;margin-bottom:12px">
+        Votre numéro d'accès figure sur vos papiers AfriMoto : il n'est pas secret.
+        <b>Votre mot de passe, lui, l'est</b> — c'est lui qui prouve que ce compte est le
+        vôtre, sinon n'importe qui pourrait rattacher un véhicule à votre nom.
+      </div>
+      <div class="fld">
+        <div class="lbl">Numéro d'accès unique *</div>
+        <input type="text" id="dem-cpt-num" autocomplete="off" placeholder="CLT-XXXXX" style="font-family:monospace"/>
+      </div>
+      <div class="fld">
+        <div class="lbl">Mot de passe *</div>
+        <div style="display:flex;gap:6px">
+          <input type="password" id="dem-cpt-mdp" style="flex:1" autocomplete="off"/>
+          <button class="btn-ghost" style="flex-shrink:0;padding:0 11px;font-size:16px"
+                  onclick="var c=document.getElementById('dem-cpt-mdp');c.type=c.type==='password'?'text':'password'">👁️</button>
+        </div>
+      </div>
+      <div id="dem-cpt-err" class="warn" style="display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" style="padding:13px 15px" onclick="demRetourPorte()">← Retour</button>
+        <button class="btn" style="flex:1;padding:13px" id="dem-cpt-btn" onclick="demPreparerAjout()">Continuer →</button>
+      </div>
+      <button class="btn-ghost" style="width:100%;padding:10px;margin-top:9px;font-size:12px"
+              onclick="closeModal('m-dem-parcours');openModal('m-recuperation')">
+        Mot de passe oublié ?
+      </button>
+    </div>
+
+    <!-- ══ ÉTAPE 3 : LE FORMULAIRE ══ -->
+    <div id="dem-e-form" style="display:none">
+
+      <!-- Ce que le serveur reprend du dossier (voie « déjà client » uniquement) -->
+      <div id="dem-repris" style="display:none;margin-bottom:12px"></div>
+      <!-- Ses véhicules déjà au registre (voie « déjà client » uniquement) -->
+      <div id="dem-mes-vehs" style="display:none;margin-bottom:12px"></div>
+
+      <!-- TYPE DE VÉHICULE -->
+      <div class="sect" style="margin-top:0">Type de véhicule *</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="dem-vt-moto" class="btn" style="flex:1;font-size:13px;padding:10px" onclick="demSetType('moto')">🏍️ Moto</button>
+        <button id="dem-vt-voiture" class="btn-ghost" style="flex:1;font-size:13px;padding:10px" onclick="demSetType('voiture')">🚗 Voiture</button>
+      </div>
+
+      <!-- RÉFÉRENCES -->
+      <div class="sect">Références</div>
+      <div class="grid2">
+        <div class="fld"><div class="lbl">Matricule <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel</span></div><input type="text" id="dem-mat" placeholder="GN-XXXX-X"/></div>
+        <div class="fld"><div class="lbl">VIN / Châssis *</div><input type="text" id="dem-vin" placeholder="VIN..."/></div>
+        <div class="fld"><div class="lbl">Marque *</div><input type="text" id="dem-brand" placeholder="Yamaha, Toyota..."/></div>
+        <div class="fld"><div class="lbl">Modèle *</div><input type="text" id="dem-model" placeholder="YBR125, Corolla..."/></div>
+        <div class="fld"><div class="lbl">Couleur</div><input type="text" id="dem-color" placeholder="Rouge..."/></div>
+        <div class="fld"><div class="lbl">Année</div><input type="number" id="dem-year" placeholder="2023"/></div>
+        <div class="fld"><div class="lbl">N° Carte grise</div><input type="text" id="dem-cg" placeholder="CG-2024-XXXX"/></div>
+        <div class="fld"><div class="lbl">Date d'achat</div><input type="date" id="dem-dachat"/></div>
+      </div>
+      <div class="fld" id="dem-gilet-wrap">
+        <div class="lbl">N° Gilet <span style="color:var(--text2)">(optionnel si taxi)</span></div>
+        <input type="text" id="dem-gilet" placeholder="TM-001"/>
+      </div>
+      <div class="fld" id="dem-permis-wrap" style="display:none">
+        <div class="lbl">N° Permis de conduire *</div>
+        <input type="text" id="dem-permis" placeholder="GN-PC-XXXXX"/>
+      </div>
+      <!-- Voie « déjà client » + voiture : le permis appartient à l'identité, pas au véhicule.
+           Le serveur le reprend du dossier et n'accepterait pas celui qu'on enverrait d'ici. -->
+      <div class="qr-note-txt" id="dem-permis-note" style="display:none;font-size:11.5px;line-height:1.5;margin-bottom:12px"></div>
+      <div class="fld">
+        <div class="lbl">Catégorie / Tarif *</div>
+        <select id="dem-cat"></select>
+        <div id="dem-cat-info" style="font-size:10.5px;color:var(--text2);margin-top:5px"></div>
+      </div>
+
+      <!-- PROPRIÉTAIRE (masqué pour un déjà-client : le serveur reprend son dossier) -->
+      <div id="dem-bloc-identite">
+        <div class="sect">Propriétaire</div>
+        <div class="qr-note-txt" style="font-size:11px;margin-bottom:10px">
+          Votre compte client sera créé <b>au moment de la validation</b>, pas maintenant.
+          Le numéro unique servira d'identifiant de connexion.
+        </div>
+        <div class="grid2">
+          <div class="fld"><div class="lbl">Prénom *</div><input type="text" id="dem-prenom" placeholder="Mamadou"/></div>
+          <div class="fld"><div class="lbl">Nom *</div><input type="text" id="dem-nom" placeholder="Diallo"/></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><div class="lbl">Date de naissance</div><input type="date" id="dem-datenais"/></div>
+          <div class="fld"><div class="lbl">Lieu de naissance</div><input type="text" id="dem-lieunais" placeholder="Labé"/></div>
+        </div>
+        <div class="fld"><div class="lbl">Téléphone *</div><input type="tel" id="dem-phone" placeholder="+224 6xx xxx xxx"/></div>
+        <div class="fld"><div class="lbl">Email <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel — pour recevoir votre numéro de suivi et le résultat</span></div><input type="email" id="dem-email" placeholder="exemple@email.com" autocomplete="off"/></div>
+        <div class="fld">
+          <div class="lbl">Mot de passe <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">6 caractères minimum</span></div>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="dem-mdp" style="flex:1" autocomplete="off"/>
+            <button class="btn-ghost" style="flex-shrink:0;padding:0 11px;font-size:16px"
+                    onclick="var c=document.getElementById('dem-mdp');c.type=c.type==='password'?'text':'password'">👁️</button>
+          </div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:5px">
+            Ce sera le mot de passe de votre compte. Il prouve à l'agent que la demande vient
+            bien de vous : sans lui, il devra vous recevoir en personne avant de valider.
+          </div>
+        </div>
+        <div class="fld"><div class="lbl">Adresse</div><input type="text" id="dem-addr" placeholder="Quartier, Ville"/></div>
+        <div class="grid2">
+          <div class="fld"><div class="lbl">Nationalité</div><input type="text" id="dem-nationalite" placeholder="Guinéenne"/></div>
+          <div class="fld"><div class="lbl">Profession</div><input type="text" id="dem-profession" placeholder="Ex: Commerçant, Enseignant..."/></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><div class="lbl">Nom du père</div><input type="text" id="dem-nom-pere" placeholder="Prénom Nom"/></div>
+          <div class="fld"><div class="lbl">Nom de la mère</div><input type="text" id="dem-nom-mere" placeholder="Prénom Nom"/></div>
+        </div>
+        <div class="fld"><div class="lbl">Type de pièce</div>
+          <select id="dem-type-piece">
+            <option value="CNI">🪪 CNI</option>
+            <option value="Passeport">📘 Passeport</option>
+            <option value="Permis">🚗 Permis de conduire</option>
+            <option value="Carte consulaire">🏛️ Carte consulaire</option>
+            <option value="Autre">📄 Autre</option>
+          </select>
+        </div>
+        <div class="fld"><div class="lbl">N° de pièce d'identité</div><input type="text" id="dem-num-piece" placeholder="Ex: CNI-2024-XXXXX" autocomplete="off"/></div>
+        <div class="grid2">
+          <div class="fld"><div class="lbl">N° Secours <span style="color:#EF4444;font-weight:700">*</span> <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Toujours visible publiquement</span></div><input type="tel" id="dem-secours" placeholder="+224 6xx xxx xxx"/></div>
+          <div class="fld"><div class="lbl">Lien <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">Optionnel</span></div><input type="text" id="dem-lien" placeholder="Père, Frère..."/></div>
+        </div>
+      </div>
+
+      <!-- QUI VÉRIFIE -->
+      <div class="sect">Qui vérifie votre dossier ?</div>
+      <div class="qr-note-txt" style="font-size:11.5px;line-height:1.55;margin-bottom:9px">
+        Choisissez où vous vous présenterez avec vos papiers.
+        <b>L'administration figure dans la liste</b> parce qu'il y a encore peu d'agents :
+        sans ce choix, une préfecture sans agent ne pourrait enregistrer personne.
+        Avec le temps, il y aura un agent près de chez vous.
+      </div>
+      <div class="fld">
+        <div class="lbl">Destinataire *</div>
+        <select id="dem-dest" onchange="demMajDestinataire()"></select>
+        <div id="dem-dest-info" style="font-size:10.5px;color:var(--text2);margin-top:5px"></div>
+      </div>
+
+      <!-- PAIEMENT ORANGE MONEY (affiché seulement si l'administration a choisi ce mode) -->
+      <div id="dem-om-wrap" style="display:none">
+        <div class="sect">Paiement Orange Money</div>
+        <div class="qr-note-txt" style="font-size:11.5px;margin-bottom:9px" id="dem-om-texte"></div>
+        <div class="fld">
+          <div class="lbl">Référence de la transaction *</div>
+          <input type="text" id="dem-om-ref" placeholder="Référence reçue par SMS" autocomplete="off"/>
+        </div>
+      </div>
+
+      <!-- PHOTOS -->
+      <div class="sect">Photos</div>
+      <div id="dem-photos-info" class="qr-note-txt" style="font-size:11px;margin-bottom:9px"></div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div id="dem-pp-box"><div class="lbl" id="dem-pp-lbl">📸 Véhicule</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-pp" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-pp-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-pp','dem-pp-ph')"/>
+          </label>
+        </div>
+        <div id="dem-ppp-box"><div class="lbl" id="dem-ppp-lbl">🪪 Propriétaire</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-ppp" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-ppp-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-ppp','dem-ppp-ph')"/>
+          </label>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div id="dem-pfa-box"><div class="lbl" id="dem-pfa-lbl">🧾 Facture</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-pfa" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-pfa-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-pfa','dem-pfa-ph')"/>
+          </label>
+        </div>
+        <div id="dem-pcg-box"><div class="lbl" id="dem-pcg-lbl">📄 Carte grise</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-pcg" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-pcg-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-pcg','dem-pcg-ph')"/>
+          </label>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:12px">
+        <div id="dem-ppi-box"><div class="lbl" id="dem-ppi-lbl">🪪 Pièce d'identité — RECTO</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-ppi" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-ppi-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-ppi','dem-ppi-ph')"/>
+          </label>
+        </div>
+        <div id="dem-ppiv-box"><div class="lbl" id="dem-ppiv-lbl">🪪 Pièce d'identité — VERSO</div>
+          <label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:76px;cursor:pointer;overflow:hidden;position:relative">
+            <img id="dem-ppiv" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="dem-ppiv-ph">📷</span>
+            <input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;overflow:hidden;cursor:pointer" onchange="previewImg(this,'dem-ppiv','dem-ppiv-ph')"/>
+          </label>
+        </div>
+      </div>
+
+      <div id="dem-err" class="warn" style="display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" style="padding:13px 15px" onclick="demRetourPorte()">← Retour</button>
+        <button class="btn" style="flex:1;padding:13px" id="dem-btn-envoyer" onclick="demEnvoyer()">📨 Envoyer ma demande</button>
+      </div>
+    </div>
+
+    <!-- ══ ÉTAPE 4 : LE REÇU ══ -->
+    <div id="dem-e-recu" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     SUIVI D'UNE DEMANDE, SANS COMPTE  (SQL 82 : suivre_demande / corriger_demande)
+     Numéro + code à 6 chiffres. Le suivi ne dit JAMAIS le numéro de compte.
+     ════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-dem-suivi" class="modal">
+  <div class="mbox fu">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
+      <div style="font-size:15px;font-weight:900">🔎 Suivre ma demande</div>
+      <button class="btn-ghost" style="padding:5px 11px;font-size:13px;flex-shrink:0" onclick="closeModal('m-dem-suivi')">✕</button>
+    </div>
+
+    <div id="svd-e-cle">
+      <div class="qr-note-txt" style="font-size:12px;line-height:1.55;margin-bottom:12px">
+        Entrez le numéro de suivi et le code à 6 chiffres reçus au dépôt.
+        <b>Le numéro seul ne suffit pas</b> à ouvrir un dossier.
+      </div>
+      <div class="fld"><div class="lbl">Numéro de suivi *</div><input type="text" id="svd-num" placeholder="DEM-0000000" style="font-family:monospace" autocomplete="off"/></div>
+      <div class="fld"><div class="lbl">Code à 6 chiffres *</div><input type="text" id="svd-code" inputmode="numeric" maxlength="6" placeholder="000000" style="font-family:monospace;letter-spacing:3px" autocomplete="off"/></div>
+      <div id="svd-err" class="warn" style="display:none"></div>
+      <button class="btn" style="width:100%;padding:13px" id="svd-btn" onclick="svdOuvrir()">Voir où en est mon dossier →</button>
+    </div>
+
+    <!-- L'état du dossier, et le formulaire de correction quand l'agent en demande une -->
+    <div id="svd-e-dossier" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Dossier ouvert par l'agent ou l'administration (ouvrir_demande) -->
+<div id="m-dem-dossier" class="modal">
+  <div class="mbox fu" id="gd-corps" style="max-width:560px"></div>
 </div>
 
 <!-- INSCRIPTION PASSAGER -->
@@ -4530,6 +4883,10 @@ const DB = {
   demandesCourse: [],
   // Photos du formulaire d'enregistrement : 'obligatoire' ou 'optionnel' — modifiable par l'admin (page Tarifs)
   photosEnreg: { moto:'optionnel', proprio:'optionnel', facture:'optionnel', cg:'optionnel', piece:'optionnel' },
+  // SQL 82 : reglages du guichet public. null = pas encore lu en base. On ne remplit PAS
+  // d'objet par defaut ici, pour que demReglagesPublics() sache distinguer « pas lu » de
+  // « lu et vide » et applique dans les deux cas les defauts du SQL, jamais les miens.
+  enregistrementPublic: null,
   renouvellement: { moto:'anniversaire', taxi:'mensuel' },   // périodes de mise à jour (mensuel | 6mois | anniversaire) — décidées par l'admin
   tarifsMaj: { taxi: 25000 },                // prix de mise à jour par catégorie (clé = id catégorie) + 'taxi'
   corbeille: [],
@@ -5009,7 +5366,9 @@ function goPage(id, skipHistory) {
   // Pages réservées agent (recharge, sous-agents, gps) : admin a aussi accès (supervision)
   // v9.603 : « suspendus » suit la meme regle que les autres pages de travail — agent ET
   // administration. Un agent doit pouvoir regulariser sur place, c'est tout son metier.
-  const pagesAgentOnly = ['recherche-agent','recharge','sousagents','gps','suspendus'];
+  // SQL 82 : « demandes » suit la meme regle — administration et agents agrees. Un agent
+  // doit pouvoir traiter les dossiers qui lui sont adresses, c'est tout l'objet du parcours.
+  const pagesAgentOnly = ['recherche-agent','recharge','sousagents','gps','suspendus','demandes'];
   if(pagesAgentOnly.includes(id) && !isAgent() && !isAdmin()) {
     id = DB.user ? (pagesPersonnelles[DB.user.role] || 'home') : 'home';
   }
@@ -5037,7 +5396,7 @@ function goPage(id, skipHistory) {
     annonces:rAnnonces,alertes:rAlertes,agences:rAgences,registre:()=>rRegistre(),
     gestion:()=>rGestion(),'recherche-agent':renderRechercheAgent,recharge:()=>rRecharge(),
     sousagents:rSA,historique:()=>rHistorique(),tarifs:rTarifs,litiges:()=>rLitiges(),
-    suspendus:()=>rSuspendus()};
+    suspendus:()=>rSuspendus(),demandes:()=>rDemandes()};
   // v9.558 : on quitte la Gestion, on lache l'abonnement d'ecran. Sans cela il resterait
   // ouvert pour rien — c'est precisement ce qu'on cherche a eviter.
   if(id !== 'gestion' && window._canalEcran && window._canalEcran.nom) {
@@ -5284,6 +5643,8 @@ function openLoginAdmin() {
   document.getElementById('login-roles-staff').style.display = 'none';
   document.getElementById('login-titre').textContent = '🛡️ ACCÈS ADMINISTRATEUR';
   document.getElementById('lien-inscription-passager').style.display = 'none';
+  // Accès dédié : ce n'est pas l'écran du public, la porte « enregistrer mon véhicule » n'y est pas.
+  var _le = document.getElementById('lien-enregistrer-vehicule'); if(_le) _le.style.display = 'none';
   setRole('admin');
 }
 function openLoginStaff() {
@@ -5292,6 +5653,8 @@ function openLoginStaff() {
   document.getElementById('login-roles-staff').style.display = 'flex';
   document.getElementById('login-titre').textContent = '📍 ESPACE AGENT';
   document.getElementById('lien-inscription-passager').style.display = 'none';
+  // Accès dédié : ce n'est pas l'écran du public, la porte « enregistrer mon véhicule » n'y est pas.
+  var _ls = document.getElementById('lien-enregistrer-vehicule'); if(_ls) _ls.style.display = 'none';
   setRole('agent');
 }
 function openModal(id) {
@@ -5310,6 +5673,10 @@ function openModal(id) {
     document.getElementById('login-roles-staff').style.display = 'none';
     document.getElementById('login-titre').textContent = '🔐 CONNEXION';
     setRole('owner');
+    // SQL 82 : la porte « je n'ai pas encore de compte ». Elle n'existe que dans la
+    // connexion PUBLIQUE, et seulement si l'administration laisse le guichet ouvert.
+    // Les deux accès dédiés (admin, agent) la masquent juste après, voir plus haut.
+    try { majBoutonEnregistrerVehicule(); } catch(e) {}
   }
   // Initialiser sélecteur préfecture
   if(id === 'm-annonce' && !(DB.user && DB.user.role === 'client')) {
@@ -7334,6 +7701,9 @@ function confirmLogout() {
   }
   closeModal('m-logout');
   retirerAbonnementPush(); // v9.350 : avant d'oublier qui etait connecte
+  // SQL 82 : le mot de passe garde en memoire pour le guichet des demandes s'oublie ici.
+  // Sans cela, l'utilisateur suivant sur le meme telephone lirait les dossiers du precedent.
+  try { if(window.oublierMotDePasseDemandes) window.oublierMotDePasseDemandes(); } catch(e) {}
   DB.user = null;
   // Les filtres du temps reel ne valent plus rien : on repasse en ecoute publique.
   try{ if(window.redemarrerTempsReel) redemarrerTempsReel(); }catch(e){}
@@ -7509,6 +7879,9 @@ function updateNav() {
   // v9.603 : meme visibilite que les litiges — administration et agents agrees.
   const tabSusp = document.getElementById('tab-suspendus');
   if(tabSusp) tabSusp.style.display = (isAdmin() || isAgent()) ? '' : 'none';
+  // SQL 82 : le guichet des demandes publiques. Meme visibilite que les litiges.
+  const tabDem = document.getElementById('tab-demandes');
+  if(tabDem) tabDem.style.display = (isAdmin() || isAgent()) ? '' : 'none';
   const gpsTabs = ['tab-gps'];
   // Onglet Accueil : masqué pour admin/agent (contenu réservé au public)
   const tabHome = document.getElementById('tab-home');
@@ -32756,6 +33129,1754 @@ body.mode-passager .nav-inner{display:none!important}
   setTimeout(function () { try { window.reprendreCoursePassager(); } catch (e) {} }, 3000);
 
   try { addDebugLog('COURSE v9.592 : machine d' + "'" + '\u00e9tats active'); } catch (e) {}
+})();
+</script>
+
+<script>
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+   AfriMoto GN \u2014 v9.643 \u2014 ENREGISTRER UN VEHICULE DEPUIS L'ESPACE PUBLIC   (SQL 82)
+
+   \u2550\u2550 CE QUE CE BLOC AJOUTE \u2550\u2550
+
+   Trois choses, et rien d'autre :
+
+     1. Dans l'espace PUBLIC : un parcours de demande d'enregistrement, avec deux portes
+        (\u00ab je n'ai pas encore de compte \u00bb et \u00ab j'ai deja un vehicule chez vous \u00bb), le choix
+        de qui verifie, et un ecran de suivi ou l'on peut corriger et renvoyer.
+     2. Dans l'espace AGENT et l'espace ADMINISTRATION : le guichet des demandes recues,
+        l'ouverture d'un dossier, et les trois gestes valider / renvoyer / refuser.
+     3. Rien de tout cela ne touche au registre : c'est la VALIDATION qui enregistre.
+
+   \u2550\u2550 LES QUATRE REGLES QUE CE BLOC S'IMPOSE \u2550\u2550
+
+   \u2022 AUCUN SEUIL ECRIT EN DUR. Photos exigees, plafond de demandes, guichet ouvert ou
+     ferme, montant, mode de paiement : tout vient du serveur. Les deux seuls defauts
+     recopies ici (guichet ouvert, paiement en especes) sont ceux de _dem_reglages() en
+     SQL, et ils servent uniquement a dessiner le formulaire AVANT le depot \u2014 voir
+     demReglagesPublics(). Ce qui est affiche APRES un depot vient de la reponse.
+
+   \u2022 QUAND LE SERVEUR DONNE \u00ab message \u00bb, ON L'AFFICHE TEL QUEL. On ne retraduit jamais
+     a partir du mot-cle. Le dictionnaire demPhraseRefus() ne sert QUE lorsque le serveur
+     n'a pas envoye de phrase \u2014 et il rend alors une phrase complete, qui dit quoi faire.
+
+   \u2022 JAMAIS DE \u00ab \u2705 \u00bb AVANT D'AVOIR LU LA REPONSE. Chaque envoi affiche \u00ab Envoi\u2026 \u00bb, puis
+     lit ok, puis parle. Une lecture qui echoue se dit : on n'invente pas de chiffre.
+
+   \u2022 AUCUNE FENETRE NE S'OUVRE TOUTE SEULE. Le guichet ne demande le mot de passe du
+     personnel que si sa page est REELLEMENT a l'ecran (voir rDemandes), et jamais
+     depuis un rafraichissement de fond : il n'y en a aucun, le bouton est manuel.
+
+   \u2550\u2550 POURQUOI LE MOT DE PASSE POUR LA DEUXIEME PORTE \u2550\u2550
+
+   Le numero d'acces d'un proprietaire figure sur ses papiers : il n'est pas secret. Avec
+   lui seul, n'importe qui rattacherait un vehicule au compte d'un autre. Le serveur exige
+   donc le mot de passe, et repond LA MEME CHOSE pour un numero inconnu et pour un mot de
+   passe faux \u2014 on ne cherche pas a distinguer les deux, ce serait dire lesquels existent.
+   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+(function () {
+  'use strict';
+
+  /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     PARTIE 1 \u2014 LES REGLAGES LUS, ET LES PHRASES
+     \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+
+  // Les reglages du guichet public, tels que le serveur les lit lui-meme dans
+  // config_admin.enregistrement_public. _dem_reglages() est fermee a anon : on lit donc
+  // la meme ligne, et on applique EXACTEMENT ses defauts quand une cle manque (guichet
+  // ouvert, paiement en especes). Ces deux defauts ne sont pas des choix d'ecran : ils
+  // sont recopies du fichier 82. Tant que ce fichier n'est pas pose, la cle n'existe pas
+  // en base et c'est ce chemin-la qui s'applique.
+  function demReglagesPublics() {
+    var r = (DB.enregistrementPublic && typeof DB.enregistrementPublic === 'object') ? DB.enregistrementPublic : {};
+    var vrai = function (v, defaut) {
+      var s = String(v == null ? '' : v).trim().toLowerCase();
+      if (s === 'true' || s === 't' || s === '1' || s === 'oui' || s === 'yes') return true;
+      if (s === 'false' || s === 'f' || s === '0' || s === 'non' || s === 'no') return false;
+      return defaut;
+    };
+    return {
+      actif: vrai(r.actif, true),
+      paiementMode: String(r.paiement_mode || '').trim().toLowerCase() === 'orange_money' ? 'orange_money' : 'especes'
+    };
+  }
+
+  // Le bouton de l'ecran de connexion : present seulement si le guichet est ouvert.
+  window.majBoutonEnregistrerVehicule = function () {
+    var el = document.getElementById('lien-enregistrer-vehicule');
+    if (!el) return;
+    el.style.display = demReglagesPublics().actif ? '' : 'none';
+  };
+
+  // Une panne de reseau ou une fonction absente n'est pas un refus : on le dit autrement,
+  // et on montre ce que le serveur a repondu \u2014 y compris son \u00ab hint \u00bb, qui explique
+  // souvent qu'une fonction existe mais avec une autre signature (code PGRST202).
+  function demErreurServeur(error, nom) {
+    var m = (error && error.message) ? String(error.message) : 'le serveur n\'a pas r\u00e9pondu';
+    var h = (error && error.hint) ? String(error.hint) : '';
+    var code = (error && error.code) ? String(error.code) : '';
+    if (code === 'PGRST202') {
+      return 'Le serveur ne trouve pas la fonction \u00ab ' + nom + ' \u00bb telle qu\'elle est appel\u00e9e. '
+           + 'Le fichier 82-demandes-enregistrement doit \u00eatre lanc\u00e9 dans Supabase, ou sa '
+           + 'signature a chang\u00e9. R\u00e9ponse du serveur : ' + m + (h ? ' \u2014 ' + h : '');
+    }
+    // 30/09 : la phrase ne disait \u00ab votre demande n'a pas pu etre envoyee \u00bb meme quand
+    // l'appel qui echouait n'envoyait RIEN \u2014 la lecture d'un dossier, d'une liste. Un
+    // agent lisait donc qu'il venait d'envoyer quelque chose. On nomme le geste reel.
+    var envoi = (nom === 'deposer_demande' || nom === 'deposer_demande_client'
+                 || nom === 'corriger_demande');
+    return (envoi ? 'Votre demande n\'a pas pu \u00eatre envoy\u00e9e : '
+                  : 'Le serveur n\'a pas pu \u00eatre lu : ')
+         + m + (h ? ' \u2014 ' + h : '')
+         + '. V\u00e9rifiez votre connexion et r\u00e9essayez. '
+         + (envoi ? 'Rien n\'a \u00e9t\u00e9 enregistr\u00e9.' : 'Rien n\'a \u00e9t\u00e9 chang\u00e9.');
+  }
+
+  // \u2550\u2550 LE DICTIONNAIRE DE SECOURS \u2550\u2550
+  //
+  // On n'appelle ceci QUE si la reponse du serveur ne porte pas de \u00ab message \u00bb. Chaque
+  // phrase est complete et dit quoi faire ensuite : jamais \u00ab erreur 400 \u00bb, jamais
+  // \u00ab champ invalide \u00bb. Les deux cas \u00ab deja au registre \u00bb ne confirment RIEN de ce que
+  // la base sait, DANS L'ESPACE PUBLIC : c'est la regle de la maquette validee avec le
+  // fondateur \u2014 le formulaire public ne doit pas servir a sonder les plaques.
+  //
+  // 30/09 \u2014 LE GUICHET N'EST PAS LE PUBLIC, ET IL LISAIT LES MEMES PHRASES.
+  //
+  // Toutes les phrases etaient ecrites pour le proprietaire. Or la validation appelle
+  // enregistrer_vehicule, qui refuse avec SES propres mots et SANS jamais joindre de
+  // \u00ab message \u00bb. L'agent lisait donc, sur son propre ecran :
+  //   \u00ab Ce vehicule ne peut pas etre enregistre depuis cet ecran. Presentez-vous chez un
+  //     agent agree\u2026 \u00bb   \u2014 alors que l'agent agree, c'est LUI ;
+  // et pour tous les autres refus de cette fonction (solde insuffisant, telephone deja
+  // client, categorie manquante, numero indisponible\u2026) il n'y avait AUCUNE phrase : il
+  // tombait sur \u00ab Le serveur a refuse : solde_insuffisant \u00bb suivi du conseil d'aller voir
+  // un agent. Le parametre \u00ab cote \u00bb donne au guichet des phrases de guichet.
+  function demPhraseRefus(rep, cote) {
+    var raison = String((rep && rep.raison) || '').trim();
+    var liste = function (t) { return (Array.isArray(t) ? t : []).join(', '); };
+    var guichet = (cote === 'guichet');
+    if (guichet) {
+      switch (raison) {
+        // Ces deux-la sont tues au public, mais l'agent a besoin du mot exact : c'est
+        // justement ce qu'il doit verifier avec la carte grise sous les yeux.
+        case 'chassis_existe':
+          return 'Ce num\u00e9ro de ch\u00e2ssis est D\u00c9J\u00c0 au registre : un autre v\u00e9hicule le porte. Comparez-le avec la carte grise pr\u00e9sent\u00e9e. Si le propri\u00e9taire s\'est tromp\u00e9, demandez-lui une rectification ; s\'il s\'agit du m\u00eame v\u00e9hicule d\u00e9j\u00e0 enregistr\u00e9, rejetez ce dossier.';
+        case 'matricule_existe':
+          return 'Ce matricule est D\u00c9J\u00c0 au registre : un autre v\u00e9hicule le porte. Comparez-le avec la carte grise pr\u00e9sent\u00e9e, puis demandez une rectification ou rejetez ce dossier.';
+        case 'solde_insuffisant':
+          return 'Votre solde ne couvre pas les frais d\'enregistrement de ce dossier. Rechargez votre compte, puis revenez valider : le dossier reste en attente, rien n\'a \u00e9t\u00e9 enregistr\u00e9.';
+        case 'telephone_deja_client':
+          return 'Ce t\u00e9l\u00e9phone appartient d\u00e9j\u00e0 \u00e0 un compte client existant. Recevez la personne, v\u00e9rifiez sa pi\u00e8ce d\'identit\u00e9, et si c\'est bien elle, faites red\u00e9poser la demande depuis son compte (num\u00e9ro d\'acc\u00e8s + mot de passe) pour que le v\u00e9hicule entre dans ce compte sans en cr\u00e9er un second.';
+        case 'client_introuvable':
+          return 'Le compte du propri\u00e9taire n\'a pas \u00e9t\u00e9 retrouv\u00e9. Rejetez ce dossier et faites-le red\u00e9poser, ou cr\u00e9ez l\'enregistrement vous-m\u00eame depuis \u00ab Enregistrer un v\u00e9hicule \u00bb.';
+        case 'categorie_manquante':
+          return 'La cat\u00e9gorie de ce dossier n\'existe plus dans vos tarifs. Ajoutez-la dans la page Tarifs, ou demandez une rectification au propri\u00e9taire.';
+        case 'agent_refuse':
+          return 'Le serveur n\'a pas reconnu votre mot de passe du personnel. Fermez ce dossier, rouvrez l\'onglet Demandes et saisissez-le de nouveau.';
+        case 'code_indisponible':
+        case 'numero_indisponible':
+        case 'numero_client_indisponible':
+          return 'Le serveur n\'a pas pu attribuer un num\u00e9ro \u00e0 ce v\u00e9hicule. R\u00e9essayez : rien n\'a \u00e9t\u00e9 enregistr\u00e9. Si cela se reproduit, signalez-le.';
+        case 'chassis_manquant':
+          return 'Ce dossier n\'a pas de num\u00e9ro de ch\u00e2ssis. Demandez une rectification au propri\u00e9taire : c\'est lui qui doit le saisir.';
+        case 'marque_modele_manquant':
+          return 'Ce dossier n\'a pas de marque ou de mod\u00e8le. Demandez une rectification au propri\u00e9taire.';
+        case 'proprietaire_incomplet':
+          return 'Ce dossier n\'a pas de pr\u00e9nom, de nom ou de t\u00e9l\u00e9phone complet. Demandez une rectification au propri\u00e9taire.';
+        default: break;   // tous les autres passent par le dictionnaire commun
+      }
+    }
+    switch (raison) {
+      case 'enregistrement_public_ferme':
+        return 'L\'enregistrement en ligne est fermé en ce moment. Présentez-vous chez un agent agréé avec votre carte grise et votre pièce d\'identité.';
+      // Le serveur repond LA MEME CHOSE pour un numero inconnu et pour un mot de passe
+      // faux : on ne cherche pas a distinguer les deux, ce serait dire lesquels existent.
+      case 'compte_refuse':
+        return 'Ce numéro d\'accès et ce mot de passe ne vont pas ensemble. Vérifiez les deux, puis réessayez.';
+      case 'trop_d_essais':
+        return 'Trop d\'essais. Réessayez dans une heure, ou présentez-vous chez un agent agréé.';
+      case 'compte_suspendu':
+        return 'Votre compte est suspendu : vous ne pouvez pas ajouter de véhicule. Présentez-vous chez un agent agréé.';
+      case 'compte_bloque':
+        return 'Votre compte est bloqué : vous ne pouvez pas ajouter de véhicule. Présentez-vous chez un agent agréé.';
+      case 'compte_liste_noire':
+        return 'Votre compte est sur la liste noire : vous ne pouvez pas ajouter de véhicule. Présentez-vous chez un agent agréé.';
+      case 'compte_incomplet':
+        return 'Votre fiche ne porte pas de nom complet ou de téléphone. Un agent agréé doit la compléter avant que vous puissiez ajouter un véhicule.';
+      case 'photos_manquantes':
+        return 'Il manque des photos : ' + liste(rep.manquantes) + '. Ajoutez-les, puis renvoyez.';
+      case 'trop_de_demandes':
+        return 'Vous avez déjà ' + (rep.plafond != null ? rep.plafond : '') + ' demande(s) en cours avec ce téléphone. Attendez la réponse pour l\'une d\'elles, ou présentez-vous chez un agent agréé.';
+      case 'trop_de_demandes_maintenant':
+        return 'Le guichet reçoit trop de demandes en ce moment. Réessayez dans une heure : rien n\'a été perdu.';
+      case 'demande_en_cours':
+        return 'Une demande est déjà en cours pour ce numéro de châssis. Si c\'est la vôtre, suivez-la avec son numéro DEM- et son code à 6 chiffres. Sinon, présentez-vous chez un agent agréé avec votre carte grise.';
+      case 'chassis_existe':
+      case 'matricule_existe':
+        return 'Ce véhicule ne peut pas être enregistré depuis cet écran. Présentez-vous chez un agent agréé avec votre carte grise : lui seul peut vérifier ce numéro.';
+      case 'chassis_manquant':
+        return 'Le numéro de châssis (VIN) est obligatoire. Il est gravé sur le cadre de la moto et inscrit sur la carte grise.';
+      case 'marque_modele_manquant':
+        return 'La marque et le modèle sont obligatoires. Ils sont inscrits sur la carte grise.';
+      case 'proprietaire_incomplet':
+        return 'Le prénom, le nom et le téléphone du propriétaire sont obligatoires. Remplissez-les, puis renvoyez.';
+      case 'categorie_inconnue':
+        return 'La catégorie choisie n\'existe plus chez l\'administration. Fermez et rouvrez ce formulaire pour recharger la liste, puis choisissez-en une autre.';
+      case 'agent_introuvable':
+        return 'L\'agent choisi n\'a pas été trouvé. Fermez et rouvrez ce formulaire, puis choisissez un autre agent, ou l\'administration.';
+      case 'agent_inactif':
+        return 'Cet agent ne reçoit plus de dossiers. Choisissez un autre agent, ou l\'administration.';
+      case 'type_inconnu':
+        return 'Le type de v\u00e9hicule doit \u00eatre \u00ab moto \u00bb ou \u00ab voiture \u00bb. Choisissez l\'un des deux en haut du formulaire.';
+      case 'date_invalide':
+        return 'La date \u00ab ' + (rep.champ === 'date_naissance' ? 'de naissance' : 'd\'achat') + ' \u00bb n\'est pas comprise. Ressaisissez-la, ou laissez-la vide.';
+      case 'photo_invalide':
+      case 'photo_publique_interdite':
+        // Pas d'echappement ici : cette phrase est toujours posee en texte, jamais en HTML.
+        // 30/09 : elle affichait le nom de colonne du serveur (\u00ab photo_carte_grise \u00bb). On
+        // nomme la photo comme elle est ecrite sur le formulaire.
+        return 'Une photo n\'est pas arriv\u00e9e correctement au serveur : ' + demLibelleChamp(rep.champ) + '. Reprenez cette photo, puis renvoyez.';
+      case 'dossier_trop_gros':
+        return 'Votre dossier est trop lourd pour \u00eatre envoy\u00e9. Reprenez les photos une par une, en attendant que chacune parte avant de choisir la suivante.';
+      case 'paiement_reference_deja_utilisee':
+        return 'Cette r\u00e9f\u00e9rence de paiement a d\u00e9j\u00e0 servi pour une autre demande. V\u00e9rifiez le message Orange Money et ressaisissez la bonne r\u00e9f\u00e9rence.';
+      case 'mot_de_passe_trop_court':
+        return 'Le mot de passe doit contenir au moins ' + (rep.minimum != null ? rep.minimum : 6) + ' caract\u00e8res. Allongez-le, puis renvoyez.';
+      case 'numero_suivi_indisponible':
+        return 'Le serveur n\'a pas pu fabriquer un num\u00e9ro de suivi. R\u00e9essayez : rien n\'a \u00e9t\u00e9 enregistr\u00e9.';
+      case 'introuvable':
+        return 'Aucun dossier ne correspond \u00e0 ce num\u00e9ro et \u00e0 ce code. V\u00e9rifiez les deux lignes re\u00e7ues au d\u00e9p\u00f4t.';
+      case 'pas_a_corriger':
+        return 'Ce dossier n\'attend pas de correction en ce moment : il est \u00ab ' + demEtatEnFrancais(rep.etat) + ' \u00bb. Rien n\'a \u00e9t\u00e9 chang\u00e9.';
+      case 'pas_votre_dossier':
+        return 'Ce dossier n\'est pas adress\u00e9 \u00e0 votre guichet. Seul l\'agent choisi par le propri\u00e9taire, ou l\'administration, peut l\'ouvrir.';
+      case 'etat_terminal':
+        return 'Ce dossier est clos : seule l\'administration peut encore le consulter.';
+      case 'reserve_personnel':
+        return 'Ce guichet est r\u00e9serv\u00e9 aux agents agr\u00e9\u00e9s et \u00e0 l\'administration.';
+      case 'reserve_admin':
+        return 'Ce geste est r\u00e9serv\u00e9 \u00e0 l\'administration.';
+      case 'motif_manquant':
+        return '\u00c9crivez le motif : c\'est lui que le propri\u00e9taire lira pour savoir quoi corriger.';
+      case 'etat_impossible':
+        return 'Ce geste n\'est plus possible : ce dossier est \u00ab ' + demEtatEnFrancais(rep.etat) + ' \u00bb. Fermez-le, puis appuyez sur \u00ab Rafra\u00eechir \u00bb pour voir son \u00e9tat actuel.';
+      // On enonce SEULEMENT le fait : le serveur joint ici une « suggestion » qui dit quoi
+      // faire, et demMessageRefus l'ajoute derriere. Repeter la consigne la doublerait.
+      case 'pas_habilite_a_valider':
+        return 'Vous n\'\u00eates pas habilit\u00e9 \u00e0 valider un enregistrement.';
+      case 'paiement_non_confirme':
+        return 'Le paiement Orange Money n\'est pas confirm\u00e9. V\u00e9rifiez la r\u00e9f\u00e9rence de la transaction, puis cochez \u00ab Paiement re\u00e7u \u00bb avant de valider.';
+      // 30/09 : cette phrase envoyait l'agent cocher \u00ab je l'ai vue en personne \u00bb. Aucune
+      // case ne porte ce nom : celle qui existe s'appelle \u00ab J'ai recu la personne \u00bb. Une
+      // consigne qui nomme un bouton absent ne dit pas quoi faire : on nomme la vraie case.
+      case 'photos_seules_interdites':
+        return 'Ce dossier ne se valide pas sur photos seules. Recevez la personne, comparez sa pi\u00e8ce d\'identit\u00e9, puis cochez \u00ab J\'ai re\u00e7u la personne \u00bb avant de valider.';
+      case 'depot_refuse':
+        return 'Le serveur a refus\u00e9 le d\u00e9p\u00f4t sans en donner la raison. R\u00e9essayez : rien n\'a \u00e9t\u00e9 enregistr\u00e9.';
+      default:
+        // On ne fabrique pas une explication qu'on n'a pas : on rend le mot exact du
+        // serveur et on dit quoi faire. C'est plus honnete qu'une phrase inventee.
+        return 'Le serveur a refus\u00e9 : ' + (raison || 'raison non pr\u00e9cis\u00e9e')
+             + '. Notez ce mot et pr\u00e9sentez-vous chez un agent agr\u00e9\u00e9, ou r\u00e9essayez plus tard.';
+    }
+  }
+
+  // Les etats du serveur, en francais. Le serveur envoie \u00ab a_corriger \u00bb, \u00ab remontee \u00bb :
+  // personne ne doit lire ces mots-la a l'ecran. SVD_ETATS est defini plus bas, dans la
+  // meme portee : cette fonction n'est appelee qu'au moment d'un refus, jamais au
+  // chargement, donc l'ordre des declarations ne pose pas de probleme.
+  function demEtatEnFrancais(etat) {
+    var e = SVD_ETATS[String(etat || '')];
+    return e ? e.texte : (String(etat || '') || '\u00e9tat inconnu');
+  }
+
+  // Ces refus-la peuvent arriver DES DEUX COTES : au proprietaire qui ajoute un vehicule,
+  // et a l'agent qui valide le dossier d'un autre. Le serveur ne joint sa \u00ab suggestion \u00bb
+  // que dans le second cas \u2014 et elle s'adresse alors a l'agent. Coller devant elle notre
+  // phrase, ecrite pour le proprietaire (\u00ab Votre compte est bloque\u2026 \u00bb), ferait lire a
+  // l'agent que c'est LE SIEN qui est bloque. Quand la suggestion est la, elle suffit.
+  var DEM_SUGGESTION_SEULE = {
+    compte_suspendu: true, compte_bloque: true, compte_liste_noire: true,
+    compte_du_demandeur_introuvable: true, personne_a_voir_compte_existant: true
+  };
+
+  // La seule fonction qui parle d'un refus. Elle PREFERE toujours la phrase du serveur.
+  // \u00ab cote \u00bb vaut 'guichet' quand c'est un agent ou l'administration qui lit, et rien
+  // quand c'est le proprietaire : certaines phrases ne peuvent pas etre les memes.
+  function demMessageRefus(rep, cote) {
+    var m = rep && rep.message ? String(rep.message).trim() : '';
+    var s = rep && rep.suggestion ? String(rep.suggestion).trim() : '';
+    // 1. Le serveur a redige : on montre SA phrase, telle quelle.
+    if (m) return s && m.indexOf(s) < 0 ? (m + ' ' + s) : m;
+    // 2. Pas de phrase, mais une suggestion deja redigee : on l'affiche.
+    if (s && DEM_SUGGESTION_SEULE[String((rep && rep.raison) || '')]) return s;
+    // 3. Sinon seulement, notre phrase de secours \u2014 suivie de la suggestion s'il y en a une.
+    var p = demPhraseRefus(rep, cote);
+    return s ? (p + ' ' + s) : p;
+  }
+
+  function demAfficherErreur(idZone, texte) {
+    var z = document.getElementById(idZone);
+    if (!z) { toast(texte, true); return; }
+    z.textContent = texte;
+    z.style.display = 'block';
+    try { z.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+  }
+  function demCacherErreur(idZone) {
+    var z = document.getElementById(idZone);
+    if (z) { z.style.display = 'none'; z.textContent = ''; }
+  }
+
+  /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     PARTIE 2 \u2014 LE PARCOURS PUBLIC
+     \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+
+  // L'etat du parcours en cours. \u00ab prepare \u00bb est la reponse de preparer_ajout_vehicule :
+  // c'est elle, et elle seule, qui dit quelles photos exiger et lesquelles sont deja au
+  // dossier pour un proprietaire deja connu.
+  var demVoie = 'non';        // 'non' = sans compte, 'oui' = deja client
+  var demType = 'moto';
+  var demPrepare = null;
+  var demCompte = { num: '', mdp: '' };
+  var demEnvoiEnCours = false;
+
+  function demMontrerEtape(nom) {
+    ['porte', 'compte', 'form', 'recu'].forEach(function (e) {
+      var el = document.getElementById('dem-e-' + e);
+      if (el) el.style.display = (e === nom) ? '' : 'none';
+    });
+    // On remonte en haut de la fenetre : sur un telephone de 360 x 640, l'etape suivante
+    // commencerait sinon au milieu du defilement de la precedente.
+    try { document.getElementById('m-dem-parcours').scrollTop = 0; } catch (e) {}
+    var boite = document.querySelector('#m-dem-parcours .mbox');
+    if (boite) { try { boite.scrollIntoView({ block: 'start' }); } catch (e) {} }
+  }
+
+  window.ouvrirDemandeEnregistrement = function () {
+    // Le guichet peut etre ferme par l'administration. On le dit, et on n'ouvre rien.
+    if (!demReglagesPublics().actif) {
+      toast('Enregistrement en ligne fermé. Présentez-vous chez un agent agréé.', true);
+      return;
+    }
+    demVoie = 'non';
+    demPrepare = null;
+    demCompte = { num: '', mdp: '' };
+    demViderFormulaire();
+    document.getElementById('dem-titre').textContent = '\ud83c\udfcd\ufe0f Enregistrer mon v\u00e9hicule';
+    demCacherErreur('dem-err');
+    demCacherErreur('dem-cpt-err');
+    demMontrerEtape('porte');
+    openModal('m-dem-parcours');
+  };
+
+  window.demRetourPorte = function () {
+    demCacherErreur('dem-err');
+    demCacherErreur('dem-cpt-err');
+    demMontrerEtape('porte');
+  };
+
+  window.demChoisirPorte = function (quoi) {
+    demVoie = (quoi === 'oui') ? 'oui' : 'non';
+    demCacherErreur('dem-err');
+    demCacherErreur('dem-cpt-err');
+    if (demVoie === 'oui') {
+      demPrepare = null;
+      document.getElementById('dem-titre').textContent = '\ud83c\udfcd\ufe0f Ajouter un v\u00e9hicule';
+      demMontrerEtape('compte');
+      return;
+    }
+    // Voie 1 : formulaire complet. Les photos exigees viennent de config_admin.photos_enreg,
+    // la meme ligne que _dem_photos_manquantes() lit cote serveur.
+    demPrepare = null;
+    document.getElementById('dem-titre').textContent = '\ud83c\udfcd\ufe0f Enregistrer mon v\u00e9hicule';
+    demPreparerFormulaire();
+    demMontrerEtape('form');
+  };
+
+  // \u2550\u2550 VOIE 2, ETAPE 1 : CE QUE LE SERVEUR REPREND DU DOSSIER \u2550\u2550
+  window.demPreparerAjout = async function () {
+    var num = (document.getElementById('dem-cpt-num').value || '').trim();
+    var mdp = document.getElementById('dem-cpt-mdp').value || '';
+    demCacherErreur('dem-cpt-err');
+    if (!num || !mdp) {
+      demAfficherErreur('dem-cpt-err', 'Entrez votre numéro d\'accès ET votre mot de passe : les deux sont nécessaires pour reconnaître votre dossier.');
+      return;
+    }
+    var btn = document.getElementById('dem-cpt-btn');
+    var libelle = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Lecture de votre dossier\u2026';
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc('preparer_ajout_vehicule', { p_num: num, p_mot_de_passe: mdp });
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+    btn.disabled = false; btn.textContent = libelle;
+
+    if (err) { demAfficherErreur('dem-cpt-err', demErreurServeur(err, 'preparer_ajout_vehicule')); return; }
+    if (!rep || rep.ok !== true) { demAfficherErreur('dem-cpt-err', demMessageRefus(rep || {})); return; }
+    if (rep.enregistrement_public_actif === false) {
+      demAfficherErreur('dem-cpt-err', 'L\'enregistrement en ligne est fermé en ce moment. Présentez-vous chez un agent agréé avec votre carte grise et votre pièce d\'identité.');
+      return;
+    }
+
+    demPrepare = rep;
+    demCompte = { num: num, mdp: mdp };
+    demPreparerFormulaire();
+    demMontrerEtape('form');
+  };
+
+  // Les libelles francais des champs que le serveur reprend, pour ecrire la phrase
+  // \u00ab nous avons deja\u2026 \u00bb avec les mots du proprietaire et non les noms de colonnes.
+  var DEM_LIBELLES = {
+    prenom: 'votre prénom', nom: 'votre nom', phone: 'votre téléphone',
+    email: 'votre adresse email', addr: 'votre adresse', permis: 'votre permis de conduire',
+    date_naissance: 'votre date de naissance', lieu_naissance: 'votre lieu de naissance',
+    nationalite: 'votre nationalité', profession: 'votre profession',
+    nom_pere: 'le nom de votre père', nom_mere: 'le nom de votre mère',
+    type_piece: 'le type de votre pièce', num_piece: 'le numéro de votre pièce',
+    secours: 'votre numéro de secours', lien_secours: 'le lien avec la personne à joindre',
+    photo_proprietaire: 'votre photo', photo_piece: 'votre pièce d\'identité (recto)',
+    photo_piece_verso: 'votre pièce d\'identité (verso)'
+  };
+
+  // Prepare le formulaire pour la voie choisie : bloc identite visible ou non, photos
+  // exigees, categories, destinataires, paiement.
+  function demPreparerFormulaire() {
+    var dejaClient = (demVoie === 'oui' && demPrepare);
+
+    // Bloc identite : masque pour un deja-client. Ce n'est pas un confort : le serveur
+    // IGNORE tout ce qui n'est pas un champ de vehicule dans deposer_demande_client.
+    // Afficher ces champs laisserait croire qu'ils sont pris en compte.
+    var blocId = document.getElementById('dem-bloc-identite');
+    if (blocId) blocId.style.display = dejaClient ? 'none' : '';
+
+    // Ce que le serveur reprend, ecrit en clair.
+    var zRepris = document.getElementById('dem-repris');
+    if (zRepris) {
+      if (dejaClient) {
+        var repris = (demPrepare.champs_repris || []).map(function (c) { return DEM_LIBELLES[c] || c; });
+        var h = '<div style="background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.3);border-radius:9px;padding:11px 13px">'
+              + '<div style="font-weight:800;color:#22C55E;font-size:13px">Dossier reconnu \u2014 ' + esc(String(demPrepare.proprietaire || '')) + '</div>'
+              + '<div style="font-size:11.5px;color:var(--text2);margin-top:3px">Compte <span style="font-family:monospace;color:#EAB308">' + esc(String(demPrepare.client_num || '')) + '</span></div>';
+        if (repris.length) {
+          h += '<div style="font-size:12px;margin-top:7px;line-height:1.55">Nous avons d\u00e9j\u00e0 ' + esc(repris.join(', ')) + '. Vous ne remplissez que le nouveau v\u00e9hicule.</div>';
+        }
+        if (demPrepare.message) {
+          h += '<div style="font-size:11.5px;color:var(--text2);margin-top:7px;line-height:1.5">' + esc(String(demPrepare.message)) + '</div>';
+        }
+        // Le plafond vient du serveur \u2014 on ne l'ecrit jamais de memoire.
+        if (demPrepare.plafond_demandes_en_cours != null) {
+          h += '<div style="font-size:11px;color:var(--text2);margin-top:6px">Demandes en cours : '
+             + esc(String(demPrepare.demandes_en_cours != null ? demPrepare.demandes_en_cours : '?'))
+             + ' sur ' + esc(String(demPrepare.plafond_demandes_en_cours)) + ' autoris\u00e9es.</div>';
+        }
+        h += '</div>';
+        zRepris.innerHTML = h;
+        zRepris.style.display = '';
+      } else {
+        zRepris.innerHTML = '';
+        zRepris.style.display = 'none';
+      }
+    }
+
+    // Ses vehicules deja au registre. Le CODE D'ACCES d'un vehicule est un secret :
+    // le serveur ne l'envoie pas, et cette liste ne l'affiche donc jamais.
+    var zVeh = document.getElementById('dem-mes-vehs');
+    if (zVeh) {
+      var mes = dejaClient ? (demPrepare.mes_vehicules || []) : [];
+      if (mes.length) {
+        var lv = '<div class="lbl" style="margin-bottom:6px">Vos v\u00e9hicules d\u00e9j\u00e0 enregistr\u00e9s</div>';
+        mes.forEach(function (v) {
+          lv += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;'
+              + 'background:rgba(0,0,0,.08);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:5px;font-size:12px">'
+              + '<div style="min-width:0"><b>' + esc(String(v.brand || '')) + ' ' + esc(String(v.model || '')) + '</b>'
+              + '<div style="color:var(--text2);font-size:11px">' + ((v.type === 'voiture') ? '\ud83d\ude97' : '\ud83c\udfcd\ufe0f') + ' '
+              + esc(String(v.mat || 'sans matricule')) + ' \u00b7 <span style="font-family:monospace">' + esc(String(v.num || '')) + '</span></div></div>'
+              + '<div style="flex-shrink:0;font-size:11px;font-weight:700;color:' + (v.valide ? '#22C55E' : '#EAB308') + '">'
+              + (v.valide ? 'au registre' : 'en attente') + '</div></div>';
+        });
+        zVeh.innerHTML = lv;
+        zVeh.style.display = '';
+      } else {
+        zVeh.innerHTML = '';
+        zVeh.style.display = 'none';
+      }
+    }
+
+    demRemplirCategories();
+    demRemplirDestinataires();
+    demSetType(demType);
+    demMajPaiement();
+  }
+
+  // \u2550\u2550 LES CATEGORIES ET LEUR PRIX \u2550\u2550
+  // La liste et les prix viennent de config_admin.tarifs \u2014 la MEME ligne que
+  // deposer_demande interroge pour calculer le montant. Le montant reellement du est
+  // celui que le serveur renvoie apres le depot : c'est lui qui s'affiche sur le recu.
+  function demRemplirCategories() {
+    var sel = document.getElementById('dem-cat');
+    var info = document.getElementById('dem-cat-info');
+    if (!sel) return;
+    var tarifs = DB.tarifs || [];
+    if (!tarifs.length) {
+      sel.innerHTML = '<option value="">\u2014 liste non lue \u2014</option>';
+      if (info) info.textContent = 'La liste des cat\u00e9gories n\'a pas pu \u00eatre lue. Fermez cette fen\u00eatre, rechargez la page, puis rouvrez \u00ab enregistrer mon v\u00e9hicule \u00bb : sans cat\u00e9gorie, le serveur refusera la demande.';
+      return;
+    }
+    sel.innerHTML = tarifs.map(function (t) {
+      return '<option value="' + esc(String(t.id)) + '">' + esc(String(t.label || t.nom || t.id)) + ' \u2014 ' + esc(fmt(t.prix)) + '</option>';
+    }).join('');
+    sel.onchange = function () {
+      var t = (DB.tarifs || []).find(function (x) { return String(x.id) === sel.value; });
+      if (info) {
+        info.textContent = t
+          ? 'Frais annonc\u00e9s par l\'administration pour cette cat\u00e9gorie : ' + fmt(t.prix) + '. Le montant exact vous sera confirm\u00e9 \u00e0 l\'envoi.'
+          : 'Choisissez une cat\u00e9gorie.';
+      }
+    };
+    sel.onchange();
+  }
+
+  // \u2550\u2550 QUI VERIFIE \u2550\u2550
+  // L'administration est TOUJOURS dans la liste : c'est ce qui rend le service utilisable
+  // dans une prefecture qui n'a pas encore d'agent.
+  //
+  // 30/09 \u2014 DEUX DEFAUTS CORRIGES ICI.
+  //
+  // 1. La liste disait \u00ab la lecture a echoue \u00bb PENDANT la lecture. Ce formulaire s'ouvre
+  //    souvent dans les premieres secondes de la page, quand la deuxieme vague de
+  //    chargement est encore en vol. Or _chargerLeReste() se protege lui-meme : si un
+  //    chargement est deja en cours, il REVIENT TOUT DE SUITE sans rien lire. On l'appelait
+  //    et on prenait son retour immediat pour un echec. Le proprietaire lisait donc
+  //    \u00ab aucun agent \u00bb sur une connexion simplement lente, choisissait l'administration, et
+  //    son dossier partait au mauvais guichet. Desormais on lit les agents NOUS-MEMES, avec
+  //    une requete minuscule qui ne depend d'aucun garde-fou, et il y a TROIS etats :
+  //    en cours de lecture, lue, ou echouee \u2014 jamais l'un pris pour l'autre.
+  //
+  // 2. Le libelle affichait le NUMERO de l'agent, en clair, a cote de son nom. Ce numero
+  //    est l'identifiant avec lequel l'agent SE CONNECTE (\u00ab votre numero d'agence + votre
+  //    mot de passe \u00bb). La page publique \u00ab Trouver un agent \u00bb ne l'a jamais montre : elle
+  //    n'affiche que le nom et la ville. On fait pareil. Le serveur en a besoin pour savoir
+  //    a qui adresser le dossier : il reste dans la valeur du choix, pas sous les yeux.
+  var demAgentsEtat = 'lecture';   // 'lecture' | 'lus' | 'echec'
+
+  function demOptionsDestinataires(actifs) {
+    var h = '<option value="admin">\ud83c\udfdb\ufe0f Administration (bureau central)</option>';
+    (actifs || []).forEach(function (a) {
+      h += '<option value="' + esc(String(a.num || a.code)) + '">\ud83d\udccd ' + esc(String(a.name || 'Agent'))
+         + (a.city ? ' \u2014 ' + esc(String(a.city)) : '') + '</option>';
+    });
+    return h;
+  }
+
+  async function demRemplirDestinataires() {
+    var sel = document.getElementById('dem-dest');
+    if (!sel) return;
+    var actifs = (DB.agents || []).filter(function (a) { return a.actif !== false && (a.num || a.code); });
+    if (actifs.length) {
+      demAgentsEtat = 'lus';
+      sel.innerHTML = demOptionsDestinataires(actifs);
+      demMajDestinataire();
+      return;
+    }
+    demAgentsEtat = 'lecture';
+    sel.innerHTML = demOptionsDestinataires([]);
+    demMajDestinataire();
+    // Une lecture a nous, courte : le nom, la ville, le numero qu'il faut au serveur, et
+    // rien d'autre. Surtout pas select=* : cette table porte aussi des empreintes de mot
+    // de passe et des photos de piece d'identite, qui n'ont rien a faire ici.
+    try {
+      var r = await supabaseClient.from('agents').select('num,code,name,city,actif');
+      if (r.error) { demAgentsEtat = 'echec'; demMajDestinataire(); return; }
+      var lus = (r.data || []).filter(function (a) { return a.actif !== false && (a.num || a.code); });
+      // On garde ce qu'on vient de lire pour que demMajDestinataire retrouve la ville.
+      if (!(DB.agents || []).length && lus.length) DB.agents = r.data.slice();
+      demAgentsEtat = 'lus';
+      sel.innerHTML = demOptionsDestinataires(lus);
+    } catch (e) {
+      demAgentsEtat = 'echec';
+    }
+    demMajDestinataire();
+  }
+
+  window.demMajDestinataire = function () {
+    var sel = document.getElementById('dem-dest');
+    var info = document.getElementById('dem-dest-info');
+    if (!sel || !info) return;
+    var texte;
+    if (sel.value === 'admin') {
+      texte = 'Votre dossier ira au bureau central. Choisissez ceci s\'il n\'y a pas encore d\'agent dans votre préfecture.';
+    } else {
+      var a = (DB.agents || []).find(function (x) { return String(x.num || x.code) === sel.value; });
+      texte = a
+        ? 'Vous vous présenterez chez ' + (a.name || 'cet agent') + (a.city ? ', à ' + a.city : '') + ', avec vos papiers.'
+        : 'Vous vous présenterez chez cet agent avec vos papiers.';
+    }
+    // Trois etats, jamais deux : on ne dit « echec » que quand la lecture a VRAIMENT echoue.
+    if (demAgentsEtat === 'lecture') {
+      texte += ' La liste des agents est en train d\'arriver : attendez un instant avant de choisir.';
+    } else if (demAgentsEtat === 'echec') {
+      texte += ' La liste des agents n\'a pas pu être lue : seule l\'administration est proposée pour le moment. '
+             + 'Si vous vouliez choisir un agent, fermez cette fenêtre, vérifiez votre connexion, rechargez la page et rouvrez le formulaire.';
+    }
+    info.textContent = texte;
+  };
+
+  // \u2550\u2550 LE MODE DE PAIEMENT \u2550\u2550
+  // Lu dans le reglage du serveur AVANT le depot, parce que le formulaire doit demander
+  // la reference Orange Money au moment ou la personne la saisit. Ce qui figure sur le
+  // recu, apres le depot, vient de la reponse du serveur.
+  function demMajPaiement() {
+    var r = demReglagesPublics();
+    var wrap = document.getElementById('dem-om-wrap');
+    var txt = document.getElementById('dem-om-texte');
+    if (!wrap) return;
+    if (r.paiementMode === 'orange_money') {
+      wrap.style.display = '';
+      if (txt) {
+        // 30/09 : la phrase precedente renvoyait « au numero Orange Money affiche par
+        // l'administration ». AUCUN ecran n'affiche ce numero, et aucun reglage ne le
+        // porte encore en base : la consigne ne menait nulle part. On dit donc a la
+        // personne comment l'OBTENIR, au lieu de lui montrer une porte qui n'existe pas.
+        txt.textContent = 'L\'administration a choisi le paiement par Orange Money au moment de la demande. '
+          + 'Le numéro Orange Money n\'est pas encore affiché sur ce site : demandez-le à l\'agent ou au '
+          + 'bureau central que vous choisissez ci-dessous, envoyez-lui les frais, puis recopiez ici la '
+          + 'référence reçue par SMS. Elle sera vérifiée avant la validation.';
+      }
+    } else {
+      wrap.style.display = 'none';
+      var ref = document.getElementById('dem-om-ref');
+      if (ref) ref.value = '';
+    }
+  }
+
+  // \u2550\u2550 TYPE DE VEHICULE \u2550\u2550
+  window.demSetType = function (type) {
+    demType = (type === 'voiture') ? 'voiture' : 'moto';
+    ['moto', 'voiture'].forEach(function (t) {
+      var b = document.getElementById('dem-vt-' + t);
+      if (!b) return;
+      b.className = (t === demType) ? 'btn' : 'btn-ghost';
+      b.style.flex = '1'; b.style.fontSize = '13px'; b.style.padding = '10px';
+    });
+    var g = document.getElementById('dem-gilet-wrap');
+    if (g) g.style.display = (demType === 'moto') ? '' : 'none';
+    // Le permis fait partie de l'IDENTITE, pas du vehicule : pour un deja-client, le
+    // serveur le reprend de son dossier et n'accepterait pas celui qu'on enverrait.
+    var dejaClient = (demVoie === 'oui' && demPrepare);
+    var p = document.getElementById('dem-permis-wrap');
+    if (p) p.style.display = (demType === 'voiture' && !dejaClient) ? '' : 'none';
+    var note = document.getElementById('dem-permis-note');
+    if (note) {
+      if (demType === 'voiture' && dejaClient) {
+        var aPermis = (demPrepare.champs_repris || []).indexOf('permis') >= 0;
+        note.textContent = aPermis
+          ? 'Votre permis de conduire est repris de votre dossier : vous n\'avez pas à le ressaisir.'
+          : 'Votre dossier ne porte pas de numéro de permis. Apportez votre permis à ' +
+            'la personne qui vérifiera : elle pourra compléter votre fiche.';
+        note.style.display = '';
+      } else {
+        note.style.display = 'none';
+        note.textContent = '';
+      }
+    }
+    demMajLabelsPhotos();
+  };
+
+  // \u2550\u2550 LES PHOTOS EXIGEES \u2550\u2550
+  // Voie 2 : photos_exigees et photos_deja_au_dossier viennent de la reponse du serveur.
+  // Voie 1 : aucune fonction publique ne les donne avant le depot, on lit donc
+  // config_admin.photos_enreg, la MEME ligne que le serveur. Une cle absente vaut
+  // \u00ab optionnel \u00bb \u2014 le meme defaut qu'en SQL, et le sens qui laisse passer : c'est le
+  // serveur qui refusera, avec sa propre liste, et c'est elle qu'on affichera.
+  function demPhotosExigees() {
+    if (demVoie === 'oui' && demPrepare && demPrepare.photos_exigees) return demPrepare.photos_exigees;
+    var pe = DB.photosEnreg || {};
+    return {
+      moto: pe.moto || 'optionnel', proprio: pe.proprio || 'optionnel',
+      facture: pe.facture || 'optionnel', cg: pe.cg || 'optionnel', piece: pe.piece || 'optionnel'
+    };
+  }
+  function demPhotosDejaAuDossier() {
+    var d = (demVoie === 'oui' && demPrepare && demPrepare.photos_deja_au_dossier) || {};
+    return { proprio: d.proprio === true, piece: d.piece === true, piece_verso: d.piece_verso === true };
+  }
+
+  function demMajLabelsPhotos() {
+    var pe = demPhotosExigees();
+    var deja = demPhotosDejaAuDossier();
+    var etoile = function (k) { return pe[k] === 'obligatoire' ? ' *' : ''; };
+    var dejaClient = (demVoie === 'oui' && demPrepare);
+
+    // Memes libelles que le formulaire de l'agent. Pour un deja-client, la \u00ab facture \u00bb
+    // devient \u00ab attestation de vente \u00bb : sa moto est achetee d'occasion, il n'a pas de
+    // facture d'usine \u2014 c'est exactement ce que fait l'ecran de l'agent.
+    var libelles = {
+      'dem-pp-lbl': (demType === 'voiture' ? '\ud83d\udcf8 Voiture \u2014 FACE AVANT *' : '\ud83d\udcf8 Moto' + etoile('moto')),
+      'dem-ppp-lbl': '\ud83e\udeaa Propri\u00e9taire' + etoile('proprio'),
+      'dem-pfa-lbl': (dejaClient ? '\ud83d\udcc4 Attestation de vente' : '\ud83e\uddfe Facture') + etoile('facture'),
+      'dem-pcg-lbl': '\ud83d\udcc4 Carte grise' + etoile('cg'),
+      'dem-ppi-lbl': '\ud83e\udeaa Pi\u00e8ce d\'identit\u00e9 \u2014 RECTO' + etoile('piece'),
+      'dem-ppiv-lbl': '\ud83e\udeaa Pi\u00e8ce d\'identit\u00e9 \u2014 VERSO'
+    };
+    for (var id in libelles) {
+      var e = document.getElementById(id);
+      if (e) e.textContent = libelles[id];
+    }
+    // Les photos deja au dossier ne sont pas redemandees.
+    var cacher = function (idBox, condition) {
+      var b = document.getElementById(idBox);
+      if (b) b.style.display = condition ? 'none' : '';
+    };
+    cacher('dem-ppp-box', dejaClient && deja.proprio);
+    cacher('dem-ppi-box', dejaClient && deja.piece);
+    cacher('dem-ppiv-box', dejaClient && deja.piece_verso);
+
+    var info = document.getElementById('dem-photos-info');
+    if (info) {
+      var caches = [];
+      if (dejaClient && deja.proprio) caches.push('votre photo');
+      if (dejaClient && deja.piece) caches.push('votre pi\u00e8ce d\'identit\u00e9 (recto)');
+      if (dejaClient && deja.piece_verso) caches.push('votre pi\u00e8ce d\'identit\u00e9 (verso)');
+      var txt = caches.length
+        ? 'D\u00e9j\u00e0 \u00e0 votre dossier, nous ne vous les redemandons pas : ' + caches.join(', ') + '. '
+        : '';
+      // 30/09 : quand le dossier porte le recto mais pas le verso, la case RECTO
+      // disparaissait et la case VERSO restait seule, sans un mot. Le proprietaire se
+      // demandait pourquoi on ne lui demandait que le dos de sa carte. On le dit.
+      if (dejaClient && deja.piece && !deja.piece_verso) {
+        txt += 'Nous n\'avons pas le verso de votre pi\u00e8ce d\'identit\u00e9 : ajoutez-le si vous l\'avez sous la main, '
+             + 'sinon apportez la pi\u00e8ce \u00e0 la personne qui v\u00e9rifiera. ';
+      }
+      txt += 'Les photos marqu\u00e9es d\'une \u00e9toile sont exig\u00e9es par l\'administration.';
+      info.textContent = txt;
+    }
+  }
+
+  function demViderFormulaire() {
+    demType = 'moto';
+    ['dem-mat', 'dem-vin', 'dem-brand', 'dem-model', 'dem-color', 'dem-year', 'dem-cg',
+     'dem-gilet', 'dem-permis', 'dem-prenom', 'dem-nom', 'dem-lieunais', 'dem-phone',
+     'dem-email', 'dem-mdp', 'dem-addr', 'dem-nationalite', 'dem-profession',
+     'dem-nom-pere', 'dem-nom-mere', 'dem-num-piece', 'dem-secours', 'dem-lien',
+     'dem-om-ref', 'dem-cpt-num', 'dem-cpt-mdp', 'dem-dachat', 'dem-datenais'
+    ].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    ['dem-pp', 'dem-ppp', 'dem-pfa', 'dem-pcg', 'dem-ppi', 'dem-ppiv'].forEach(function (id) {
+      var e = document.getElementById(id); if (e) { e.src = ''; e.style.display = 'none'; }
+    });
+    ['dem-pp-ph', 'dem-ppp-ph', 'dem-pfa-ph', 'dem-pcg-ph', 'dem-ppi-ph', 'dem-ppiv-ph'].forEach(function (id) {
+      var e = document.getElementById(id); if (e) e.style.display = '';
+    });
+    var tp = document.getElementById('dem-type-piece'); if (tp) tp.value = 'CNI';
+    // 30/09 : le recu n'etait jamais effacé. Apres un depot, le NUMERO et le CODE A SIX
+    // CHIFFRES du dossier precedent restaient dans la page, ainsi que les photos de la
+    // piece d'identite (en clair, dans les balises image) et le mot de passe choisi. Sur
+    // le telephone d'un guichet, ou plusieurs proprietaires passent l'un apres l'autre,
+    // le code d'un dossier est un secret : il ne survit pas a la fermeture.
+    var recu = document.getElementById('dem-e-recu');
+    if (recu) recu.innerHTML = '';
+    demCompte = { num: '', mdp: '' };
+    demPrepare = null;
+  }
+
+  // La sortie du parcours, quel que soit le chemin : la croix, « Fermer », ou le bouton
+  // qui mene au suivi. Rien du dossier precedent ne reste dans la page.
+  window.demFermerParcours = function () {
+    closeModal('m-dem-parcours');
+    demVoie = 'non';
+    try { demViderFormulaire(); } catch (e) {}
+    demMontrerEtape('porte');
+  };
+
+  // Les photos partent AVANT le dossier : le serveur n'accepte qu'une adresse, jamais une
+  // image collee dans le texte (il refuserait avec photo_invalide). La photo du VEHICULE
+  // va dans l'espace public \u2014 c'est elle qui permet de reconnaitre une moto volee. Les
+  // quatre documents personnels vont dans l'espace prive, et ne s'ouvrent qu'avec une
+  // adresse signee de courte duree, delivree au personnel au moment de la consultation.
+  async function demDeposerPhoto(idImg, emplacement, chemin, nomLisible) {
+    var brut = getPic(idImg);
+    if (!brut) return { vide: true };
+    var ref = await televerserPhoto(brut, emplacement, chemin);
+    var bon = (emplacement === 'documents')
+      ? (typeof ref === 'string' && ref.indexOf('doc:') === 0)
+      : (typeof ref === 'string' && /^https?:\/\//i.test(ref));
+    if (!bon) {
+      // televerserPhoto rend l'image d'origine quand le depot echoue. On ne l'envoie pas :
+      // le serveur la refuserait, et le dossier serait perdu pour une raison illisible.
+      return { echec: 'La photo \u00ab ' + nomLisible + ' \u00bb n\'a pas pu \u00eatre d\u00e9pos\u00e9e sur le serveur. V\u00e9rifiez votre connexion, puis appuyez de nouveau sur \u00ab Envoyer ma demande \u00bb : rien n\'a \u00e9t\u00e9 envoy\u00e9.' };
+    }
+    return { ref: ref };
+  }
+
+  // \u2550\u2550 L'ENVOI \u2550\u2550
+  window.demEnvoyer = async function () {
+    if (demEnvoiEnCours) return;
+    demCacherErreur('dem-err');
+
+    var dejaClient = (demVoie === 'oui' && demPrepare);
+    var lire = function (id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+
+    var mat = lire('dem-mat'), vin = lire('dem-vin'), brand = lire('dem-brand'), model = lire('dem-model');
+    var permis = lire('dem-permis'), catId = lire('dem-cat');
+    var prenom = lire('dem-prenom'), nom = lire('dem-nom'), phone = lire('dem-phone');
+    var secours = lire('dem-secours'), mdp = (document.getElementById('dem-mdp') || {}).value || '';
+    var dest = lire('dem-dest');
+    var reglages = demReglagesPublics();
+
+    // \u2550\u2550 LES CONTROLES DU FORMULAIRE DE L'AGENT, REPRIS TELS QUELS \u2550\u2550
+    if (!vin || !brand || !model) {
+      demAfficherErreur('dem-err', '\u26a0\ufe0f Num\u00e9ro de ch\u00e2ssis (VIN), marque et mod\u00e8le obligatoires.');
+      return;
+    }
+    if (!catId) {
+      demAfficherErreur('dem-err', '\u26a0\ufe0f Choisissez une cat\u00e9gorie : c\'est elle qui fixe les frais d\'enregistrement.');
+      return;
+    }
+    if (!dejaClient) {
+      if (!prenom || !nom || !phone) {
+        demAfficherErreur('dem-err', '\u26a0\ufe0f Pr\u00e9nom, nom et t\u00e9l\u00e9phone du propri\u00e9taire obligatoires.');
+        return;
+      }
+      if (!secours) {
+        demAfficherErreur('dem-err', '\u26a0\ufe0f Le num\u00e9ro de secours est obligatoire. Il sera toujours visible publiquement pour permettre de contacter la famille en cas d\'accident.');
+        return;
+      }
+      if (mdp && mdp.length < 6) {
+        demAfficherErreur('dem-err', '\u26a0\ufe0f Le mot de passe doit contenir au moins 6 caract\u00e8res. Laissez-le vide si vous pr\u00e9f\u00e9rez le recevoir chez l\'agent.');
+        return;
+      }
+      if (demType === 'voiture' && !permis) {
+        demAfficherErreur('dem-err', '\u26a0\ufe0f Permis de conduire obligatoire pour une voiture.');
+        return;
+      }
+    }
+    if (reglages.paiementMode === 'orange_money' && !lire('dem-om-ref')) {
+      demAfficherErreur('dem-err', '\u26a0\ufe0f La r\u00e9f\u00e9rence de la transaction Orange Money est obligatoire : c\'est elle qui permet \u00e0 l\'agent de retrouver votre paiement.');
+      return;
+    }
+
+    // Le controle des photos reprend EXACTEMENT la regle du serveur, avec ses mots, pour
+    // eviter un aller-retour inutile sur une connexion faible. Le serveur reste le juge :
+    // s'il refuse quand meme, c'est SA liste qui s'affiche.
+    var pe = demPhotosExigees();
+    var deja = demPhotosDejaAuDossier();
+    var manquantes = [];
+    if (demType === 'voiture' && !getPic('dem-pp')) {
+      manquantes.push('photo de face avant de la voiture');
+    } else if (pe.moto === 'obligatoire' && !getPic('dem-pp')) {
+      manquantes.push(demType === 'voiture' ? 'photo de la voiture' : 'photo de la moto');
+    }
+    if (pe.proprio === 'obligatoire' && !getPic('dem-ppp') && !(dejaClient && deja.proprio)) manquantes.push('photo du propriétaire');
+    if (pe.facture === 'obligatoire' && !getPic('dem-pfa')) manquantes.push(dejaClient ? 'attestation de vente' : 'photo de la facture');
+    if (pe.cg === 'obligatoire' && !getPic('dem-pcg')) manquantes.push('photo de la carte grise');
+    if (pe.piece === 'obligatoire' && !getPic('dem-ppi') && !(dejaClient && deja.piece)) manquantes.push('photo de la pièce d\'identité');
+    if (manquantes.length) {
+      demAfficherErreur('dem-err', '\u26a0\ufe0f Il manque des photos : ' + manquantes.join(', ') + '.');
+      return;
+    }
+
+    demEnvoiEnCours = true;
+    var btn = document.getElementById('dem-btn-envoyer');
+    var libelle = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Envoi des photos\u2026';
+
+    var terminer = function () {
+      demEnvoiEnCours = false;
+      btn.disabled = false; btn.textContent = libelle;
+    };
+
+    // \u2500\u2500 Les photos d'abord \u2500\u2500
+    var base = 'demandes/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    var refs = {};
+    try {
+      var plan = [
+        ['photo', 'dem-pp', 'photos', base + '-vehicule', 'v\u00e9hicule', true],
+        ['photo_facture', 'dem-pfa', 'documents', base + '-facture', dejaClient ? 'attestation de vente' : 'facture', true],
+        ['photo_carte_grise', 'dem-pcg', 'documents', base + '-carte-grise', 'carte grise', true],
+        ['photo_proprietaire', 'dem-ppp', 'documents', base + '-proprietaire', 'propri\u00e9taire', !(dejaClient && deja.proprio)],
+        ['photo_piece', 'dem-ppi', 'documents', base + '-piece', 'pi\u00e8ce d\'identit\u00e9 recto', !(dejaClient && deja.piece)],
+        ['photo_piece_verso', 'dem-ppiv', 'documents', base + '-piece-verso', 'pi\u00e8ce d\'identit\u00e9 verso', !(dejaClient && deja.piece_verso)]
+      ];
+      for (var i = 0; i < plan.length; i++) {
+        var p = plan[i];
+        if (!p[5]) continue;               // deja au dossier : le serveur refuserait de la relire
+        var res = await demDeposerPhoto(p[1], p[2], p[3], p[4]);
+        if (res.echec) { demAfficherErreur('dem-err', res.echec); terminer(); return; }
+        if (res.ref) refs[p[0]] = res.ref;
+      }
+    } catch (e) {
+      demAfficherErreur('dem-err', 'Les photos n\'ont pas pu être déposées : ' + ((e && e.message) || e) + '. Vérifiez votre connexion, puis appuyez de nouveau sur « Envoyer ma demande » : rien n\'a été envoyé.');
+      terminer(); return;
+    }
+
+    // \u2500\u2500 Le dossier ensuite \u2500\u2500
+    // Voie 2 : p_donnees ne doit contenir QUE les champs du vehicule, plus le destinataire
+    // et la reference de paiement. Tout le reste est ignore par le serveur \u2014 l'y mettre
+    // ferait croire qu'il est pris en compte.
+    var d = {
+      type: demType,
+      mat: mat, vin: vin, brand: brand, model: model,
+      color: lire('dem-color'), year: lire('dem-year'),
+      carte_grise: lire('dem-cg'), date_achat: lire('dem-dachat'),
+      cat_id: catId,
+      gilet: (demType === 'moto') ? lire('dem-gilet') : '',
+      destinataire_type: (dest === 'admin') ? 'administration' : 'agent',
+      agent_num: (dest === 'admin') ? '' : dest,
+      paiement_reference: lire('dem-om-ref')
+    };
+    ['photo', 'photo_facture', 'photo_carte_grise'].forEach(function (k) { if (refs[k]) d[k] = refs[k]; });
+
+    if (!dejaClient) {
+      d.permis = (demType === 'voiture') ? permis : '';
+      d.prenom = prenom; d.nom = nom; d.phone = phone;
+      d.email = lire('dem-email'); d.addr = lire('dem-addr');
+      d.date_naissance = lire('dem-datenais'); d.lieu_naissance = lire('dem-lieunais');
+      d.nationalite = lire('dem-nationalite'); d.profession = lire('dem-profession');
+      d.nom_pere = lire('dem-nom-pere'); d.nom_mere = lire('dem-nom-mere');
+      d.type_piece = (document.getElementById('dem-type-piece') || {}).value || '';
+      d.num_piece = lire('dem-num-piece');
+      d.secours = secours; d.lien_secours = lire('dem-lien');
+      if (mdp) d.mot_de_passe = mdp;
+      ['photo_proprietaire', 'photo_piece', 'photo_piece_verso'].forEach(function (k) { if (refs[k]) d[k] = refs[k]; });
+    } else {
+      // Les trois photos d'identite ne sont acceptees que si le serveur a dit qu'elles
+      // manquaient au dossier.
+      if (refs.photo_proprietaire && !deja.proprio) d.photo_proprietaire = refs.photo_proprietaire;
+      if (refs.photo_piece && !deja.piece) d.photo_piece = refs.photo_piece;
+      if (refs.photo_piece_verso && !deja.piece_verso) d.photo_piece_verso = refs.photo_piece_verso;
+    }
+
+    btn.textContent = 'Envoi du dossier\u2026';
+    var rep = null, err = null;
+    try {
+      var r = dejaClient
+        ? await supabaseClient.rpc('deposer_demande_client', { p_num: demCompte.num, p_mot_de_passe: demCompte.mdp, p_donnees: d })
+        : await supabaseClient.rpc('deposer_demande', { p_donnees: d });
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+
+    if (err) {
+      demAfficherErreur('dem-err', demErreurServeur(err, dejaClient ? 'deposer_demande_client' : 'deposer_demande'));
+      terminer(); return;
+    }
+    if (!rep || rep.ok !== true) {
+      demAfficherErreur('dem-err', demMessageRefus(rep || {}));
+      terminer(); return;
+    }
+
+    // C'est SEULEMENT ICI, apres avoir lu ok, qu'on annonce quoi que ce soit.
+    terminer();
+    await demAfficherRecu(rep);
+  };
+
+  // \u2550\u2550 LE RECU \u2550\u2550
+  // Le mode de paiement ne figure pas dans la reponse du depot. Il figure dans
+  // suivre_demande : on le lit donc tout de suite, avec le numero et le code qu'on vient
+  // de recevoir. Si cette lecture echoue, ON LE DIT \u2014 on n'ecrit pas \u00ab especes \u00bb au hasard.
+  async function demAfficherRecu(rep) {
+    var num = String(rep.numero_suivi || '');
+    var code = String(rep.code_suivi || '');
+    var dest = rep.destinataire || {};
+    var paiement = null;
+    var lectureRatee = '';
+    // \u00ab chez Administration \u00bb se lisait mal : on ecrit \u00ab chez l'administration \u00bb quand le
+    // destinataire est le bureau central, et le nom de l'agent quand c'est un agent.
+    var ouPayer = (dest.type === 'agent' && dest.nom) ? String(dest.nom) : 'l\'administration';
+    try {
+      var s = await supabaseClient.rpc('suivre_demande', { p_numero: num, p_code: code });
+      if (!s.error && s.data && s.data.ok === true && s.data.paiement) paiement = s.data.paiement;
+      else lectureRatee = 'La lecture du mode de paiement a \u00e9chou\u00e9. Demandez \u00e0 ' + ouPayer + ' comment payer, en donnant votre num\u00e9ro de suivi.';
+    } catch (e) {
+      lectureRatee = 'La lecture du mode de paiement a \u00e9chou\u00e9. Demandez \u00e0 ' + ouPayer + ' comment payer, en donnant votre num\u00e9ro de suivi.';
+    }
+
+    var commentPayer;
+    if (paiement && paiement.mode === 'orange_money') {
+      commentPayer = 'Par <b>Orange Money</b>, au moment de la demande. '
+        + (paiement.reference ? 'R\u00e9f\u00e9rence enregistr\u00e9e : <span style="font-family:monospace">' + esc(String(paiement.reference)) + '</span>. ' : '')
+        + (paiement.confirme ? 'Paiement confirm\u00e9.' : 'Le paiement sera confirm\u00e9 par ' + esc(ouPayer) + ' avant la validation.');
+    } else if (paiement && paiement.mode === 'especes') {
+      commentPayer = 'En <b>esp\u00e8ces</b>, au moment de la validation, chez ' + esc(ouPayer) + '.';
+    } else {
+      commentPayer = esc(lectureRatee || 'Le serveur n\'a pas indiqu\u00e9 le mode de paiement.');
+    }
+
+    var montant = (rep.montant != null) ? fmt(rep.montant) : '';
+
+    var h =
+      '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.35);border-radius:11px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:900;color:#22C55E;font-size:15px">Demande d\u00e9pos\u00e9e</div>'
+      + '<div style="font-size:12.5px;line-height:1.55;margin-top:6px">' + esc(String(rep.message || '')) + '</div>'
+      + '</div>'
+
+      + '<div class="sect" style="margin-top:0">Gardez ces deux lignes</div>'
+      + '<div style="background:rgba(0,0,0,.1);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:6px">'
+        + '<div style="font-size:11px;color:var(--text2);letter-spacing:1px">NUM\u00c9RO DE SUIVI</div>'
+        + '<div style="font-family:monospace;font-size:19px;font-weight:900;color:#EAB308;letter-spacing:1px;word-break:break-all">' + esc(num) + '</div>'
+        + '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;margin-top:10px">CODE \u00c0 6 CHIFFRES</div>'
+        + '<div style="font-family:monospace;font-size:26px;font-weight:900;color:#EAB308;letter-spacing:6px">' + esc(code) + '</div>'
+      + '</div>'
+      + '<div class="qr-note-txt" style="font-size:11.5px;line-height:1.5;margin-bottom:14px">'
+        + 'Le num\u00e9ro <b>seul ne suffit pas</b> \u00e0 ouvrir votre dossier : notez aussi le code. '
+        + 'Il ne vous sera pas renvoy\u00e9.'
+      + '</div>'
+
+      + '<div class="sect">\u00c0 payer</div>'
+      + '<div style="background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);border-radius:10px;padding:12px;margin-bottom:14px">'
+        + (montant ? '<div style="font-size:20px;font-weight:900;color:#f97316">' + esc(montant) + '</div>'
+                   : '<div style="font-size:12.5px;color:#EAB308">Le serveur n\'a pas indiqu\u00e9 de montant. Demandez-le au guichet.</div>')
+        + '<div style="font-size:12.5px;line-height:1.55;margin-top:6px">' + commentPayer + '</div>'
+      + '</div>'
+
+      + '<div class="sect">Qui v\u00e9rifie votre dossier</div>'
+      + '<div style="background:rgba(0,0,0,.08);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">'
+        + '<div style="font-weight:800;font-size:14px">' + ((dest.type === 'agent') ? '\ud83d\udccd ' : '\ud83c\udfdb\ufe0f ') + esc(String(dest.nom || 'Administration')) + '</div>'
+        + (dest.ville ? '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(String(dest.ville)) + '</div>' : '')
+        + '<div style="font-size:12px;color:var(--text2);margin-top:6px">Pr\u00e9sentez-vous avec votre carte grise et votre pi\u00e8ce d\'identit\u00e9.</div>'
+      + '</div>'
+
+      + (rep.deja_client
+          ? '<div class="qr-note-txt" style="font-size:11.5px;margin-bottom:14px;line-height:1.5">Aucun second compte ne sera cr\u00e9\u00e9 : ce v\u00e9hicule entrera dans votre compte '
+            + '<span style="font-family:monospace;color:#EAB308">' + esc(String(rep.client_num || '')) + '</span>.</div>'
+          : '')
+
+      + '<button class="btn" style="width:100%;padding:13px;margin-bottom:8px" onclick="demSuivreCeDossier(\'' + esc(num) + '\',\'' + esc(code) + '\')">\ud83d\udd0e Suivre ce dossier maintenant</button>'
+      + '<button class="btn-ghost" style="width:100%;padding:12px" onclick="demFermerParcours()">Fermer</button>';
+
+    var z = document.getElementById('dem-e-recu');
+    z.innerHTML = h;
+    document.getElementById('dem-titre').textContent = '\ud83d\udce8 Votre num\u00e9ro de suivi';
+    demMontrerEtape('recu');
+  }
+
+  // Passer du recu au suivi sans retaper le numero et le code.
+  window.demSuivreCeDossier = function (num, code) {
+    // Le numero et le code sont deja dans les mains de cette fonction : on peut donc
+    // effacer le recu de la page avant d'ouvrir le suivi.
+    demFermerParcours();
+    ouvrirSuiviDemande();
+    var a = document.getElementById('svd-num'); if (a) a.value = num || '';
+    var b = document.getElementById('svd-code'); if (b) b.value = code || '';
+  };
+
+  /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     PARTIE 3 \u2014 LE SUIVI, ET LA CORRECTION
+     \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+
+  var svdCle = { num: '', code: '' };
+
+  window.ouvrirSuiviDemande = function () {
+    svdCle = { num: '', code: '' };
+    demCacherErreur('svd-err');
+    document.getElementById('svd-e-cle').style.display = '';
+    var z = document.getElementById('svd-e-dossier');
+    z.style.display = 'none'; z.innerHTML = '';
+    openModal('m-dem-suivi');
+  };
+
+  // Traduit un nom de colonne du dossier en francais. Sert partout ou le serveur nomme
+  // un champ : ni le proprietaire ni le fondateur ne doivent lire « photo_carte_grise ».
+  // Une cle inconnue est rendue telle quelle plutot que devinee.
+  var DEM_CHAMPS_PHOTOS = {
+    photo: 'la photo du véhicule', photo_proprietaire: 'votre photo',
+    photo_facture: 'la facture', photo_carte_grise: 'la photo de la carte grise',
+    photo_piece: 'la pièce d\'identité (recto)', photo_piece_verso: 'la pièce d\'identité (verso)',
+    mat: 'le matricule', vin: 'le numéro de châssis', brand: 'la marque', model: 'le modèle',
+    color: 'la couleur', year: 'l\'année', carte_grise: 'le numéro de carte grise',
+    date_achat: 'la date d\'achat', cat_id: 'la catégorie', gilet: 'le numéro de gilet',
+    permis: 'le permis de conduire', type: 'le type de véhicule'
+  };
+  function demLibelleChamp(cle) {
+    var k = String(cle || '');
+    if (DEM_CHAMPS_PHOTOS[k]) return DEM_CHAMPS_PHOTOS[k];
+    if (DEM_LIBELLES[k]) return DEM_LIBELLES[k];
+    return k;
+  }
+
+  var SVD_ETATS = {
+    deposee:    { texte: 'D\u00e9pos\u00e9e \u2014 en attente de v\u00e9rification', couleur: '#f97316' },
+    remontee:   { texte: 'Remont\u00e9e \u00e0 l\'administration', couleur: '#EAB308' },
+    a_corriger: { texte: '\u00c0 corriger \u2014 votre dossier vous est renvoy\u00e9', couleur: '#EF4444' },
+    validee:    { texte: 'Valid\u00e9e \u2014 v\u00e9hicule enregistr\u00e9', couleur: '#22C55E' },
+    refusee:    { texte: 'Refus\u00e9e', couleur: '#EF4444' },
+    abandonnee: { texte: 'Class\u00e9e sans suite', couleur: '#9CA3AF' }
+  };
+
+  window.svdOuvrir = async function () {
+    var num = (document.getElementById('svd-num').value || '').trim().toUpperCase();
+    var code = (document.getElementById('svd-code').value || '').trim();
+    demCacherErreur('svd-err');
+    if (!num || !code) {
+      demAfficherErreur('svd-err', 'Entrez le numéro de suivi ET le code à 6 chiffres : le numéro seul ne suffit pas à ouvrir un dossier.');
+      return;
+    }
+    var btn = document.getElementById('svd-btn');
+    var libelle = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Lecture\u2026';
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc('suivre_demande', { p_numero: num, p_code: code });
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+    btn.disabled = false; btn.textContent = libelle;
+
+    if (err) { demAfficherErreur('svd-err', demErreurServeur(err, 'suivre_demande')); return; }
+    if (!rep || rep.ok !== true) { demAfficherErreur('svd-err', demMessageRefus(rep || {})); return; }
+
+    svdCle = { num: num, code: code };
+    svdAfficher(rep);
+  };
+
+  // L'affichage du dossier, et le formulaire de correction quand l'agent en demande une.
+  // Ce formulaire est construit en JavaScript : il ne contient AUCUNE photo deja choisie
+  // avant d'etre affiche, donc rien a perdre \u2014 et les photos qu'on y ajoute sont lues au
+  // moment du clic sur \u00ab Renvoyer \u00bb, pas conservees entre deux affichages.
+  function svdAfficher(d) {
+    var etat = String(d.etat_affiche || d.etat || '');
+    var e = SVD_ETATS[etat] || { texte: etat, couleur: '#9CA3AF' };
+    var dest = d.destinataire || {};
+    var paiement = d.paiement || {};
+
+    var h =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:12px">'
+        + '<div style="min-width:0"><div style="font-size:11px;color:var(--text2);letter-spacing:1px">DOSSIER</div>'
+        + '<div style="font-family:monospace;font-size:16px;font-weight:900;color:#EAB308;word-break:break-all">' + esc(String(d.numero_suivi || '')) + '</div></div>'
+        + '<button class="btn-ghost" style="flex-shrink:0;padding:7px 11px;font-size:12px" onclick="ouvrirSuiviDemande()">Autre dossier</button>'
+      + '</div>'
+
+      + '<div style="background:rgba(0,0,0,.1);border:1px solid var(--border);border-left:4px solid ' + e.couleur + ';border-radius:10px;padding:12px;margin-bottom:12px">'
+        + '<div style="font-weight:900;font-size:14px;color:' + e.couleur + '">' + esc(e.texte) + '</div>'
+        + '<div style="font-size:12.5px;line-height:1.55;margin-top:6px">' + esc(String(d.message || '')) + '</div>'
+      + '</div>';
+
+    if (d.motif) {
+      h += '<div class="warn" style="display:block;line-height:1.55">'
+         + '<b>Ce que l\'agent demande :</b><br>' + esc(String(d.motif)) + '</div>';
+    }
+
+    h += '<div class="sect" style="margin-top:0">Qui v\u00e9rifie</div>'
+       + '<div style="background:rgba(0,0,0,.08);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:12px;font-size:12.5px">'
+         + '<b>' + ((dest.type === 'agent') ? '\ud83d\udccd ' : '\ud83c\udfdb\ufe0f ') + esc(String(dest.nom || 'Administration')) + '</b>'
+         + (dest.ville ? ' \u2014 ' + esc(String(dest.ville)) : '')
+       + '</div>'
+
+       + '<div class="sect">\u00c0 payer</div>'
+       + '<div style="background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);border-radius:10px;padding:11px;margin-bottom:12px;font-size:12.5px">'
+         + (d.montant != null ? '<b style="font-size:16px;color:#f97316">' + esc(fmt(d.montant)) + '</b><br>' : '')
+         + (paiement.mode === 'orange_money'
+             ? 'Par Orange Money. ' + (paiement.confirme ? 'Paiement confirm\u00e9.' : 'Paiement pas encore confirm\u00e9 par le guichet.')
+             : (paiement.mode === 'especes'
+                 ? 'En esp\u00e8ces, au moment de la validation.'
+                 : 'Le serveur n\'a pas indiqu\u00e9 le mode de paiement.'))
+       + '</div>';
+
+    if (d.vehicule && d.vehicule.num) {
+      h += '<div class="sect">Au registre</div>'
+         + '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:11px;margin-bottom:12px;font-size:12.5px">'
+           + 'Num\u00e9ro au registre : <span style="font-family:monospace;color:#22C55E;font-weight:800">' + esc(String(d.vehicule.num)) + '</span><br>'
+           + '<span style="color:var(--text2);font-size:11.5px">Votre code d\'acc\u00e8s et votre QR se remettent en main propre, chez '
+           + esc(String(dest.nom || 'l\'administration')) + '. Ils ne sont jamais envoy\u00e9s par message.</span>'
+         + '</div>';
+    }
+
+    // \u2550\u2550 LA CORRECTION \u2550\u2550
+    if (String(d.etat || '') === 'a_corriger') {
+      var champs = Array.isArray(d.champs_a_corriger) ? d.champs_a_corriger : [];
+      h += '<div class="sect">Corriger et renvoyer</div>'
+         + '<div class="qr-note-txt" style="font-size:11.5px;line-height:1.5;margin-bottom:10px">'
+           + 'Ne remplissez que ce qui doit changer : <b>un champ laiss\u00e9 vide garde sa valeur actuelle</b>. '
+           + 'Une photo reprise remplace l\'ancienne.'
+         + '</div>'
+         // Le serveur envoie ici des NOMS DE COLONNES (\u00ab photo_carte_grise \u00bb). Le
+         // proprietaire lit le francais : on les traduit avant de les montrer.
+         + (champs.length
+             ? '<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.3);border-radius:9px;padding:10px;margin-bottom:10px;font-size:12px">'
+               + 'L\'agent a d\u00e9sign\u00e9 : <b>' + esc(champs.map(demLibelleChamp).join(', ')) + '</b></div>'
+             : '')
+         + '<div class="grid2">'
+           + '<div class="fld"><div class="lbl">Matricule</div><input type="text" id="svd-c-mat" placeholder="GN-XXXX-X"/></div>'
+           + '<div class="fld"><div class="lbl">VIN / Ch\u00e2ssis</div><input type="text" id="svd-c-vin" placeholder="VIN..."/></div>'
+           + '<div class="fld"><div class="lbl">Marque</div><input type="text" id="svd-c-brand"/></div>'
+           + '<div class="fld"><div class="lbl">Mod\u00e8le</div><input type="text" id="svd-c-model"/></div>'
+           + '<div class="fld"><div class="lbl">Couleur</div><input type="text" id="svd-c-color"/></div>'
+           + '<div class="fld"><div class="lbl">Ann\u00e9e</div><input type="number" id="svd-c-year"/></div>'
+           + '<div class="fld"><div class="lbl">N\u00b0 Carte grise</div><input type="text" id="svd-c-cg"/></div>'
+           + '<div class="fld"><div class="lbl">Date d\'achat</div><input type="date" id="svd-c-dachat"/></div>'
+         + '</div>'
+         + '<div class="fld"><div class="lbl">T\u00e9l\u00e9phone</div><input type="text" id="svd-c-phone" placeholder="Laissez vide pour ne rien changer"/></div>'
+         + '<div class="fld"><div class="lbl">Adresse</div><input type="text" id="svd-c-addr"/></div>'
+         // 30/09 : on ne peut pas savoir, depuis le suivi, si ce dossier a ete depose
+         // depuis un compte AfriMoto (suivre_demande ne le dit pas). Or dans ce cas le
+         // serveur IGNORE le telephone et l'adresse envoyes d'ici : ils viennent du
+         // dossier du compte. Sans cette phrase, la personne changeait son telephone,
+         // lisait \u00ab dossier renvoye \u00bb, et rien n'avait change. On le dit au lieu de le
+         // laisser croire.
+         + '<div class="qr-note-txt" style="font-size:11px;line-height:1.5;margin-bottom:10px">'
+           + 'Si vous avez d\u00e9pos\u00e9 cette demande depuis votre compte AfriMoto, votre t\u00e9l\u00e9phone et '
+           + 'votre adresse sont ceux de votre dossier : ils ne changent pas ici. Demandez \u00e0 un agent '
+           + 'agr\u00e9\u00e9 de les corriger sur votre fiche.'
+         + '</div>'
+         + '<div class="lbl" style="margin-bottom:6px">Reprendre une photo</div>'
+         + '<div class="grid2" style="margin-bottom:10px">'
+           + svdBoiteP('svd-cp-pp', '\ud83d\udcf8 V\u00e9hicule')
+           + svdBoiteP('svd-cp-pfa', '\ud83e\uddfe Facture')
+         + '</div>'
+         + '<div class="grid2" style="margin-bottom:10px">'
+           + svdBoiteP('svd-cp-pcg', '\ud83d\udcc4 Carte grise')
+           + svdBoiteP('svd-cp-ppi', '\ud83e\udeaa Pi\u00e8ce \u2014 RECTO')
+         + '</div>'
+         // 30/09 : il manquait deux cases. L'agent peut ecrire \u00ab reprenez la photo du
+         // proprietaire \u00bb ou \u00ab le verso de la piece est illisible \u00bb : le serveur accepte
+         // ces deux photos dans une correction, mais l'ecran n'offrait aucun moyen de les
+         // envoyer. La personne lisait un motif auquel elle ne pouvait pas obeir.
+         + '<div class="grid2" style="margin-bottom:12px">'
+           + svdBoiteP('svd-cp-ppp', '\ud83e\udeaa Photo du propri\u00e9taire')
+           + svdBoiteP('svd-cp-ppiv', '\ud83e\udeaa Pi\u00e8ce \u2014 VERSO')
+         + '</div>'
+         + '<div id="svd-c-err" class="warn" style="display:none"></div>'
+         + '<button class="btn" style="width:100%;padding:13px" id="svd-c-btn" onclick="svdCorriger()">\ud83d\udce8 Renvoyer mon dossier corrig\u00e9</button>';
+    }
+
+    h += '<button class="btn-ghost" style="width:100%;padding:12px;margin-top:10px" onclick="closeModal(\'m-dem-suivi\')">Fermer</button>';
+
+    document.getElementById('svd-e-cle').style.display = 'none';
+    var z = document.getElementById('svd-e-dossier');
+    z.innerHTML = h;
+    z.style.display = '';
+    try { document.getElementById('m-dem-suivi').scrollTop = 0; } catch (err2) {}
+  }
+
+  function svdBoiteP(id, libelle) {
+    return '<div><div class="lbl">' + libelle + '</div>'
+      + '<label style="display:flex;align-items:center;justify-content:center;border:2px dashed rgba(249,115,22,.4);border-radius:8px;height:72px;cursor:pointer;overflow:hidden;position:relative">'
+      + '<img id="' + id + '" src="" style="display:none;width:100%;height:100%;object-fit:cover"/><span id="' + id + '-ph">\ud83d\udcf7</span>'
+      + '<input type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer" onchange="previewImg(this,\'' + id + '\',\'' + id + '-ph\')"/>'
+      + '</label></div>';
+  }
+
+  window.svdCorriger = async function () {
+    demCacherErreur('svd-c-err');
+    var lire = function (id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+    var d = {};
+    // Seuls les champs REMPLIS partent : corriger_demande reprend la valeur actuelle pour
+    // tous les autres. Envoyer un champ vide l'effacerait.
+    var simples = [['svd-c-mat', 'mat'], ['svd-c-vin', 'vin'], ['svd-c-brand', 'brand'],
+                   ['svd-c-model', 'model'], ['svd-c-color', 'color'], ['svd-c-year', 'year'],
+                   ['svd-c-cg', 'carte_grise'], ['svd-c-dachat', 'date_achat'],
+                   ['svd-c-phone', 'phone'], ['svd-c-addr', 'addr']];
+    simples.forEach(function (p) { var v = lire(p[0]); if (v) d[p[1]] = v; });
+
+    var btn = document.getElementById('svd-c-btn');
+    var libelle = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Envoi des photos\u2026';
+
+    try {
+      var plan = [
+        ['photo', 'svd-cp-pp', 'photos', 'v\u00e9hicule'],
+        ['photo_facture', 'svd-cp-pfa', 'documents', 'facture'],
+        ['photo_carte_grise', 'svd-cp-pcg', 'documents', 'carte grise'],
+        ['photo_piece', 'svd-cp-ppi', 'documents', 'pi\u00e8ce d\'identit\u00e9 recto'],
+        ['photo_proprietaire', 'svd-cp-ppp', 'documents', 'photo du propri\u00e9taire'],
+        ['photo_piece_verso', 'svd-cp-ppiv', 'documents', 'pi\u00e8ce d\'identit\u00e9 verso']
+      ];
+      var base = 'demandes/' + String(svdCle.num || 'dem') + '-' + Date.now();
+      for (var i = 0; i < plan.length; i++) {
+        var p = plan[i];
+        var res = await demDeposerPhoto(p[1], p[2], base + '-' + p[0], p[3]);
+        if (res.echec) { demAfficherErreur('svd-c-err', res.echec); btn.disabled = false; btn.textContent = libelle; return; }
+        if (res.ref) d[p[0]] = res.ref;
+      }
+    } catch (e) {
+      demAfficherErreur('svd-c-err', 'Les photos n\'ont pas pu être déposées : ' + ((e && e.message) || e) + '. Vérifiez votre connexion et réessayez.');
+      btn.disabled = false; btn.textContent = libelle; return;
+    }
+
+    if (!Object.keys(d).length) {
+      demAfficherErreur('svd-c-err', 'Rien n\'a été rempli : renseignez au moins un champ, ou reprenez une photo, avant de renvoyer.');
+      btn.disabled = false; btn.textContent = libelle; return;
+    }
+
+    btn.textContent = 'Envoi du dossier\u2026';
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc('corriger_demande', {
+        p_numero: svdCle.num, p_code: svdCle.code, p_donnees: d
+      });
+      err = r.error; rep = r.data;
+    } catch (e2) { err = e2; }
+    btn.disabled = false; btn.textContent = libelle;
+
+    if (err) { demAfficherErreur('svd-c-err', demErreurServeur(err, 'corriger_demande')); return; }
+    if (!rep || rep.ok !== true) { demAfficherErreur('svd-c-err', demMessageRefus(rep || {})); return; }
+
+    // corriger_demande rend la vue de suivi a jour : on la reaffiche, sans rien inventer.
+    // Le bandeau reste court \u2014 la phrase complete du serveur est dans la vue ci-dessous.
+    toast('Dossier renvoy\u00e9.');
+    svdAfficher(rep);
+  };
+
+  /* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+     PARTIE 4 \u2014 LE GUICHET DE L'AGENT ET DE L'ADMINISTRATION
+     \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+
+  // L'identifiant et le mot de passe du personnel, gardes le temps de la consultation.
+  // Le serveur les redemande a CHAQUE appel : c'est lui qui protege, pas cet ecran.
+  var gdAuth = null;
+  var gdFiltre = '';
+  var gdPage = 1;
+  // La derniere phrase du serveur apres un geste (valider / renvoyer / refuser), ou un
+  // refus d'ouverture. Elle s'affiche une fois, en haut de la liste, puis s'effface.
+  // Pas dans un toast : le bandeau du site est en « nowrap » et couperait la phrase.
+  var gdAnnonce = '';
+  var gdAnnonceErreur = false;
+
+  // 30/09 — LE MOT DE PASSE GARDE EN MEMOIRE EST ATTACHE A CELUI QUI L'A DONNE.
+  //
+  // Il ne suffisait pas de l'oublier a la deconnexion volontaire. Le site peut changer
+  // d'utilisateur SANS passer par ce bouton : quand la base signale que le compte vient
+  // d'etre ouvert sur un autre appareil, le site remet DB.user a null et affiche
+  // « reconnectez-vous » ; et une nouvelle connexion ne touchait pas non plus a gdAuth.
+  // Le membre du personnel suivant, sur le meme telephone, ouvrait l'onglet Demandes et le
+  // site envoyait au serveur le numero ET le mot de passe du precedent — tous deux valables.
+  // Il voyait ses dossiers, et pouvait valider en son nom. On compare donc, a chaque usage,
+  // avec l'identifiant reellement connecte : des qu'il change, le mot de passe garde tombe.
+  function gdIdentifiantCourant() {
+    try { return String(_identifiantPersonnel() || ''); } catch (e) { return ''; }
+  }
+  async function gdCredentials(titre) {
+    var ici = gdIdentifiantCourant();
+    if (gdAuth && (!ici || gdAuth.num !== ici)) gdAuth = null;
+    if (gdAuth) return gdAuth;
+    var a = await _motDePassePersonnel(titre || 'Demandes d\'enregistrement');
+    if (!a) return null;
+    gdAuth = a;
+    return gdAuth;
+  }
+
+  // 30/09 : il manquait l'etat « remontee ». C'est pourtant celui que le serveur place EN
+  // TETE de la liste, et la raison d'etre du guichet de l'administration : un dossier que
+  // l'agent choisi n'a pas traite dans le delai remonte tout seul au bureau central.
+  // Sans ce filtre, l'administration ne pouvait pas voir sa propre file d'attente.
+  var GD_FILTRES = ['', 'deposee', 'remontee', 'a_corriger', 'validee', 'refusee', 'abandonnee'];
+
+  window.setFiltreDemandes = function (etat) {
+    gdFiltre = etat || '';
+    gdPage = 1;
+    GD_FILTRES.forEach(function (e) {
+      var b = document.getElementById('gd-f-' + (e || 'tous'));
+      if (b) b.className = (e === gdFiltre) ? 'btn' : 'btn-ghost';
+    });
+    rDemandes();
+  };
+
+  window.rDemandes = async function () {
+    var zone = document.getElementById('demandes-contenu');
+    if (!zone) return;
+
+    // \u2550\u2550 CETTE PAGE NE DEMANDE RIEN QUAND ON NE LA REGARDE PAS \u2550\u2550
+    // Le mot de passe du personnel ne doit jamais etre reclame par une fenetre qui
+    // s'ouvre toute seule : on verifie que la page est REELLEMENT a l'ecran.
+    var page = document.getElementById('page-demandes');
+    if (!page || !page.classList.contains('act')) return;
+    if (!(isAdmin() || isAgent())) {
+      zone.innerHTML = '<div class="empty">Ce guichet est r\u00e9serv\u00e9 aux agents agr\u00e9\u00e9s et \u00e0 l\'administration.</div>';
+      return;
+    }
+
+    zone.innerHTML = '<div class="empty">Chargement\u2026</div>';
+    var auth = await gdCredentials('Demandes d\'enregistrement');
+    if (!auth) {
+      zone.innerHTML = '<div class="empty">Votre mot de passe est n\u00e9cessaire pour lire ces dossiers.<br>'
+        + '<button class="btn" style="margin-top:10px;padding:9px 14px;font-size:12px" onclick="rDemandes()">R\u00e9essayer</button></div>';
+      return;
+    }
+
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc('liste_demandes', {
+        p_num: auth.num, p_mot_de_passe: auth.pw,
+        p_etat: gdFiltre || null, p_page: gdPage
+      });
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+
+    if (err) {
+      zone.innerHTML = '<div class="empty" style="color:#EF4444">' + esc(demErreurServeur(err, 'liste_demandes')) + '<br>'
+        + '<button class="btn" style="margin-top:10px;padding:9px 14px;font-size:12px" onclick="rDemandes()">R\u00e9essayer</button></div>';
+      return;
+    }
+    if (!rep || rep.ok !== true) {
+      // On n'oublie le mot de passe QUE s'il a ete refuse. Un sous-agent recoit
+      // « reserve_personnel » : son mot de passe est bon, le guichet ne lui est pas
+      // ouvert — le lui redemander a chaque clic ne changerait rien.
+      if (String((rep || {}).raison || '') === 'compte_refuse') gdAuth = null;
+      zone.innerHTML = '<div class="empty" style="color:#EF4444">' + esc(demMessageRefus(rep || {}, 'guichet')) + '<br>'
+        + '<button class="btn" style="margin-top:10px;padding:9px 14px;font-size:12px" onclick="rDemandes()">R\u00e9essayer</button></div>';
+      return;
+    }
+
+    var lignes = rep.lignes || [];
+    // La phrase du serveur apres le dernier geste, telle quelle, sur plusieurs lignes.
+    var annonce = '';
+    if (gdAnnonce) {
+      var fondA = gdAnnonceErreur ? 'rgba(239,68,68,.1)' : 'rgba(34,197,94,.09)';
+      var traitA = gdAnnonceErreur ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.35)';
+      annonce = '<div style="background:' + fondA + ';border:1px solid ' + traitA + ';'
+        + 'border-radius:10px;padding:12px;margin-bottom:12px;font-size:12.5px;line-height:1.55">'
+        + esc(gdAnnonce) + '</div>';
+      gdAnnonce = ''; gdAnnonceErreur = false;
+    }
+    var entete = annonce
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
+      + '<div style="font-size:11.5px;color:var(--text2)">' + esc(String(rep.total != null ? rep.total : lignes.length))
+      + ' dossier(s) \u00b7 page ' + esc(String(rep.page || 1)) + '</div>'
+      + '<button class="btn-ghost" style="padding:7px 12px;font-size:12px" onclick="rDemandes()">\ud83d\udd04 Rafra\u00eechir</button></div>';
+
+    if (!lignes.length) {
+      zone.innerHTML = entete + '<div class="empty">Aucun dossier' + (gdFiltre ? ' dans cet \u00e9tat' : '') + '.</div>';
+      return;
+    }
+
+    var h = entete;
+    lignes.forEach(function (l) {
+      var etat = String(l.etat_affiche || l.etat || '');
+      var e = SVD_ETATS[etat] || { texte: etat, couleur: '#9CA3AF' };
+      h += '<div class="card" style="margin-bottom:9px;padding:13px;cursor:pointer;border-left:4px solid ' + e.couleur + '" '
+         + 'onclick="ouvrirDossierDemande(\'' + esc(String(l.id)) + '\')">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
+          + '<div style="min-width:0">'
+            + '<div style="font-family:monospace;font-size:13px;font-weight:800;color:#EAB308">' + esc(String(l.numero_suivi || '')) + '</div>'
+            + '<div style="font-size:13.5px;font-weight:800;margin-top:2px">' + ((l.type === 'voiture') ? '\ud83d\ude97 ' : '\ud83c\udfcd\ufe0f ')
+              + esc(String(l.brand || '')) + ' ' + esc(String(l.model || '')) + '</div>'
+            + '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(String(l.mat || 'sans matricule'))
+              + ' \u00b7 ' + esc(String((l.prenom || '') + ' ' + (l.nom || '')).trim()) + '</div>'
+          + '</div>'
+          + '<div style="flex-shrink:0;text-align:right">'
+            + '<div style="font-size:11px;font-weight:800;color:' + e.couleur + '">' + esc(e.texte.split(' \u2014 ')[0]) + '</div>'
+            + '<div style="font-size:10.5px;color:var(--text2);margin-top:2px">' + esc(String(l.age_jours != null ? l.age_jours + ' j' : '')) + '</div>'
+          + '</div>'
+        + '</div>'
+        // Le numero de compte d'un proprietaire n'est pas un secret : il figure sur ses
+        // papiers. Son mot de passe et le code de son vehicule, si \u2014 ils ne sont pas ici.
+        + (l.client_deja_connu
+            ? '<div style="margin-top:8px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:7px;padding:7px 9px;font-size:11.5px;font-weight:700;color:#22C55E">'
+              + '\u2714 CLIENT D\u00c9J\u00c0 CONNU' + (l.client_num ? ' \u2014 <span style="font-family:monospace">' + esc(String(l.client_num)) + '</span>' : '')
+              + '</div>'
+            : '')
+        + '<div style="margin-top:7px;font-size:11px;color:var(--text2)">'
+          + ((l.destinataire_type === 'agent') ? '\ud83d\udccd ' : '\ud83c\udfdb\ufe0f ') + esc(String(l.agent_nom || 'Administration'))
+          + (l.montant != null ? ' \u00b7 ' + esc(fmt(l.montant)) : '')
+          + (l.paiement_mode ? ' \u00b7 ' + (l.paiement_mode === 'orange_money' ? 'Orange Money' : 'esp\u00e8ces')
+              + (l.paiement_confirme ? ' (re\u00e7u)' : ' (non confirm\u00e9)') : '')
+        + '</div>'
+      + '</div>';
+    });
+
+    if (rep.total != null && rep.par_page && rep.total > rep.par_page) {
+      h += '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px">'
+        + (gdPage > 1 ? '<button class="btn-ghost" style="padding:9px 14px;font-size:12px" onclick="gdChangerPage(-1)">\u2190 Page pr\u00e9c\u00e9dente</button>' : '')
+        + ((gdPage * rep.par_page) < rep.total ? '<button class="btn-ghost" style="padding:9px 14px;font-size:12px" onclick="gdChangerPage(1)">Page suivante \u2192</button>' : '')
+        + '</div>';
+    }
+    zone.innerHTML = h;
+  };
+
+  window.gdChangerPage = function (delta) {
+    gdPage = Math.max(1, gdPage + delta);
+    rDemandes();
+  };
+
+  var gdDossier = null;
+
+  window.ouvrirDossierDemande = async function (id) {
+    var auth = await gdCredentials('Ouvrir ce dossier');
+    if (!auth) return;
+    // 30/09 : entre l'appui sur un dossier et son affichage, il y a la lecture du dossier
+    // PUIS une adresse signee a demander pour chacune des cinq photos. Sur la connexion
+    // d'un agent a Labe, cela fait plusieurs secondes pendant lesquelles il ne se passait
+    // RIEN a l'ecran : l'agent appuyait deux, trois fois. La fenetre s'ouvre donc tout de
+    // suite et dit ce qu'elle fait. Elle s'ouvre sur un geste, jamais toute seule.
+    var corps = document.getElementById('gd-corps');
+    if (corps) corps.innerHTML = '<div class="empty" style="padding:26px 10px">Lecture du dossier et des photos…<br>'
+      + '<span style="font-size:11.5px;color:var(--text2)">Sur une connexion lente, cela peut prendre quelques secondes.</span></div>';
+    openModal('m-dem-dossier');
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc('ouvrir_demande', {
+        p_num: auth.num, p_mot_de_passe: auth.pw, p_demande_id: id
+      });
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+    // Un refus d'ouverture peut etre une phrase longue : elle va dans le bandeau de la
+    // liste, qui defile, et pas dans le toast qui la couperait.
+    if (err) {
+      closeModal('m-dem-dossier');
+      gdAnnonce = demErreurServeur(err, 'ouvrir_demande'); gdAnnonceErreur = true;
+      rDemandes(); return;
+    }
+    if (!rep || rep.ok !== true) {
+      closeModal('m-dem-dossier');
+      if (String((rep || {}).raison || '') === 'compte_refuse') gdAuth = null;
+      gdAnnonce = demMessageRefus(rep || {}, 'guichet'); gdAnnonceErreur = true;
+      rDemandes(); return;
+    }
+    gdDossier = rep;
+    await gdAfficherDossier(rep);
+  };
+
+  // Libelles francais des champs du dossier, pour ne jamais afficher un nom de colonne.
+  var GD_CHAMPS = [
+    ['type', 'Type'], ['mat', 'Matricule'], ['vin', 'VIN / Ch\u00e2ssis'],
+    ['brand', 'Marque'], ['model', 'Mod\u00e8le'], ['color', 'Couleur'], ['year', 'Ann\u00e9e'],
+    ['carte_grise', 'N\u00b0 Carte grise'], ['date_achat', 'Date d\'achat'],
+    ['cat_id', 'Cat\u00e9gorie'], ['gilet', 'N\u00b0 Gilet'], ['permis', 'N\u00b0 Permis'],
+    ['prenom', 'Pr\u00e9nom'], ['nom', 'Nom'], ['phone', 'T\u00e9l\u00e9phone'], ['email', 'Email'],
+    ['addr', 'Adresse'], ['date_naissance', 'Date de naissance'],
+    ['lieu_naissance', 'Lieu de naissance'], ['nationalite', 'Nationalit\u00e9'],
+    ['profession', 'Profession'], ['nom_pere', 'Nom du p\u00e8re'], ['nom_mere', 'Nom de la m\u00e8re'],
+    ['type_piece', 'Type de pi\u00e8ce'], ['num_piece', 'N\u00b0 de pi\u00e8ce'],
+    ['secours', 'N\u00b0 Secours'], ['lien_secours', 'Lien']
+  ];
+
+  async function gdAfficherDossier(d) {
+    var doss = d.dossier || {};
+    var etat = String(d.etat_affiche || d.etat || '');
+    var e = SVD_ETATS[etat] || { texte: etat, couleur: '#9CA3AF' };
+    var paiement = d.paiement || {};
+    var estAdmin = isAdmin();
+
+    var h = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">'
+      + '<div style="font-size:15px;font-weight:900;min-width:0;word-break:break-all">\ud83d\udce8 ' + esc(String(d.numero_suivi || '')) + '</div>'
+      + '<button class="btn-ghost" style="padding:5px 11px;font-size:13px;flex-shrink:0" onclick="closeModal(\'m-dem-dossier\')">\u2715</button>'
+      + '</div>';
+
+    // \u2550\u2550 LA NOTE \u00ab CLIENT DEJA CONNU \u00bb VA EN HAUT DU DOSSIER \u2550\u2550
+    // Elle change ce que l'agent doit verifier avant de valider : elle ne peut pas se
+    // trouver en bas, apres trente lignes de champs.
+    if (d.note_client_connu) {
+      var k = d.client_du_compte || {};
+      var alerte = (k.suspendu || k.bloque);
+      h += '<div style="background:' + (alerte ? 'rgba(239,68,68,.1)' : 'rgba(34,197,94,.09)') + ';'
+         + 'border:1px solid ' + (alerte ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.35)') + ';'
+         + 'border-radius:10px;padding:12px;margin-bottom:12px;font-size:12.5px;line-height:1.55">'
+         + esc(String(d.note_client_connu)) + '</div>';
+    }
+    if (d.note_compte) {
+      var grave = String(d.rattachement_sans_preuve || '') !== '';
+      h += '<div style="background:' + (grave ? 'rgba(239,68,68,.1)' : 'rgba(234,179,8,.08)') + ';'
+         + 'border:1px solid ' + (grave ? 'rgba(239,68,68,.4)' : 'rgba(234,179,8,.3)') + ';'
+         + 'border-radius:10px;padding:12px;margin-bottom:12px;font-size:12.5px;line-height:1.55">'
+         + esc(String(d.note_compte)) + '</div>';
+    }
+
+    // Ses vehicules deja au registre \u2014 a comparer avec la personne en face.
+    var vehs = d.vehicules_du_client || [];
+    if (vehs.length) {
+      h += '<div class="sect" style="margin-top:0">Ses v\u00e9hicules au registre (' + vehs.length + ')</div>';
+      vehs.forEach(function (v) {
+        h += '<div style="background:rgba(0,0,0,.08);border:1px solid var(--border);border-radius:8px;padding:9px 10px;margin-bottom:5px;font-size:12px">'
+          + '<b>' + ((v.type === 'voiture') ? '\ud83d\ude97 ' : '\ud83c\udfcd\ufe0f ') + esc(String(v.brand || '')) + ' ' + esc(String(v.model || '')) + '</b>'
+          + '<div style="color:var(--text2);font-size:11px;margin-top:2px">'
+          + esc(String(v.mat || 'sans matricule')) + ' \u00b7 ch\u00e2ssis ' + esc(String(v.vin || '\u2014'))
+          + ' \u00b7 <span style="font-family:monospace">' + esc(String(v.num || '')) + '</span>'
+          + ' \u00b7 ' + (v.valide ? 'au registre' : 'en attente')
+          + (v.enregistre_le ? ' \u00b7 ' + esc(String(v.enregistre_le)) : '')
+          + '</div></div>';
+      });
+    }
+
+    h += '<div style="background:rgba(0,0,0,.1);border:1px solid var(--border);border-left:4px solid ' + e.couleur + ';border-radius:10px;padding:11px;margin:12px 0;font-size:12.5px">'
+      + '<b style="color:' + e.couleur + '">' + esc(e.texte) + '</b>'
+      + '<div style="color:var(--text2);font-size:11.5px;margin-top:4px">'
+        + ((d.destinataire_type === 'agent') ? '\ud83d\udccd ' : '\ud83c\udfdb\ufe0f ') + esc(String(d.agent_nom || 'Administration'))
+        + (d.montant != null ? ' \u00b7 ' + esc(fmt(d.montant)) : '')
+        + ' \u00b7 ' + (paiement.mode === 'orange_money' ? 'Orange Money' : 'esp\u00e8ces')
+        + (paiement.confirme ? ' (re\u00e7u' + (paiement.confirme_par ? ' par ' + esc(String(paiement.confirme_par)) : '') + ')' : ' (non confirm\u00e9)')
+        + (paiement.reference ? ' \u00b7 r\u00e9f. ' + esc(String(paiement.reference)) : '')
+      + '</div></div>';
+
+    if (d.motif) {
+      h += '<div class="warn" style="display:block;line-height:1.5"><b>Motif en cours :</b><br>' + esc(String(d.motif)) + '</div>';
+    }
+
+    // Les champs du dossier.
+    h += '<div class="sect">Le dossier</div><div style="font-size:12.5px">';
+    GD_CHAMPS.forEach(function (c) {
+      var v = doss[c[0]];
+      if (v == null || String(v).trim() === '') return;
+      var affiche = String(v);
+      // La categorie est enregistree sous son identifiant (« tf2 »). On montre le nom
+      // que l'administration lui a donne — et, si on ne le retrouve pas, l'identifiant
+      // tel quel plutot qu'un nom devine.
+      if (c[0] === 'cat_id') {
+        var t = (DB.tarifs || []).find(function (x) { return String(x.id) === affiche; });
+        if (t) affiche = String(t.label || t.nom || affiche) + ' — ' + fmt(t.prix);
+      }
+      if (c[0] === 'type') affiche = (affiche === 'voiture') ? 'Voiture' : 'Moto';
+      h += '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="flex:0 0 42%;color:var(--text2);font-size:11.5px">' + esc(c[1]) + '</div>'
+        + '<div style="flex:1;min-width:0;word-break:break-word"><b>' + esc(affiche) + '</b></div></div>';
+    });
+    h += '</div>';
+
+    // Les photos. Les quatre documents personnels sont des references \u00ab doc: \u00bb du seau
+    // prive : on demande MAINTENANT une adresse signee de courte duree, exactement comme
+    // le fait la fiche d'un vehicule. On ne laisse pas la reference dans la page : le
+    // resolveur de fond la re-signerait toutes les deux secondes pour rien.
+    var photos = [
+      ['photo', '\ud83d\udcf8 V\u00e9hicule'], ['photo_proprietaire', '\ud83e\udeaa Propri\u00e9taire'],
+      ['photo_facture', '\ud83e\uddfe Facture'], ['photo_carte_grise', '\ud83d\udcc4 Carte grise'],
+      ['photo_piece', '\ud83e\udeaa Pi\u00e8ce recto'], ['photo_piece_verso', '\ud83e\udeaa Pi\u00e8ce verso']
+    ];
+    var pHtml = '';
+    for (var ip = 0; ip < photos.length; ip++) {
+      var p = photos[ip];
+      var v = doss[p[0]];
+      if (!v || !String(v).trim()) continue;
+      var s = String(v);
+      var url = s;
+      if (s.indexOf('doc:') === 0) {
+        try { url = await adressePhotoPrivee(s); } catch (e4) { url = ''; }
+      }
+      pHtml += '<div><div class="lbl">' + p[1] + '</div>'
+        + (url
+            ? '<img src="' + esc(url) + '" style="width:100%;height:96px;object-fit:cover;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.2)"/>'
+            : '<div style="height:96px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.2);font-size:11px;color:#EF4444;padding:6px">'
+              + 'Cette photo n\'a pas pu \u00eatre ouverte. R\u00e9essayez, ou demandez au propri\u00e9taire de la reprendre.</div>')
+        + '</div>';
+    }
+    if (pHtml) {
+      // 30/09 : ici s'affichait note_photos, la phrase que le serveur adresse au
+      // PROGRAMMEUR (« references du seau prive documents », « adresse signee de courte
+      // duree »). Ce n'est pas un « message » de refus : c'est une consigne technique, et
+      // elle est deja respectee juste au-dessus. Un agent n'a aucun moyen de la comprendre.
+      // On lui dit ce qui le concerne, lui : ces documents ne restent pas.
+      h += '<div class="sect">Photos</div>'
+        + '<div class="qr-note-txt" style="font-size:11px;margin-bottom:8px;line-height:1.5">'
+        + 'Ces pièces personnelles ne s\'affichent que le temps de cette consultation, et votre '
+        + 'ouverture du dossier est inscrite au journal. Ne les enregistrez pas sur ce téléphone.'
+        + '</div>'
+        + '<div class="grid2" style="gap:10px">' + pHtml + '</div>';
+    }
+
+    // \u2550\u2550 LES TROIS GESTES \u2550\u2550
+    var peut = (etat === 'deposee' || etat === 'remontee');
+    h += '<div class="sect">Que faire de ce dossier</div>';
+    if (peut) {
+      h += '<div style="background:rgba(0,0,0,.1);border:1px solid var(--border);border-radius:9px;padding:11px;margin-bottom:10px">'
+        + '<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;margin-bottom:9px;cursor:pointer">'
+          + '<input type="checkbox" id="gd-vu" style="margin-top:2px;flex-shrink:0;width:18px;height:18px"/>'
+          + '<span>J\'ai <b>re\u00e7u la personne</b> et compar\u00e9 sa pi\u00e8ce d\'identit\u00e9 avec son dossier.</span></label>'
+        + '<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;cursor:pointer">'
+          + '<input type="checkbox" id="gd-paye" style="margin-top:2px;flex-shrink:0;width:18px;height:18px"/>'
+          + '<span><b>Paiement re\u00e7u</b>' + (d.montant != null ? ' \u2014 ' + esc(fmt(d.montant)) : '') + '.</span></label>'
+        + '</div>'
+        + '<button class="btn" style="width:100%;padding:13px;margin-bottom:8px" id="gd-btn-valider" onclick="gdValider()">\u2714\ufe0f Valider et enregistrer le v\u00e9hicule</button>';
+    } else {
+      h += '<div class="qr-note-txt" style="font-size:12px;margin-bottom:10px">'
+        + 'Ce dossier n\'attend pas de d\u00e9cision : son \u00e9tat est \u00ab ' + esc(e.texte) + ' \u00bb.</div>';
+    }
+    h += '<div class="fld"><div class="lbl">Motif (lu par le propri\u00e9taire)</div>'
+      + '<textarea id="gd-motif" rows="3" placeholder="Ex : carte grise illisible, le ch\u00e2ssis ne correspond pas\u2026" '
+      + 'style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);background:rgba(0,0,0,.15);color:inherit;font-family:inherit;font-size:13px;box-sizing:border-box"></textarea></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<button class="btn-gold" style="flex:1;min-width:150px;padding:12px;font-size:12.5px" id="gd-btn-renvoyer" onclick="gdRenvoyer()">\u270f\ufe0f Demander une rectification</button>'
+        + '<button class="btn-red" style="flex:1;min-width:110px;padding:12px;font-size:12.5px" id="gd-btn-refuser" onclick="gdRefuser()">\u26d4 Rejeter</button>'
+      + '</div>'
+      + '<div id="gd-err" class="warn" style="display:none;margin-top:10px"></div>'
+      + '<button class="btn-ghost" style="width:100%;padding:12px;margin-top:10px" onclick="closeModal(\'m-dem-dossier\')">Fermer</button>';
+
+    document.getElementById('gd-corps').innerHTML = h;
+    openModal('m-dem-dossier');
+    try { document.getElementById('m-dem-dossier').scrollTop = 0; } catch (err3) {}
+  }
+
+  // Un geste, un appel, une phrase : la meme mecanique pour les trois boutons.
+  async function gdGeste(nomFonction, params, idBouton, libelleEnCours, phraseSucces) {
+    var auth = await gdCredentials('Confirmez votre identit\u00e9');
+    if (!auth) return;
+    demCacherErreur('gd-err');
+    var btn = document.getElementById(idBouton);
+    var libelle = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = libelleEnCours; }
+
+    var rep = null, err = null;
+    try {
+      var r = await supabaseClient.rpc(nomFonction, Object.assign({
+        p_num: auth.num, p_mot_de_passe: auth.pw, p_demande_id: gdDossier.id
+      }, params));
+      err = r.error; rep = r.data;
+    } catch (e) { err = e; }
+    if (btn) { btn.disabled = false; btn.textContent = libelle; }
+
+    if (err) { demAfficherErreur('gd-err', demErreurServeur(err, nomFonction)); return; }
+    if (!rep || rep.ok !== true) {
+      if (String((rep || {}).raison || '') === 'compte_refuse') gdAuth = null;
+      demAfficherErreur('gd-err', demMessageRefus(rep || {}, 'guichet'));
+      // Un refus peut avoir RENVOYE le dossier au proprietaire (chassis ou matricule deja
+      // au registre) : le serveur le dit avec « dossier_renvoye ». La phrase est alors
+      // longue et compte : elle va dans le bandeau de la liste, qui defile, et pas dans la
+      // fenetre qu'on vient de fermer.
+      if (rep && rep.dossier_renvoye) {
+        gdAnnonce = demMessageRefus(rep || {}, 'guichet'); gdAnnonceErreur = true;
+        closeModal('m-dem-dossier'); rDemandes();
+      }
+      return;
+    }
+
+    // Lu, et seulement maintenant annonce. Quand le serveur a redige une phrase, c'est
+    // la sienne qu'on montre — pas la notre.
+    //
+    // Et pas dans un toast : le bandeau du site est en « nowrap » et coupe toute phrase
+    // longue sur un telephone de 360 points. On la pose EN HAUT de la liste, ou elle tient
+    // sur plusieurs lignes et reste lisible le temps qu'il faut.
+    gdAnnonce = rep.message ? String(rep.message) : phraseSucces;
+    closeModal('m-dem-dossier');
+    rDemandes();
+  }
+
+  window.gdValider = function () {
+    if (!gdDossier) return;
+    var vu = !!(document.getElementById('gd-vu') || {}).checked;
+    var paye = !!(document.getElementById('gd-paye') || {}).checked;
+    askConfirm('Valider ce dossier enregistre le v\u00e9hicule au registre, cr\u00e9e le compte du propri\u00e9taire s\'il n\'en a pas, '
+      + 'et d\u00e9bite les frais. Ce geste ne s\'annule pas tout seul. Continuer ?', function () {
+      // p_frais n'est pas envoye : le serveur garde le montant qu'il a lui-meme calcule
+      // au depot. On n'invente aucun chiffre a sa place.
+      gdGeste('valider_demande',
+        { p_frais: null, p_paiement_confirme: paye, p_vu_en_personne: vu },
+        'gd-btn-valider', 'Validation\u2026', 'V\u00e9hicule enregistr\u00e9. Le code se lit dans la fiche du v\u00e9hicule.');
+    });
+  };
+
+  window.gdRenvoyer = function () {
+    if (!gdDossier) return;
+    var motif = String((document.getElementById('gd-motif') || {}).value || '').trim();
+    if (!motif) {
+      demAfficherErreur('gd-err', '\u00c9crivez le motif : c\'est lui que le propri\u00e9taire lira pour savoir quoi corriger.');
+      return;
+    }
+    gdGeste('renvoyer_demande', { p_motif: motif, p_champs: null },
+      'gd-btn-renvoyer', 'Envoi\u2026', 'Dossier renvoy\u00e9 au propri\u00e9taire avec votre motif.');
+  };
+
+  window.gdRefuser = function () {
+    if (!gdDossier) return;
+    var motif = String((document.getElementById('gd-motif') || {}).value || '').trim();
+    if (!motif) {
+      demAfficherErreur('gd-err', '\u00c9crivez le motif du refus : le propri\u00e9taire le lira, et il reste au dossier.');
+      return;
+    }
+    askConfirm('Rejeter d\u00e9finitivement ce dossier ? Le propri\u00e9taire sera pr\u00e9venu avec votre motif, '
+      + 'et le dossier restera consultable.', function () {
+      gdGeste('refuser_demande', { p_motif: motif },
+        'gd-btn-refuser', 'Envoi\u2026', 'Dossier rejet\u00e9. Le propri\u00e9taire a \u00e9t\u00e9 pr\u00e9venu.');
+    });
+  };
+
+  // La deconnexion oublie le mot de passe garde en memoire pour le guichet.
+  window.oublierMotDePasseDemandes = function () { gdAuth = null; };
+
+  try { addDebugLog('DEMANDES v9.643 : parcours public, suivi et guichet en place'); } catch (e) {}
 })();
 </script>
 
