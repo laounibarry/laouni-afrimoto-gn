@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.644';
+window.AFRIMOTO_VERSION = 'v9.645';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -737,7 +737,11 @@ body.is-staff .vi,body.is-dark .vi{background:rgba(255,255,255,.05);border-color
 body.is-staff .tag-green,body.is-dark .tag-green{background:rgba(22,163,74,.15);color:#4ade80}
 body.is-staff .tag-red,body.is-dark .tag-red{background:rgba(239,68,68,.1);color:#EF4444}
 body.is-staff .tag-gold,body.is-dark .tag-gold{background:rgba(234,179,8,.1);color:#EAB308}
-.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-90px);z-index:9999;background:var(--text);border-radius:10px;padding:11px 20px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.2);transition:transform .3s ease;pointer-events:none;max-width:90vw;color:#fff}
+/* v9.645 : le bandeau etait en « nowrap » et coupait toute phrase longue sur un telephone de
+   360 points — or les refus de la base sont desormais des phrases completes. Il passe a la
+   ligne, et il est cache de toute sa hauteur (plus de « -90px » fixes qui laissaient
+   depasser un bandeau de trois lignes). */
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(calc(-100% - 24px));z-index:9999;background:var(--text);border-radius:10px;padding:11px 20px;font-weight:700;font-size:13px;white-space:normal;text-align:center;line-height:1.4;box-shadow:0 4px 24px rgba(0,0,0,.2);transition:transform .3s ease;pointer-events:none;max-width:90vw;color:#fff}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{background:#c2410c}
 .toast.err{background:#b91c1c}
@@ -904,6 +908,80 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     'chauffeur_bloque,created_at,suspendu_auto_maj,avertissements,appreciations,' +
     'details_avertissements,details_appreciations';
 
+  // ══ 02/10 (v9.645) — LES QUATRE DERNIERES TABLES QUI PORTENT UNE EMPREINTE ══
+  //
+  // Le fichier SQL 87 ferme la lecture de « pass_hash » sur agents, sous_agents et
+  // passagers, et de « admin_pass_hash » sur config_admin. Comme pour vehicules et clients
+  // le 15/09 : des que la colonne est fermee, un « select('*') » est refuse EN ENTIER —
+  // pas seulement la colonne. Sans ces listes, plus aucun reglage ne s'appliquerait a
+  // personne (verrou, services, tarifs, guichet 82), l'espace passager s'ouvrirait vide
+  // et le personnel ne pourrait plus se connecter. Noms releves en production le 01/10.
+  // Le mot de passe, lui, n'a plus besoin de descendre : la connexion de l'administration,
+  // des agents et des sous-agents est verifiee par le serveur (verifier_connexion), comme
+  // celle du client et du passager depuis le 15/09.
+  const COLONNES_CONFIG_ADMIN =
+    'id,admin_id,admin_email,tarifs,commissions,regles_zones,frais_trajet_defaut,' +
+    'pourcentage_trajet_defaut,bandeau_actif,bandeau_texte,bandeau_vitesse,compteurs_publics,' +
+    'photos_enreg,enregistrement_public,commission_course_taxi,commission_course_vtc,services,' +
+    'commission_vtc_mode,commission_vtc_pourcent,renouvellement,motos_retrouvees,tarifs_maj,' +
+    'trajet_unique_desactive,verrou_app_actif,tri_note_actif,tri_note_rayon,' +
+    'photo_taxi_obligatoire,selfie_periodicite_jours,commission_payeur,rayon_arrivee_m,' +
+    'prix_km_defaut,prix_min_course,prix_km_zones,frais_annonce,appareil_unique_actif';
+  const COLONNES_AGENTS =
+    'id,num,code,name,resp,pref,addr,city,tel,email,solde,actif,peut_valider,created_at,' +
+    'date_naissance,lieu_naissance,profession,nom_pere,nom_mere,piece_type,piece_num,' +
+    'piece_delivrance,piece_expiration,piece_photo,piece_photo_verso';
+  const COLONNES_SOUS_AGENTS =
+    'id,num,code,name,agent_id,tel,email,solde,actif,created_at';
+  const COLONNES_PASSAGERS =
+    'id,num,prenom,nom,tel,email,user_login,solde,piece,photo_profil,photo_piece,' +
+    'photo_piece_verso,valide,date_consentement,created_at,avertissements,appreciations,' +
+    'details_avertissements,details_appreciations,nationalite,type_piece,profession,' +
+    'nom_pere,nom_mere';
+
+  // ══ 02/10 (v9.645) — UN SEUL TABLEAU « NOM DU VERROU -> PHRASE », POUR TOUT LE SITE ══
+  //
+  // Le fichier SQL 88 pose huit index uniques normalises (lettres et chiffres seulement :
+  // « GN 1234 A » et « gn-1234-a » sont le meme matricule). Quand l'un d'eux refuse une
+  // ecriture, la base repond le code 23505 et le NOM de l'index. Jusqu'ici l'ecran disait
+  // « verifiez votre connexion internet » : l'agent reessayait, puis contournait. Chaque
+  // nom se traduit ici, une fois, en une phrase qui dit quoi faire ensuite. Les anciens
+  // verrous en texte brut (« _key ») recoivent la meme phrase que leur jumeau.
+  const PHRASES_DOUBLON = {
+    vehicules_vin_humain_uidx: 'Ce numéro de châssis est déjà au registre.',
+    vehicules_vin_key:         'Ce numéro de châssis est déjà au registre.',
+    vehicules_mat_humain_uidx: 'Ce matricule est déjà au registre.',
+    vehicules_mat_key:         'Ce matricule est déjà au registre.',
+    vehicules_num_humain_uidx: 'Ce numéro d\'enregistrement est déjà attribué. Réessayez : un nouveau numéro sera tiré.',
+    vehicules_num_key:         'Ce numéro d\'enregistrement est déjà attribué. Réessayez : un nouveau numéro sera tiré.',
+    taxis_plaque_humain_uidx:  'Cette plaque est déjà enregistrée comme taxi.',
+    taxis_moto_id_uidx:        'Ce véhicule a déjà une fiche taxi.',
+    demandes_enr_mat_encours_uidx: 'Une demande est déjà en cours pour ce matricule. Si c\'est la vôtre, suivez-la avec son numéro DEM- et son code à 6 chiffres. Sinon, présentez-vous chez un agent agréé avec votre carte grise.',
+    clients_num_humain_uidx:   'Ce numéro client existe déjà.',
+    clients_num_key:           'Ce numéro client existe déjà.',
+    clients_tel_humain_uidx:   'Ce téléphone a déjà un compte client. Recherchez ce compte plutôt que d\'en créer un second.',
+    clients_tel_key:           'Ce téléphone a déjà un compte client. Recherchez ce compte plutôt que d\'en créer un second.'
+  };
+  // Rend la phrase francaise d'un refus de doublon (code 23505), ou '' si l'erreur n'en
+  // est pas un. Accepte l'objet d'erreur de supabase-js, une Error, ou un simple texte.
+  function phraseDoublon(erreur) {
+    if(!erreur) return '';
+    const msg = String((erreur && (erreur.message || erreur.details)) || erreur || '');
+    const code = String((erreur && erreur.code) || '');
+    const m = /duplicate key value violates unique constraint "([^"]+)"/.exec(msg);
+    const nom = m ? m[1] : '';
+    if(!nom && code !== '23505' && msg.indexOf('duplicate key') < 0) return '';
+    if(nom && PHRASES_DOUBLON[nom]) return PHRASES_DOUBLON[nom];
+    if(/_pkey$/.test(nom)) return 'Cet enregistrement existe déjà sur le serveur (même identifiant). Actualisez la page, puis reprenez.';
+    return 'Cet enregistrement existe déjà' + (nom ? ' (verrou « ' + nom + ' »)' : '') +
+           '. Vérifiez le matricule, le châssis, le numéro ou le téléphone avant de réessayer.';
+  }
+  // Le dernier refus d'une sauvegarde (voir sbEcrireSouple) : table, verrou, phrase et
+  // message brut. Les ecrans qui ont leur propre zone d'erreur le lisent pour montrer la
+  // phrase exacte, au lieu d'un « verifiez votre connexion » generique.
+  let _dernierRefusSauvegarde = null;
+  function dernierRefusSauvegarde() { return _dernierRefusSauvegarde; }
+
   // ══ 21/09 — LA CORBEILLE GARDAIT LA PORTE OUVERTE JUSTE A COTE ══
   //
   // Fermer « code » et « pass_hash » sur vehicules et clients ne sert a rien si la copie
@@ -1041,9 +1119,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // n'etait pas deja pris, et lire SA PROPRE fiche. Les deux premieres sont passees
         // cote serveur ; il ne reste donc que la sienne. Un chauffeur ou un visiteur n'a
         // aucune raison de recevoir la liste des passagers du pays.
-        _perso ? supabaseClient.from('passagers').select('*').limit(PLAFOND_LIGNES)
+        // 02/10 (v9.645) : colonnes explicites, SANS « pass_hash » (voir COLONNES_PASSAGERS).
+        // Apres le SQL 87, un « select('*') » serait refuse en entier : espace passager vide.
+        _perso ? supabaseClient.from('passagers').select(COLONNES_PASSAGERS).limit(PLAFOND_LIGNES)
                : (_roleEnregistre() === 'passager' && _idEnregistre()
-                   ? supabaseClient.from('passagers').select('*').eq('id', _idEnregistre()).limit(1)
+                   ? supabaseClient.from('passagers').select(COLONNES_PASSAGERS).eq('id', _idEnregistre()).limit(1)
                    : Promise.resolve({ data: [] })),
         // v9.541 : LE REGISTRE DES VEHICULES N'EST PLUS TELECHARGE PAR TOUT LE MONDE.
         // C'est LA table que le ministere veut remplir : un million de lignes la premiere
@@ -1088,7 +1168,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         // l'administration. Un passager n'a aucune raison de le telecharger.
         Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
         Promise.resolve({ data: [] }),   // v9.587 : charge apres le premier ecran
-        supabaseClient.from('config_admin').select('*').limit(1),
+        // 02/10 (v9.645) : colonnes explicites, SANS « admin_pass_hash » (voir
+        // COLONNES_CONFIG_ADMIN). C'est la lecture la plus lourde de consequences : elle
+        // est dans ce Promise.all, donc si elle etait refusee, TOUT le chargement echouait
+        // d'un bloc et plus aucun reglage ne s'appliquait a personne.
+        supabaseClient.from('config_admin').select(COLONNES_CONFIG_ADMIN).limit(1),
       ]);
 
       // Mapper les colonnes Supabase vers les champs attendus par le code JS
@@ -1222,7 +1306,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
               if(i >= 0) DB.vehs[i] = m; else DB.vehs.push(m);
             });
           } else if(role === 'passager') {
-            const { data: p } = await supabaseClient.from('passagers').select('*').eq('id', id).limit(1);
+            // 02/10 : sans « pass_hash » — voir COLONNES_PASSAGERS.
+            const { data: p } = await supabaseClient.from('passagers').select(COLONNES_PASSAGERS).eq('id', id).limit(1);
             if(p && p.length) {
               const m = mapPassager(p[0]);
               const i = DB.passagers.findIndex(x => x.id === m.id);
@@ -1258,8 +1343,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(window._resteEnCours) return; window._resteEnCours = true;
         try {
           const [ ag, sa, tj, an, al, mv, av1, av2, cb, jr, ln ] = await Promise.all([
-            supabaseClient.from('agents').select('*'),
-            supabaseClient.from('sous_agents').select('*'),
+            // 02/10 (v9.645) : sans « pass_hash » — voir COLONNES_AGENTS / COLONNES_SOUS_AGENTS.
+            // L'empreinte n'a plus aucun usage ici : la connexion du personnel est verifiee
+            // par le serveur (doLogin -> verifier_connexion).
+            supabaseClient.from('agents').select(COLONNES_AGENTS),
+            supabaseClient.from('sous_agents').select(COLONNES_SOUS_AGENTS),
             supabaseClient.from('trajets').select('*'),
             supabaseClient.from('annonces').select('*'),
             supabaseClient.from('alertes').select('*'),
@@ -1449,9 +1537,19 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         if(cfg.prix_km_zones) DB.prixKmZones = cfg.prix_km_zones;
         if(cfg.appareil_unique_actif !== undefined) DB.appareilUniqueActif = cfg.appareil_unique_actif;
         if(cfg.admin_email) DB.adminEmail = cfg.admin_email;
-        // Charger identifiant et mot de passe admin depuis Supabase
-        if(cfg.admin_id) DB.adminId = cfg.admin_id;
-        if(cfg.admin_pass_hash) DB.adminPass = cfg.admin_pass_hash;
+        // Charger l'identifiant admin depuis Supabase (il sert a l'ecran de connexion et
+        // aux appels du personnel : _identifiantPersonnel).
+        // 03/10 (v9.645) : on retient que cet identifiant vient du SERVEUR. Le fichier en
+        // porte un par defaut ('LAOUNIBARRY') qui n'est PAS celui de la base
+        // ('laounibarry', releve le 03/10) ; sans ce drapeau, l'ecran de connexion aurait
+        // envoye le defaut du fichier au serveur, qui compare a la lettre, et le fondateur
+        // aurait lu « identifiants incorrects » avec le bon mot de passe.
+        if(cfg.admin_id) { DB.adminId = cfg.admin_id; DB.adminIdLu = true; }
+        // 02/10 (v9.645) : l'EMPREINTE du mot de passe administrateur n'est plus lue ici.
+        // Elle ne descend plus (COLONNES_CONFIG_ADMIN ne la demande pas, et le SQL 87 la
+        // ferme). La connexion de l'administration est verifiee par le serveur
+        // (verifier_connexion, role 'admin'), comme celle du client depuis le 15/09.
+        // Garder cette ligne aurait fait croire que l'empreinte comptait encore.
   }
 
   // ── Mappers : colonnes Supabase → objets JS attendus par le code ──
@@ -1511,7 +1609,25 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       photoPiece:r.photo_piece||r.photo_piece_url||r.photoPiece||'',
       photoPieceVerso:r.photo_piece_verso||r.photo_piece_verso_url||'',   // v9.576
       valide:r.valide||false, consentement:r.consentement||false,
-      dateConsentement:r.date_consentement||null, created_at:r.created_at };
+      dateConsentement:r.date_consentement||null, created_at:r.created_at,
+      // 02/10 (v9.645) : ces quatre champs n'etaient JAMAIS relus, alors que
+      // _sbSavePassager les reecrivait a 0 / [] a chaque sauvegarde. Un avertissement
+      // donne a un passager disparaissait donc a la sauvegarde suivante (solde, photo...).
+      // Meme lecture que mapClient : le JSON peut arriver en texte sur une base ancienne.
+      nationalite:r.nationalite||'', typePiece:r.type_piece||'', profession:r.profession||'',
+      nomPere:r.nom_pere||'', nomMere:r.nom_mere||'',
+      avertissements:r.avertissements||0,
+      appreciations:r.appreciations||0,
+      detailsAvertissements: (function() {
+        const data = r.details_avertissements||r.detailsAvertissements||[];
+        if(typeof data === 'string') try { return JSON.parse(data); } catch(e) { return []; }
+        return data || [];
+      })(),
+      detailsAppreciations: (function() {
+        const data = r.details_appreciations||r.detailsAppreciations||[];
+        if(typeof data === 'string') try { return JSON.parse(data); } catch(e) { return []; }
+        return data || [];
+      })() };
   }
   function mapVehicule(r) {
     return { id:r.id, num:r.num, mat:r.matricule||r.mat||'', vin:r.vin||'',
@@ -1869,8 +1985,27 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   // Ce helper réessaie en renommant (via 'alts') ou retirant les colonnes inconnues,
   // et AFFICHE un message visible si la sauvegarde échoue vraiment.
   const sbSchemaMemo = {}; // corrections de colonnes apprises, réutilisées pour les sauvegardes suivantes
-  async function sbUpsertSouple(table, row, alts) {
+  // ══ 02/10 (v9.645) — TROIS FACONS D'ECRIRE, POUR LES TABLES QUI PORTENT UNE EMPREINTE ══
+  //
+  // « mode » vaut 'upsert' (defaut, inchange), 'insert' ou 'update'. Pourquoi :
+  //   • agents, sous_agents et passagers gardent une colonne pass_hash que le SQL 87
+  //     ferme a la lecture. Un upsert qui PORTE la cle pass_hash est alors refuse en
+  //     entier (ON CONFLICT DO UPDATE exige de lire la colonne) ; et un upsert qui ne la
+  //     porte PAS peut etre refuse par un NOT NULL sur une base ou la colonne l'exige
+  //     (la contrainte est verifiee AVANT la detection du doublon). D'ou :
+  //       - fiche EXISTANTE : « update ... where id » SANS pass_hash — l'empreinte en base
+  //         n'est pas touchee, aucun droit de lecture n'est exige ;
+  //       - compte NEUF : « insert » AVEC pass_hash — un insert simple passe meme la
+  //         colonne fermee (prouve sur PostgreSQL, banc du 87).
+  //   • en mode 'update', on demande le NOMBRE de lignes touchees (count=exact). Une mise
+  //     a jour qui ne touche aucune ligne « passe sans erreur » : c'est ainsi qu'une fiche
+  //     supprimee cote serveur, ou une regle RLS, rendait une sauvegarde muette. Ici c'est
+  //     un refus, dit a l'ecran. On ne juge que sur un zero certain : si le serveur ne
+  //     renvoie pas de compte, on ne devine rien.
+  async function sbUpsertSouple(table, row, alts, mode) {
     let r = {...row};
+    mode = (mode === 'insert' || mode === 'update') ? mode : 'upsert';
+    _dernierRefusSauvegarde = null;
     // Appliquer immédiatement les corrections déjà apprises pour cette table (1 seule requête ensuite)
     const memo = sbSchemaMemo[table] || (sbSchemaMemo[table] = {});
     for(const col of Object.keys(memo)) {
@@ -1878,8 +2013,26 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     }
     const fkDejaAttendu = {}; // clés étrangères pour lesquelles on a déjà patienté
     for(let essai = 0; essai < 40; essai++) {
-      const {error} = await supabaseClient.from(table).upsert(r, {onConflict:'id'});
-      if(!error) return true;
+      let _rep;
+      if(mode === 'insert') {
+        _rep = await supabaseClient.from(table).insert(r);
+      } else if(mode === 'update') {
+        const _sansId = {...r}; delete _sansId.id;
+        _rep = await supabaseClient.from(table).update(_sansId, { count: 'exact' }).eq('id', r.id);
+      } else {
+        _rep = await supabaseClient.from(table).upsert(r, {onConflict:'id'});
+      }
+      const error = _rep.error;
+      if(!error) {
+        if(mode === 'update' && typeof _rep.count === 'number' && _rep.count === 0) {
+          const _ph = 'Cette fiche n\'existe plus sur le serveur : rien n\'a été enregistré. Actualisez la page ; si elle a été supprimée, restaurez-la depuis la corbeille.';
+          _dernierRefusSauvegarde = { table: table, verrou: '', phrase: _ph, brut: 'aucune ligne touchee' };
+          console.error('❌ Sauvegarde ' + table + ' : aucune ligne touchée (id ' + r.id + ')');
+          if(typeof toast === 'function') toast('⚠️ ' + _ph, true);
+          return false;
+        }
+        return true;
+      }
       const msg = error.message || error.details || String(error);
       // Environnement d'aperçu (sandbox sans vraie connexion Supabase) : ignorer en silence
       if(error.name === 'DataCloneError' || msg.indexOf('could not be cloned') !== -1 || msg.indexOf('DataCloneError') !== -1) return false;
@@ -1929,29 +2082,81 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
           continue;
         }
       }
-      // Doublon (contrainte d'unicité de la base) : message compréhensible
-      const dup = /duplicate key value violates unique constraint "([^"]+)"/.exec(msg);
-      if(dup) {
-        const champ = dup[1].replace(table + '_', '').replace(/_key$/, '').replace('_', ' ');
+      // Doublon (verrou d'unicite de la base, code 23505) : UNE phrase francaise par
+      // verrou, la meme partout (PHRASES_DOUBLON, en tete de ce script). Avant, l'ecran
+      // disait « verifiez votre connexion internet » : l'agent reessayait, puis contournait.
+      const _phraseDup = phraseDoublon(error);
+      if(_phraseDup) {
+        const dup = /violates unique constraint "([^"]+)"/.exec(msg);
+        _dernierRefusSauvegarde = { table: table, verrou: dup ? dup[1] : '', phrase: _phraseDup, brut: msg };
         console.error('❌ Doublon ' + table + ':', msg);
-        if(typeof toast === 'function') toast('⚠️ Doublon refusé : un enregistrement ' + table + ' existe déjà avec le même « ' + champ + ' »', true);
+        if(typeof toast === 'function') toast('⛔ ' + _phraseDup, true);
         return false;
       }
       console.error('❌ Sauvegarde ' + table + ' échouée:', msg, error);
+      _dernierRefusSauvegarde = { table: table, verrou: '', phrase: 'La sauvegarde a été refusée par le serveur : ' + msg.slice(0,200), brut: msg };
       if(typeof toast === 'function') toast('⚠️ SAUVEGARDE ' + table.toUpperCase() + ' ÉCHOUÉE — ' + msg.slice(0,200), true);
       return false;
     }
+    _dernierRefusSauvegarde = { table: table, verrou: '', phrase: 'La sauvegarde n\'a pas abouti après plusieurs essais.', brut: '' };
     if(typeof toast === 'function') toast('⚠️ Sauvegarde ' + table + ' impossible', true);
     return false;
   }
 
+  // Phrase a montrer apres une sauvegarde refusee (resultat !== true) : celle du doublon
+  // si c'en est un, sinon celle du dernier refus, sinon la phrase de repli donnee.
+  function phraseRefusSauvegarde(repli) {
+    const d = _dernierRefusSauvegarde;
+    if(d && d.phrase) return d.phrase;
+    return repli || 'La sauvegarde a échoué. Vérifiez votre connexion, puis réessayez.';
+  }
+
+  // ══ 03/10 (v9.645) — « LA SAUVEGARDE A PASSE » NE VEUT PAS DIRE « TOUT EST ARRIVE » ══
+  //
+  // Quand la base ne connait pas une colonne, sbUpsertSouple la RETIRE et renvoie la
+  // ligne sans elle : le reste de la fiche est bien enregistre, et la fonction rend
+  // « true ». C'est le bon choix pour un champ accessoire (mieux vaut un agent
+  // enregistre sans sa photo). Mais un ecran qui ne sert QU'A ce champ annonce alors un
+  // reglage qui n'existe nulle part et qui disparaitra au rechargement.
+  // Cette fonction dit si la colonne demandee a ete retiree faute d'exister. Elle lit la
+  // memoire d'apprentissage du helper : la clef y est posee des le premier essai.
+  function colonneRefusee(table, colonne) {
+    const m = sbSchemaMemo[table];
+    return !!(m && Object.prototype.hasOwnProperty.call(m, colonne) && !m[colonne]);
+  }
+
+  // ══ 02/10 (v9.645) — L'EMPREINTE QU'ON ACCEPTE DE REINSERER ══
+  // Une fiche relue n'a plus d'empreinte (pass vaut ''), et hashAllPasswords transforme
+  // un « pass » absent en empreinte du MOT DE PASSE VIDE. La reinserer a la creation ou a
+  // la restauration d'un compte ouvrirait ce compte a quiconque laisse le champ vide.
+  // On ne reinsere donc qu'une vraie empreinte (64 caracteres, differente de celle du
+  // vide) ; sinon '' — personne n'entre, et l'administration redonne un mot de passe.
+  async function _empreinteUtile(pass) {
+    const p = String(pass || '');
+    if(p.length !== 64) return '';
+    try {
+      if(typeof hashPw === 'function' && p === await hashPw('')) return '';
+    } catch(e) {}
+    return p;
+  }
+
+  // ══ 02/10 (v9.645) — « pass_hash » NE PART PLUS DANS LA SAUVEGARDE D'UNE FICHE EXISTANTE ══
+  // Meme raison que pour les clients le 15/09 : « ag.pass » vaut '' sur une fiche relue
+  // (l'empreinte ne descend plus), donc pass_hash:'' ou null EFFACERAIT le mot de passe a
+  // la premiere sauvegarde (solde, habilitation...) ; et apres le SQL 87, un upsert qui
+  // porte la cle est refuse en entier. Une fiche existante part donc en « update » sans
+  // pass_hash. Seul un compte NEUF (drapeau « _neuf », pose par saveAgent et par la
+  // restauration depuis la corbeille) part en « insert » avec son empreinte.
+  // Changer un mot de passe passe par le serveur : changer_mon_mot_de_passe (le sien),
+  // changer_mdp_compte (par l'administration).
   async function _sbSaveAgent(ag) {
+    const _neuf = (ag._neuf === true);
     const row = { id:ag.id, num:ag.num||'', nom:ag.name||'', responsable:ag.resp||null,
       prefecture:ag.pref||null, adresse:ag.addr||null, ville:ag.city||'', code:ag.code||ag.num||'',
       telephone:ag.tel||null, email:ag.email||null, solde:ag.solde||0,
       actif:ag.actif!==false, peut_valider:ag.peutValider||false,
       peut_voir_courses:ag.peutVoirCourses||false,
-      photo_url:ag.photo||null, pass_hash:ag.pass||null,
+      photo_url:ag.photo||null,
       // ══ v9.576 — CES CHAMPS N'ETAIENT ENVOYES NULLE PART ══
       // Le formulaire les demandait depuis toujours ; la fonction ne les transmettait pas
       // et la table n'avait pas les colonnes. L'identite de l'agent — celui qui encaisse
@@ -1962,20 +2167,34 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       piece_type:ag.pieceType||null, piece_num:ag.pieceNum||null,
       piece_delivrance:ag.pieceDelivrance||null, piece_expiration:ag.pieceExpiration||null,
       piece_photo:ag.piecePhoto||null, piece_photo_verso:ag.piecePhotoVerso||null };
+    // Compte neuf : l'empreinte part UNE fois, avec l'insert. Vide si on ne l'a pas
+    // (restauration d'une fiche supprimee apres la fermeture) : personne ne peut alors
+    // entrer avec ce compte tant que l'administration n'a pas redonne un mot de passe —
+    // et restaurerCorbeille le dit. _empreinteUtile ecarte l'empreinte du mot de passe
+    // VIDE, que hashAllPasswords fabrique a partir d'un « pass » absent.
+    if(_neuf) row.pass_hash = await _empreinteUtile(ag.pass);
     const alts = { nom:'name', responsable:'resp', prefecture:'pref', adresse:'addr',
       ville:'city', telephone:'tel', photo_url:'photo' };
-    await sbUpsertSouple('agents', row, alts);
+    // On REND le resultat : les ecrans attendent la reponse avant d'annoncer « ✅ ».
+    const ok = await sbUpsertSouple('agents', row, alts, _neuf ? 'insert' : 'update');
+    if(ok === true && _neuf) ag._neuf = false;
+    return ok;
   }
   const sbSaveAgent = sbIgnoreErr(_sbSaveAgent, 'sbSaveAgent');
 
+  // 02/10 (v9.645) : meme regle que _sbSaveAgent — voir le commentaire au-dessus.
   async function _sbSaveSousAgent(sa) {
+    const _neuf = (sa._neuf === true);
     const row = { id:sa.id, num:sa.num||'', nom:sa.name||'', agent_id:sa.agId||null,
       prefecture:sa.pref||null, adresse:sa.addr||null, ville:sa.city||'', code:sa.code||sa.num||'',
       telephone:sa.tel||null, email:sa.email||null, solde:sa.solde||0,
-      actif:sa.actif!==false, photo_url:sa.photo||null, pass_hash:sa.pass||null };
+      actif:sa.actif!==false, photo_url:sa.photo||null };
+    if(_neuf) row.pass_hash = await _empreinteUtile(sa.pass);
     const alts = { nom:'name', agent_id:'ag_id', prefecture:'pref', adresse:'addr',
       ville:'city', telephone:'tel', photo_url:'photo' };
-    await sbUpsertSouple('sous_agents', row, alts);
+    const ok = await sbUpsertSouple('sous_agents', row, alts, _neuf ? 'insert' : 'update');
+    if(ok === true && _neuf) sa._neuf = false;
+    return ok;
   }
   const sbSaveSousAgent = sbIgnoreErr(_sbSaveSousAgent, 'sbSaveSousAgent');
 
@@ -2021,7 +2240,12 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   }
   const sbSaveClient = sbIgnoreErr(_sbSaveClient, 'sbSaveClient');
 
+  // 02/10 (v9.645) : meme regle que _sbSaveAgent — fiche existante en « update » SANS
+  // pass_hash (l'empreinte en base reste), compte neuf (drapeau « _neuf ») en « insert »
+  // AVEC pass_hash. Sans cela : valider un passager, le rembourser, le recharger ou
+  // l'avertir effacerait son mot de passe aujourd'hui, et serait refuse apres le SQL 87.
   async function _sbSavePassager(ps) {
+    const _neuf = (ps._neuf === true);
     const row = { id:ps.id, num:ps.num||'', prenom:ps.prenom||'', nom:ps.nom||'',
       telephone:ps.tel||null, email:ps.email||null, user_login:ps.user||null, solde:ps.solde||0,
       // v9.516 : LA PHOTO DE PROFIL N'ETAIT JAMAIS ENREGISTREE. Deux erreurs se cumulaient :
@@ -2043,11 +2267,16 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       appreciations:ps.appreciations||0,
       details_avertissements:ps.detailsAvertissements||[],
       details_appreciations:ps.detailsAppreciations||[],
-      pass_hash:ps.pass||null };  // ← CRUCIAL : le mot de passe n'était jamais sauvegardé → connexion impossible après rechargement
+      // v9.576 : l'identite complete, relue par mapPassager depuis le 02/10.
+      nationalite:ps.nationalite||null, type_piece:ps.typePiece||null,
+      profession:ps.profession||null, nom_pere:ps.nomPere||null, nom_mere:ps.nomMere||null };
+    if(_neuf) row.pass_hash = await _empreinteUtile(ps.pass);
     // Replis pour les bases plus anciennes, dont les colonnes portaient d'autres noms.
     const alts = { telephone:'tel', user_login:'login', piece_identite:'piece',
       photo_profil:'photo_url', photo_piece:'photo_piece_url', date_consentement:'consentement_le' };
-    return await sbUpsertSouple('passagers', row, alts);
+    const ok = await sbUpsertSouple('passagers', row, alts, _neuf ? 'insert' : 'update');
+    if(ok === true && _neuf) ps._neuf = false;
+    return ok;
   }
   const sbSavePassager = sbIgnoreErr(_sbSavePassager, 'sbSavePassager');
 
@@ -2131,7 +2360,11 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       valide:t.valide!==false,
       derniere_maj:t.derniereMaj||null, suspendu_auto:t.suspenduAuto||false };
     const alts = { nom_chauffeur:'nom', telephone:'tel', photo_url:'photo', frais_enregistrement:'frais' };
-    await sbUpsertSouple('taxis', row, alts);
+    // 02/10 (v9.645) : on REND le resultat. Sans cela, saveTaxi et editTaxi annoncaient
+    // « ✅ » sans savoir si la base avait accepte — et le SQL 88 refuse desormais une
+    // plaque deja enregistree (taxis_plaque_humain_uidx) ou un vehicule qui a deja sa
+    // fiche taxi (taxis_moto_id_uidx).
+    return await sbUpsertSouple('taxis', row, alts);
   }
   const sbSaveTaxi = sbIgnoreErr(_sbSaveTaxi, 'sbSaveTaxi');
 
@@ -3027,7 +3260,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:14px">
       <canvas id="qr-canvas"></canvas>
     </div>
-    <div id="qr-code-display" style="font-family:monospace;font-size:13px;color:#EAB308;margin-bottom:8px;font-weight:700"></div>
+    <div id="qr-code-display" style="font-family:monospace;font-size:13px;color:#EAB308;margin-bottom:8px;font-weight:700;word-break:break-all"></div>
     <div style="font-size:11px" class="qr-note-txt" id="qr-note"></div>
     <div style="font-size:9px;opacity:.45;margin-top:6px">AfriMoto v9.64</div>
     <div style="display:flex;gap:8px">
@@ -3148,7 +3381,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 
     <!-- Choix rôle : espace public (Owner/Client/Passager) -->
     <div id="login-roles-public" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn" onclick="setRole('owner')" id="rl-owner" style="flex:1;font-size:11px;padding:8px 6px">🏍️ Proprio</button>
+      <!-- 02/10 (v9.645) : « Proprio » devient « Moto/Voiture volée » (décidé par le propriétaire du projet).
+           Seul le NOM de l'onglet change : c'est toujours l'espace du propriétaire (rôle « owner »),
+           on y entre toujours par le matricule ou le châssis et le code d'accès du véhicule. -->
+      <button class="btn" onclick="setRole('owner')" id="rl-owner" style="flex:1;font-size:11px;padding:8px 6px">🏍️ Moto/Voiture volée</button>
       <!-- v9.639 : les espaces portent le nom de ceux qui y entrent (demandé par le propriétaire du projet).
            Seuls les NOMS changent : les rôles « client » et « passager », les numéros CLT-/PSG- et les mots de passe restent les mêmes. -->
       <button class="btn-ghost" onclick="setRole('client')" id="rl-client" style="flex:1;font-size:11px;padding:8px 6px">👤 Chauffeur</button>
@@ -4872,7 +5108,13 @@ const DB = {
   user: null,
   adminId: 'LAOUNIBARRY',
   // v9.559 : l'EMPREINTE, plus le mot de passe. Ce fichier est public.
-  adminPass: '1042063b3ffe4baa4773d3139273bcb25599c0cfc592471715cade9d6499478e',
+  // 02/10 (v9.645) : plus d'empreinte par defaut DU TOUT. Celle qui etait ecrite ici
+  // (publique, donc) correspondait au mot de passe par defaut : apres la fermeture du
+  // SQL 87, si la connexion etait restee locale, elle aurait ROUVERT l'espace
+  // administrateur a quiconque connaissait ce mot de passe d'origine. La connexion de
+  // l'administration est verifiee par le serveur (verifier_connexion) ; ce champ ne sert
+  // plus a rien et reste vide.
+  adminPass: '',
   adminEmail: 'djoniwouri@gmail.com',
   adminNom: 'Barry',
   adminPrenom: 'Mamadou Bassirou',
@@ -5335,7 +5577,20 @@ function toast(msg, err=false) {
   el.textContent = msg;
   el.className = 'toast ' + (err ? 'err' : 'ok');
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3200);
+  // ══ 03/10 (v9.645) — UNE PHRASE QUI DISPARAIT AVANT D'ETRE LUE NE SERT A RIEN ══
+  //
+  // Le bandeau restait 3,2 secondes, quelle que soit la longueur. C'etait tenable pour
+  // « ✅ Agent créé ». Ce ne l'est plus : depuis le SQL 88, les refus affiches ici sont
+  // des phrases completes qui disent quoi faire ensuite — celle d'une demande deja en
+  // cours fait plus de deux cents caracteres, soit six a sept lignes sur un telephone de
+  // 360 points. A 3,2 secondes, l'agent voyait passer un bloc de texte sans le lire,
+  // puis reessayait. Le temps d'affichage suit donc la longueur : environ 70
+  // millisecondes par caractere, jamais moins de 3,2 secondes, jamais plus de 15.
+  // Et on annule le minuteur precedent : sinon le compte a rebours d'une phrase longue
+  // faisait disparaitre tout de suite le message suivant.
+  if(window._toastMinuteur) clearTimeout(window._toastMinuteur);
+  const _dureeToast = Math.min(15000, Math.max(3200, 1600 + String(msg).length * 70));
+  window._toastMinuteur = setTimeout(() => { el.classList.remove('show'); window._toastMinuteur = null; }, _dureeToast);
 }
 
 // ── Historique de navigation interne (pour le bouton retour) ──
@@ -6081,12 +6336,37 @@ async function restaurerCorbeille(corbeilleId) {
   if(entree.listeOrigine === 'clients') {
     if(entree.data && entree.data.pass) entree.data._mdpInitial = true;
     else { _secretPerdu = 'mot de passe'; _ouLeRefaire = 'Gestion → Mots de passe'; }
+  } else if(entree.listeOrigine === 'agents' || entree.listeOrigine === 'sousAgents' || entree.listeOrigine === 'passagers') {
+    // 02/10 (v9.645) : la ligne a ete EFFACEE du serveur ; la restituer est un INSERT —
+    // drapeau « _neuf », lu par sbSaveAgent / sbSaveSousAgent / sbSavePassager, qui
+    // repose l'empreinte si l'instantane la porte encore (fiche supprimee avant la
+    // fermeture du SQL 87). Sinon le compte revient SANS mot de passe : on le dit, avec
+    // le geste exact a faire ensuite, au lieu de laisser la personne dehors en silence.
+    if(entree.data) entree.data._neuf = true;
+    // _empreinteUtile ecarte l'empreinte du mot de passe VIDE (voir sa definition) : dans
+    // ce cas aussi, le compte revient sans mot de passe, et on le dit.
+    const _empr = entree.data ? await _empreinteUtile(entree.data.pass) : '';
+    if(!_empr) { _secretPerdu = 'mot de passe'; _ouLeRefaire = 'Gestion → Mots de passe'; }
   } else if(entree.listeOrigine === 'vehs' || entree.listeOrigine === 'vehicules') {
     _secretPerdu = 'code d\'accès propriétaire'; _ouLeRefaire = 'Gestion → Code accès propriétaires';
   }
 
   if(sbFnMap[entree.listeOrigine]) {
-    await sbFnMap[entree.listeOrigine](entree.data);  // ✅ AWAIT!
+    const _okRestau = await sbFnMap[entree.listeOrigine](entree.data);  // ✅ AWAIT!
+    if(_okRestau !== true) {
+      // ══ ⚠️ 02/10 (v9.645) — LA CORBEILLE NE S'EFFACE QUE SI LA BASE A ACCEPTE ══
+      // Avant, l'entree de corbeille etait supprimee MEME quand la sauvegarde avait ete
+      // refusee (doublon du SQL 88, serveur muet...) : la fiche etait alors perdue des
+      // deux cotes. Ici on remet la liste locale en l'etat, on garde l'entree, et on
+      // montre la phrase du refus.
+      DB[entree.listeOrigine] = DB[entree.listeOrigine].filter(x => x !== entree.data);
+      addDebugLog('❌ RESTAURATION refusée par la base : ' + entree.label);
+      toast('⛔ « ' + entree.label + ' » n\'a PAS été restauré : ' +
+            phraseRefusSauvegarde('la base a refusé la sauvegarde.') +
+            ' L\'entrée reste dans la corbeille.', true);
+      rGestion();
+      return;
+    }
     addDebugLog('💾 Sauvegardé dans Supabase');
   } else {
     // Une restitution qui ne réécrit rien ne doit PAS se présenter comme réussie. C'est
@@ -6311,7 +6591,8 @@ async function soumettreInscriptionPassager() {
     try { addDebugLog('INSCRIPTION serveur erreur : ' + ((e && e.message) || e)); } catch(er) {}
   }
 
-  if(sauvegardeOk === null) sauvegardeOk = await sbSavePassager(newPs);   // ancien chemin
+  // 02/10 (v9.645) : compte NEUF -> insert avec son empreinte (voir _sbSavePassager).
+  if(sauvegardeOk === null) { newPs._neuf = true; sauvegardeOk = await sbSavePassager(newPs); }   // ancien chemin
   err.style.display = 'none';
   if(sauvegardeOk === false) {
     err.textContent = '⚠️ Votre inscription n\'a pas pu être enregistrée (compte similaire déjà existant ou problème de connexion). Si vous vous êtes déjà inscrit, attendez la validation par un agent.';
@@ -7077,6 +7358,49 @@ function _messageRefusMdp(raison) {
   return m[raison] || ('Refusé par le serveur' + (raison ? ' (' + raison + ')' : '') + '.');
 }
 
+// ══ 02/10 (v9.645) — REDONNER UN MOT DE PASSE : UN SEUL CHEMIN, PAR LE SERVEUR ══
+//
+// Utilise par l'onglet « Mots de passe » (changeMdp) et par les ecrans « Modifier » d'un
+// agent, d'un sous-agent et d'un passager — comme « Modifier client » depuis le 15/09.
+// Les sauvegardes de fiche n'envoient plus « pass_hash » : un mot de passe tape dans ces
+// ecrans aurait ete PERDU EN SILENCE, l'ecran disant « mis a jour ». changer_mdp_compte
+// verifie QUI demande (mot de passe du personnel redemande ici), ecrit l'empreinte cote
+// serveur et laisse une trace. Rend { ok:true } ou { ok:false, phrase } ; la phrase est
+// complete et dit ce qu'il en est du mot de passe.
+async function _changerMdpParServeur(cibleType, cibleId, nouveau, titre) {
+  if(!nouveau || nouveau.length < 6) {
+    return { ok:false, phrase:'Le mot de passe doit contenir au moins 6 caractères : il est inchangé.' };
+  }
+  const auth = await _motDePassePersonnel(titre || 'Changer un mot de passe');
+  if(!auth) return { ok:false, phrase:'Mot de passe INCHANGÉ : la confirmation a été annulée.' };
+  try {
+    const { data, error } = await supabaseClient.rpc('changer_mdp_compte', {
+      p_num: auth.num, p_mot_de_passe: auth.pw, p_cible_type: cibleType,
+      p_cible_id: cibleId, p_nouveau: nouveau
+    });
+    if(error) {
+      const m = String(error.message || '');
+      // Defaut connu du serveur (releve du 02/10) : la trace du changement ecrit un TEXTE
+      // dans « mouvements.cible_id », qui est en uuid en production (mesure du 84b). Dans
+      // ce cas tout l'appel est annule : le mot de passe N'EST PAS change. On le dit tel
+      // quel plutot que « serveur injoignable ».
+      if(/cible_id|type uuid/i.test(m)) {
+        return { ok:false, phrase:'Le serveur a vérifié votre identité mais n\'a pas pu inscrire la trace du changement (fonction changer_mdp_compte, colonne cible_id). Le mot de passe n\'a PAS été changé. Cette fonction doit être corrigée dans Supabase ; rien à refaire ici ensuite.' };
+      }
+      if(/fetch|network|réseau|timeout/i.test(m)) {
+        return { ok:false, phrase:'Serveur injoignable : le mot de passe n\'a PAS été changé. Réessayez dans un instant.' };
+      }
+      return { ok:false, phrase:'Le serveur n\'a pas accepté le changement (' + m + '). Le mot de passe n\'a PAS été changé.' };
+    }
+    if(!data || data.ok !== true) {
+      return { ok:false, phrase:_messageRefusMdp(data && data.raison) + ' Le mot de passe n\'a PAS été changé.' };
+    }
+    return { ok:true };
+  } catch(e) {
+    return { ok:false, phrase:'Serveur injoignable : le mot de passe n\'a PAS été changé. Réessayez dans un instant.' };
+  }
+}
+
 function clearSession() {
   try { localStorage.removeItem('afrimoto_session'); } catch(e) {}
   // v9.560 : le jeton du personnel meurt avec la session. On le dit aussi au serveur, pour
@@ -7145,18 +7469,25 @@ async function doLogin() {
       );
     }
     else if(curRole === 'passager') {
-      const { data } = await supabaseClient.from('passagers').select('*').eq('num', id).limit(1);
+      // 02/10 (v9.645) : sans « pass_hash » (COLONNES_PASSAGERS) — le serveur compare.
+      const { data } = await supabaseClient.from('passagers').select(COLONNES_PASSAGERS).eq('num', id).limit(1);
       _fusionner(DB.passagers, data, mapPassager);
     }
     else if(curRole === 'agent') {
-      const { data } = await supabaseClient.from('agents').select('*')
+      // 02/10 (v9.645) : sans « pass_hash » (COLONNES_AGENTS). Le filtre « code » reste :
+      // c'est un identifiant de connexion, pas un secret.
+      const { data } = await supabaseClient.from('agents').select(COLONNES_AGENTS)
         .or('num.eq.' + id + ',code.eq.' + id).limit(1);
       _fusionner(DB.agents, data, mapAgent);
       await _corbeilleUtile();
     }
     else if(curRole === 'sousagent') {
-      const { data } = await supabaseClient.from('sous_agents').select('*');
-      if(data && data.length > 0) DB.sousAgents = data.map(mapSousAgent);
+      // 02/10 (v9.645) : AVANT, toute la table des sous-agents partait ici, sans filtre et
+      // AVANT tout mot de passe. On ne demande que CE compte, sans « pass_hash »
+      // (COLONNES_SOUS_AGENTS), et on COMPLETE la liste au lieu de la remplacer.
+      const { data } = await supabaseClient.from('sous_agents').select(COLONNES_SOUS_AGENTS)
+        .or('num.eq.' + id + ',code.eq.' + id).limit(1);
+      _fusionner(DB.sousAgents, data, mapSousAgent);
 
       // 🔧 FIX: Recharger corbeille pour vérifier si sous-agent supprimé
       // ══ ⚠️ 21/09 — LA TROISIEME PORTE, ET LA PLUS OUVERTE DES TROIS ══
@@ -7210,13 +7541,73 @@ async function doLogin() {
 
   let user = null;
 
-  if(curRole==='admin' && nrm(id)===nrm(DB.adminId) && (
-    (await verifyPw(pw, DB.adminPass))
-  )) {
-    user = {role:'admin', name: (DB.adminPrenom||'Mamadou Bassirou') + ' ' + (DB.adminNom||'Barry')};
+  // ══ 02/10 (v9.645) — LE PERSONNEL EST VERIFIE PAR LE SERVEUR, COMME LE CLIENT ══
+  //
+  // Jusqu'ici l'administration, les agents et les sous-agents etaient compares ICI, dans
+  // le navigateur, a une empreinte descendue avec la table — et une empreinte VIDE
+  // acceptait n'importe quel mot de passe (« !ag.pass || ... »). Le SQL 87 ferme la
+  // lecture de ces empreintes : sans ce bloc, des qu'elles ne descendent plus, soit
+  // l'administration s'enferme dehors (comparee a l'empreinte par defaut du fichier),
+  // soit N'IMPORTE QUEL mot de passe ouvre l'espace agent.
+  // Le serveur tranche donc en premier (verifier_connexion) : il ne renvoie jamais
+  // d'empreinte, repond pareil pour un compte inexistant ou un mot de passe faux, et dit
+  // lui-meme « suspendu ». Quand il ne repond pas, on le DIT — « serveur injoignable »,
+  // jamais « identifiants incorrects ». Le journal de securite local (SEC) et la session
+  // unique (ouvrir_session_personnel, plus bas) restent en place.
+  //
+  // L'identifiant envoye pour l'administration : verifier_connexion compare « admin_id »
+  // A LA LETTRE, alors que cet ecran tolerait casse, accents et espaces (nrm). Si ce qui
+  // est tape correspond, a la normalisation pres, a l'identifiant connu (admin_id reste
+  // lisible), on envoie la forme exacte de la base : le fondateur garde sa tolerance.
+  //
+  // ══ ⚠️ 03/10 (v9.645) — LE DEFAUT DU FICHIER N'EST PAS L'IDENTIFIANT DE LA BASE ══
+  //
+  // DB.adminId porte un defaut ecrit dans ce fichier : « LAOUNIBARRY », en majuscules.
+  // La base, elle, contient « laounibarry » en minuscules (releve en production le
+  // 03/10). Or nrm() ignore la casse : tant que config_admin n'etait pas encore arrivee
+  // — une connexion lente en Guinee, et l'ecran de connexion s'ouvre bien avant les
+  // donnees — la condition ci-dessous etait VRAIE et envoyait au serveur le defaut du
+  // fichier, en majuscules. verifier_connexion compare « admin_id = p_identifiant » A LA
+  // LETTRE : aucune ligne, donc « identifiants incorrects » avec le BON mot de passe.
+  // C'est exactement l'enfermement que ces retouches doivent empecher, et il n'a pas
+  // besoin du SQL 87 pour arriver.
+  // Deux garde-fous : (1) on ne fait confiance a DB.adminId que s'il vient du SERVEUR
+  // (drapeau adminIdLu) ; (2) pour une connexion d'administration, s'il n'est pas encore
+  // arrive, on le demande MAINTENANT — une seule colonne, une seule ligne, et elle reste
+  // lisible apres le SQL 87.
+  if(curRole === 'admin' && DB.adminIdLu !== true) {
+    try {
+      const { data: _ca } = await supabaseClient.from('config_admin').select('admin_id').eq('id', 1).limit(1);
+      if(_ca && _ca.length && _ca[0].admin_id) { DB.adminId = _ca[0].admin_id; DB.adminIdLu = true; }
+    } catch(e) { /* hors ligne : on enverra ce qui a ete tape, et le message le dira */ }
+  }
+  let _idConnexion = id;
+  if(curRole === 'admin' && DB.adminIdLu === true && DB.adminId && nrm(id) === nrm(DB.adminId)) _idConnexion = DB.adminId;
+  let _svPerso = null;
+  if(curRole === 'admin' || curRole === 'agent' || curRole === 'sousagent') {
+    _connexionServeurDisponible = null;   // on redonne sa chance au serveur a chaque essai
+    _svPerso = await connexionServeur(curRole, _idConnexion, pw);
+    if(!_svPerso) {
+      err.textContent = '⚠️ Connexion impossible pour le moment (serveur injoignable). Réessayez dans un instant.';
+      err.style.display = 'block';
+      return;
+    }
+  }
+
+  if(curRole==='admin') {
+    if(_svPerso.ok === true) {
+      user = {role:'admin', name: (DB.adminPrenom||'Mamadou Bassirou') + ' ' + (DB.adminNom||'Barry')};
+    }
   } else if(curRole==='agent') {
     // 🔧 FIX: Trouver agent SANS condition a.actif (pour vérifier ensuite pourquoi il ne peut pas se connecter)
     const ag = DB.agents.find(a => a.num===id || a.code===id);
+    // Le serveur repond « suspendu » lui-meme (actif = false ET mot de passe bon) : le
+    // message dedie ne depend plus d'une empreinte en memoire.
+    if(_svPerso.ok === false && _svPerso.raison === 'suspendu') {
+      err.innerHTML = '🚫 <b>Cet agent est suspendu.</b> Vous ne pouvez pas accéder à cet espace agent. Rendez-vous chez l\'administration.';
+      err.style.display = 'block';
+      return;
+    }
     
     if(ag) {
       // 🔧 FIX CRITICAL: Bloquer si agent SUSPENDU
@@ -7225,7 +7616,7 @@ async function doLogin() {
         let pwCorrect = false;
         
         // Vérifier quand même le mot de passe pour message d'erreur dédié
-        if(!ag.pass || ag.pass === 'null' || ag.pass === null || await verifyPw(pw2, ag.pass)) {
+        if(_svPerso && (_svPerso.ok === true || _svPerso.raison === 'suspendu')) {   // 02/10 : le serveur a compare
           pwCorrect = true;
         }
         
@@ -7242,7 +7633,7 @@ async function doLogin() {
         const pw2 = pw;
         let pwCorrect = false;
         
-        if(!ag.pass || ag.pass === 'null' || ag.pass === null || await verifyPw(pw2, ag.pass)) {
+        if(_svPerso && (_svPerso.ok === true || _svPerso.raison === 'suspendu')) {   // 02/10 : le serveur a compare
           pwCorrect = true;
         }
         
@@ -7253,14 +7644,24 @@ async function doLogin() {
         }
       }
       
-      // ✅ Sinon, procéder à la vérification normale
-      if(!ag.pass || ag.pass === 'null' || ag.pass === null || await verifyPw(pw, ag.pass)) {
+      // ✅ Le serveur a reconnu le compte : c'est lui qui a compare le mot de passe.
+      if(_svPerso && _svPerso.ok === true) {
         user = {role:'agent', name:ag.name, agId:ag.id};
       }
+    } else if(_svPerso && _svPerso.ok === true && _svPerso.id) {
+      // Reconnu par le serveur sans etre en memoire (lecture de la fiche refusee ou en
+      // retard) : on ouvre quand meme, avec ce que le serveur a rendu.
+      user = {role:'agent', name:String(_svPerso.prenom || _svPerso.nom || id).trim(), agId:_svPerso.id};
     }
   } else if(curRole==='sousagent') {
     // 🔧 FIX: Trouver sous-agent SANS condition a.actif
     const sa = DB.sousAgents.find(s => s.num===id || s.code===id);
+    // 02/10 (v9.645) : « suspendu » vient du serveur (voir le bloc agent).
+    if(_svPerso.ok === false && _svPerso.raison === 'suspendu') {
+      err.innerHTML = '🚫 <b>Ce sous-agent est suspendu.</b> Vous ne pouvez pas accéder à cet espace. Rendez-vous chez l\'administration.';
+      err.style.display = 'block';
+      return;
+    }
     
     if(sa) {
       // 🔧 FIX CRITICAL: Bloquer si sous-agent SUSPENDU
@@ -7268,7 +7669,7 @@ async function doLogin() {
         const pw2 = pw;
         let pwCorrect = false;
         
-        if(!sa.pass || sa.pass === 'null' || sa.pass === null || await verifyPw(pw2, sa.pass)) {
+        if(_svPerso && (_svPerso.ok === true || _svPerso.raison === 'suspendu')) {   // 02/10 : le serveur a compare
           pwCorrect = true;
         }
         
@@ -7285,7 +7686,7 @@ async function doLogin() {
         const pw2 = pw;
         let pwCorrect = false;
         
-        if(!sa.pass || sa.pass === 'null' || sa.pass === null || await verifyPw(pw2, sa.pass)) {
+        if(_svPerso && (_svPerso.ok === true || _svPerso.raison === 'suspendu')) {   // 02/10 : le serveur a compare
           pwCorrect = true;
         }
         
@@ -7296,10 +7697,12 @@ async function doLogin() {
         }
       }
       
-      // ✅ Sinon, procéder à la vérification normale
-      if(!sa.pass || sa.pass === 'null' || sa.pass === null || await verifyPw(pw, sa.pass)) {
+      // ✅ Le serveur a reconnu le compte : c'est lui qui a compare le mot de passe.
+      if(_svPerso && _svPerso.ok === true) {
         user = {role:'sousagent', name:sa.name, saId:sa.id, agId:sa.agId};
       }
+    } else if(_svPerso && _svPerso.ok === true && _svPerso.id) {
+      user = {role:'sousagent', name:String(_svPerso.prenom || _svPerso.nom || id).trim(), saId:_svPerso.id, agId:null};
     }
   } else if(curRole==='owner') {
     const id2 = id;
@@ -7550,6 +7953,8 @@ async function doLogin() {
   } else if(curRole==='passager') {
     // v9.517 : le passager passe lui aussi par le serveur. C'est, avec le client, le role
     // le plus nombreux — donc celui qui pese le plus sur la table telechargee.
+    // 02/10 (v9.645) : comme pour le client, on redonne sa chance au serveur a chaque essai.
+    _connexionServeurDisponible = null;
     const _svp = await connexionServeur('passager', id, pw);
     // Le serveur connait desormais la regle « compte valide par un agent » : elle survivra
     // au jour ou l'on cessera de telecharger la table des passagers.
@@ -7558,8 +7963,16 @@ async function doLogin() {
       err.style.display = 'block';
       return;
     }
+    // 02/10 (v9.645) : PLUS DE REPLI LOCAL. L'empreinte ne descend plus (ps.pass vaut ''),
+    // le repli refusait donc tout le monde avec « identifiants incorrects ». Si le serveur
+    // ne repond pas, on le dit — meme phrase que pour le client.
+    if(!_svp) {
+      err.textContent = '⚠️ Connexion impossible pour le moment (serveur injoignable). Réessayez dans un instant.';
+      err.style.display = 'block';
+      return;
+    }
     const ps = DB.passagers.find(p => p.num===id);
-    const _okP = _svp ? (_svp.ok === true) : (ps ? await verifyPw(pw, ps.pass) : false);
+    const _okP = (_svp.ok === true);
     if(_okP && !ps && _svp) {
       // Reconnu par le serveur sans etre en memoire : ce sera la norme quand on cessera
       // de telecharger la table des passagers.
@@ -7601,7 +8014,15 @@ async function doLogin() {
     
     SEC.failLogin(curRole, id);
     const rl2 = SEC.checkRateLimit(curRole);
-    err.textContent = rl2.locked ? rl2.msg : '❌ Identifiants incorrects.';
+    // 03/10 (v9.645) : pour l'administration, un refus peut venir de ce que l'identifiant
+    // enregistre n'a pas encore pu etre lu sur le serveur (connexion lente, hors ligne).
+    // Le serveur compare « admin_id » A LA LETTRE : on ne laisse pas croire a un mauvais
+    // mot de passe, on dit ce qui manque et quoi faire.
+    const _adminSansRef = (curRole === 'admin' && DB.adminIdLu !== true);
+    err.textContent = rl2.locked ? rl2.msg
+      : (_adminSansRef
+          ? '❌ Connexion refusée. Votre identifiant enregistré n\'a pas encore pu être lu sur le serveur : attendez que la page finisse de charger (quelques secondes sur une connexion lente), puis réessayez. Si cela persiste, saisissez votre identifiant EXACTEMENT comme il est enregistré, majuscules et minuscules comprises.'
+          : '❌ Identifiants incorrects.');
     err.style.display = 'block';
     // Animation shake
     const box = document.getElementById('lerr');
@@ -7634,11 +8055,13 @@ async function doLogin() {
   // la session admin dans ce meme stockage : le jeton ne lui apprend rien de plus.
   if(curRole === 'admin' || curRole === 'agent' || curRole === 'sousagent') {
     try {
+      // 02/10 (v9.645) : meme identifiant que celui accepte par verifier_connexion (pour
+      // l'administration, la forme exacte de la base — voir _idConnexion plus haut).
       const { data: _s } = await supabaseClient.rpc('ouvrir_session_personnel', {
-        p_role: curRole, p_identifiant: id, p_mot_de_passe: pw
+        p_role: curRole, p_identifiant: _idConnexion, p_mot_de_passe: pw
       });
       if(_s && _s.ok === true && _s.jeton) {
-        enregistrerJeton(_s.jeton, _s.expire_le, curRole, id);
+        enregistrerJeton(_s.jeton, _s.expire_le, curRole, _idConnexion);
         try { addDebugLog('SESSION personnel ouverte (' + curRole + ')'); } catch(e) {}
       } else {
         effacerJeton();
@@ -10907,7 +11330,9 @@ async function rembourserPassagerCourse(demande, motif) {
   if (!ps) {
     // Le chauffeur n'a pas forcement le passager en memoire : on le charge
     try {
-      const { data } = await supabaseClient.from('passagers').select('*').eq('id', demande.passagerId);
+      // 02/10 (v9.645) : sans « pass_hash » (COLONNES_PASSAGERS) — sinon, apres le SQL 87,
+      // cette lecture etait refusee et le remboursement disait « passager introuvable ».
+      const { data } = await supabaseClient.from('passagers').select(COLONNES_PASSAGERS).eq('id', demande.passagerId);
       if (data && data[0]) { ps = mapPassager(data[0]); DB.passagers.push(ps); }
     } catch (e) {}
   }
@@ -14960,14 +15385,21 @@ async function validerChangerMdp() {
     toast('✅ Mot de passe changé avec succès !');
     return;
   }
-  // Vérifier ancien MDP
-  const ancienOk = await verifyPw(ancien, obj.pass);
-  if(!ancienOk){err.textContent='❌ Ancien mot de passe incorrect.';err.style.display='block';return;}
-  // Sauvegarder nouveau
-  obj.pass = await hashPw(nv);
-  if(type==='agent')     sbSaveAgent(obj);
-  if(type==='sousagent') sbSaveSousAgent(obj);
-  if(type==='passager')  sbSavePassager(obj);
+  // ══ 02/10 (v9.645) — AGENT, SOUS-AGENT ET PASSAGER : LE MEME CHEMIN QUE LE CLIENT ══
+  // L'empreinte ne descend plus (obj.pass vaut '') : la comparaison locale aurait dit
+  // « Ancien mot de passe incorrect » a TOUT LE MONDE, et sbSaveAgent / sbSaveSousAgent /
+  // sbSavePassager n'ecrivent plus pass_hash. changer_mon_mot_de_passe verifie l'ancien et
+  // ecrit le nouveau cote serveur, pour ces trois roles comme pour le client (sonde 01/10).
+  try {
+    const { data, error } = await supabaseClient.rpc('changer_mon_mot_de_passe', {
+      p_role: type, p_num: obj.num, p_ancien: ancien, p_nouveau: nv
+    });
+    if(error) { err.textContent='⚠️ Serveur injoignable. Réessayez dans un instant.'; err.style.display='block'; return; }
+    if(!data || data.ok !== true) {
+      err.textContent = '❌ ' + _messageRefusMdp(data && data.raison);
+      err.style.display='block'; return;
+    }
+  } catch(e) { err.textContent='⚠️ Serveur injoignable. Réessayez dans un instant.'; err.style.display='block'; return; }
   closeModal('m-chg-mdp');
   toast('✅ Mot de passe changé avec succès !');
 }
@@ -16166,6 +16598,36 @@ function showQR(data, titre, infosHtml, note) {
   openModal('m-qr');
 }
 
+// ══ 02/10 (v9.645) — LE QR D'UN LIEN FOURNI PAR LE SERVEUR ══
+// showQR reconstruit l'adresse a partir de « numero|matricule|VIN ». Ici, l'adresse arrive
+// TOUTE FAITE du serveur (valider_demande / suivre_demande : « lien_verification », SQL
+// 82c) et le QR l'encode telle quelle : c'est elle que n'importe quel telephone ouvrira.
+// Elle ne contient jamais le code d'acces. Meme modal, memes boutons (imprimer, terminer).
+function montrerQrLien(lien, titre, infosHtml, note) {
+  const _bfiche = document.getElementById('qr-btn-fiche'); if(_bfiche) _bfiche.style.display = 'none';
+  const _bmail = document.getElementById('qr-btn-email'); if(_bmail) _bmail.style.display = 'none';
+  document.getElementById('qr-titre').textContent = titre;
+  document.getElementById('qr-infos').innerHTML = infosHtml;
+  document.getElementById('qr-code-display').textContent = lien;
+  document.getElementById('qr-note').textContent = note;
+  const canvas = document.getElementById('qr-canvas');
+  const fallback = document.getElementById('qr-fallback');
+  if(typeof QRCode === 'undefined') {
+    canvas.style.display = 'none';
+    if(fallback) {
+      fallback.style.display = '';
+      fallback.innerHTML = '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px;text-align:center"><div style="font-size:28px;margin-bottom:6px">📡</div><div style="font-size:12px;color:#92400e">Le dessin du QR est indisponible hors connexion.<br>Le lien ci-dessous suffit à vérifier le véhicule.</div></div>';
+    }
+  } else {
+    canvas.style.display = '';
+    if(fallback) fallback.style.display = 'none';
+    try {
+      QRCode.toCanvas(canvas, lien, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } }, e => { if(e) console.error(e); });
+    } catch(e) { console.error('QR lien :', e); }
+  }
+  openModal('m-qr');
+}
+
 // ══ Email de confirmation générique (tous les formulaires) ══
 async function envoyerEmailConfirmation(email, titre, lignes, pdfBase64, pdfNom) {
   if(!email) return false;
@@ -16604,9 +17066,42 @@ async function saveMoto() {
       _mdpInitial: true
     };
     DB.clients.push(newClient);
-    sbSaveClient(newClient);
+    // ══ 03/10 (v9.645) — ON ATTEND LA BASE AVANT DE CONTINUER AVEC LE VEHICULE ══
+    //
+    // Ici, la creation du compte du proprietaire partait SANS ETRE ATTENDUE, et son
+    // resultat n'etait jamais lu. Tant que la base acceptait tout, cela ne se voyait pas.
+    // Le SQL 88 pose deux verrous sur les clients (clients_tel_humain_uidx,
+    // clients_num_humain_uidx) : des qu'il est en place, ce compte peut etre REFUSE —
+    // par exemple quand le telephone appartient deja a un client que la liste de
+    // l'appareil n'avait pas (au-dela de mille comptes, le serveur n'envoie plus tout).
+    // Ce qui se passait alors, en silence : le compte n'existait pas sur le serveur, le
+    // vehicule etait quand meme enregistre, sa reference au proprietaire tombait a
+    // « null » (le helper retire une cle etrangere introuvable), le QR s'affichait et
+    // l'ecran disait « ✅ ». Le proprietaire n'avait plus de compte, et sa moto plus de
+    // proprietaire. On s'arrete donc ici, on rend a l'agent ce qui vient de lui etre
+    // preleve, et on montre la phrase du verrou — qui dit quoi faire ensuite.
+    const _okClient = await sbSaveClient(newClient);
+    if(_okClient !== true) {
+      const _refusCl = (typeof dernierRefusSauvegarde === 'function') ? dernierRefusSauvegarde() : null;
+      DB.clients = DB.clients.filter(x => x.id !== newClient.id);
+      if(agId && tf && !isAdmin()) {
+        const agRC = DB.agents.find(a => a.id === agId);
+        if(agRC) {
+          const debitRC = Math.round(tf.prix * DB.commissions.enregAgent / 100);
+          agRC.solde += debitRC;
+          logMvt('rech','↩️ Remboursement auto — compte du propriétaire refusé (' + (mat||vin).toUpperCase() + ')', debitRC, 'Système', agRC.name, {annulation:true});
+          sbSaveAgent(agRC);
+        }
+      }
+      err.textContent = (_refusCl && _refusCl.phrase)
+        ? '⛔ ' + _refusCl.phrase + ' Le compte du propriétaire n\'a PAS été créé, le véhicule n\'a PAS été enregistré et aucun QR n\'a été généré.'
+        : '⚠️ Le compte du propriétaire n\'a PAS pu être créé : le véhicule n\'a PAS été enregistré et aucun QR n\'a été généré. Vérifiez votre connexion, puis réessayez.';
+      err.style.display = 'block';
+      window.__saveMotoEnCours = false;   // la phrase invite à reprendre : le bouton répond tout de suite
+      return;
+    }
     cltIdFinal = newClient.id;
-    
+
     // 📧 Envoyer emails d'enregistrement
     _envoyerEmailEnregistrementClient(newClient, agId);
   }
@@ -16681,6 +17176,9 @@ async function saveMoto() {
   toast('⏳ Sauvegarde en cours…');
   const sauvegardeOK = await sbSaveVehicule(newV);
   if(sauvegardeOK !== true) {
+    // 02/10 (v9.645) : on lit la raison du refus TOUT DE SUITE — la sauvegarde de
+    // remboursement ci-dessous la remplacerait.
+    const _refusVeh = (typeof dernierRefusSauvegarde === 'function') ? dernierRefusSauvegarde() : null;
     // Retirer le véhicule local + rembourser le débit agent éventuel
     DB.vehs = DB.vehs.filter(x => x.id !== newV.id);
     if(agId && tf && !isAdmin()) {
@@ -16692,9 +17190,20 @@ async function saveMoto() {
         sbSaveAgent(agR);
       }
     }
-    err.textContent = '⚠️ ÉCHEC DE LA SAUVEGARDE — le véhicule n\'a PAS été enregistré dans le système. Vérifiez votre connexion internet puis réessayez. Aucun QR n\'a été généré.';
+    // 02/10 (v9.645) : si la base a refuse un DOUBLON (SQL 88 : matricule, chassis ou
+    // numero deja au registre), c'est CETTE phrase qu'on montre — pas « verifiez votre
+    // connexion », qui faisait reessayer puis contourner.
+    err.textContent = (_refusVeh && _refusVeh.phrase)
+      ? '⛔ ' + _refusVeh.phrase + ' Le véhicule n\'a PAS été enregistré et aucun QR n\'a été généré.'
+      : '⚠️ ÉCHEC DE LA SAUVEGARDE — le véhicule n\'a PAS été enregistré dans le système. Vérifiez votre connexion internet puis réessayez. Aucun QR n\'a été généré.';
     err.style.display = 'block';
-    toast('⚠️ Enregistrement NON sauvegardé — réessayez', true);
+    toast((_refusVeh && _refusVeh.phrase) ? '⛔ ' + _refusVeh.phrase : '⚠️ Enregistrement NON sauvegardé — réessayez', true);
+    // 03/10 (v9.645) : la phrase dit « Réessayez » (et, pour un numéro déjà attribué,
+    // « un nouveau numéro sera tiré » — genNum en tire bien un autre à chaque appel).
+    // Or l'anti-double-appui posé à l'entrée ne se relâchait qu'au bout de six secondes :
+    // l'agent appuyait, RIEN ne se passait, et aucun message ne lui disait d'attendre.
+    // On relâche donc le verrou ici : le bouton répond tout de suite.
+    window.__saveMotoEnCours = false;
     return;
   }
   // Lier le véhicule au compte client (si c'est son premier véhicule, on garde une référence directe)
@@ -19316,7 +19825,11 @@ function openAddTaxi() {
   openModal('m-taxi');
 }
 
-function saveTaxi() {
+async function saveTaxi() {
+  // 02/10 (v9.645) : la fonction attend desormais la base ; un double appui creerait deux
+  // envois, le second refuse en doublon. Le verrou n'est pose qu'autour de l'envoi (plus
+  // bas), pour qu'une erreur de saisie corrigee puisse etre renvoyee tout de suite.
+  if(window.__saveTaxiEnCours) return;
   const nom = document.getElementById('mt-nom').value.trim();
   const plaque = document.getElementById('mt-plaque').value.trim();
   const gilet = document.getElementById('mt-gilet').value.trim();
@@ -19341,6 +19854,7 @@ function saveTaxi() {
 
   // ── Vérification + déduction solde agent ──
   const agId = document.getElementById('mt-agent').value||'';
+  let _agDebite = null, _debitTaxi = 0;   // 02/10 : pour rembourser si la base refuse
   if(agId && !isAdmin()) {
     const ag = DB.agents.find(a=>a.id===agId);
     const tf = DB.tarifs.find(t=>t.id==='tf2') || DB.tarifs[0];
@@ -19351,6 +19865,7 @@ function saveTaxi() {
     }
     if(ag && debit > 0) {
       ag.solde -= debit;
+      _agDebite = ag; _debitTaxi = debit;
       logMvt('enreg','🛵 Enregistrement taxi '+plaque.toUpperCase()+' — part société',debit,ag.name,'Société (enregistrement)');
     }
   }
@@ -19370,7 +19885,29 @@ function saveTaxi() {
     valide: peutValiderEnregistrements()
   };
   DB.taxis.push(newTaxi);
-  sbSaveTaxi(newTaxi);
+  // ══ 02/10 (v9.645) — ON ATTEND LA REPONSE DE LA BASE AVANT D'ANNONCER « ✅ » ══
+  // Le SQL 88 refuse une plaque deja enregistree (taxis_plaque_humain_uidx) ou un
+  // vehicule qui a deja sa fiche taxi (taxis_moto_id_uidx). Avant, le taxi etait annonce,
+  // le QR affiche et l'agent debite — alors que la fiche n'existait pas sur le serveur.
+  err.textContent = '⏳ Enregistrement en cours…'; err.style.display = 'block';
+  let _okTaxi;
+  window.__saveTaxiEnCours = true;
+  try { _okTaxi = await sbSaveTaxi(newTaxi); } finally { window.__saveTaxiEnCours = false; }
+  if(_okTaxi !== true) {
+    const _refusT = (typeof dernierRefusSauvegarde === 'function') ? dernierRefusSauvegarde() : null;
+    DB.taxis = DB.taxis.filter(x => x.id !== newTaxi.id);
+    if(_agDebite && _debitTaxi > 0) {
+      _agDebite.solde += _debitTaxi;
+      logMvt('rech','↩️ Remboursement auto — échec enregistrement taxi ' + plaque.toUpperCase(), _debitTaxi, 'Système', _agDebite.name, {annulation:true});
+      sbSaveAgent(_agDebite);
+    }
+    err.textContent = (_refusT && _refusT.phrase)
+      ? '⛔ ' + _refusT.phrase + ' Le taxi n\'a PAS été enregistré et aucun QR n\'a été généré.'
+      : '⚠️ ÉCHEC DE LA SAUVEGARDE — le taxi n\'a PAS été enregistré. Vérifiez votre connexion puis réessayez. Aucun QR n\'a été généré.';
+    err.style.display = 'block';
+    return;
+  }
+  err.style.display = 'none';
   { const motoTx = motoLiee || null;
     const clTx = motoTx ? DB.clients.find(cc => cc.id === motoTx.clientId) : null;
     envoyerEmailConfirmation(clTx && clTx.email, 'Confirmation enregistrement taxi — ' + plaque.toUpperCase(), [
@@ -25509,18 +26046,40 @@ async function changeMdpAdmin() {
     ' Notez bien ces informations avant de continuer — sans elles, vous perdrez l\'accès à cet espace.';
 
   askConfirm(messageConfirm, async () => {
-    if(newId) { DB.adminId = newId; }
-    if(newEmail) DB.adminEmail = newEmail;
-    if(nv) { DB.adminPass = await hashPw(nv); }
-    // Sauvegarder dans Supabase pour persister après rechargement
+    // ══ 02/10 (v9.645) — UNE MISE A JOUR CIBLEE, ET L'ERREUR REMONTE A L'ECRAN ══
+    // Avant : un upsert de la ligne entiere, dont « admin_pass_hash: DB.adminPass » MEME
+    // quand seul l'identifiant changeait — or DB.adminPass vaut desormais '' (l'empreinte
+    // ne descend plus) : l'upsert aurait EFFACE le mot de passe du fondateur. Et apres le
+    // SQL 87, un upsert qui porte admin_pass_hash est refuse en entier, alors qu'un
+    // « update ... where id = 1 » passe (banc). On n'envoie donc QUE ce qui change, par
+    // update, et un refus s'affiche au lieu d'un « mis a jour » mensonger.
+    const _patch = {};
+    if(newId) _patch.admin_id = newId;
+    if(newEmail) _patch.admin_email = newEmail;
+    if(nv) _patch.admin_pass_hash = await hashPw(nv);
     try {
-      await supabaseClient.from('config_admin').upsert({
-        id: 1,
-        admin_id: DB.adminId,
-        admin_email: DB.adminEmail,
-        admin_pass_hash: DB.adminPass
-      });
-    } catch(e) { console.warn('Sauvegarde admin:', e.message); }
+      const { error, count } = await supabaseClient.from('config_admin')
+        .update(_patch, { count: 'exact' }).eq('id', 1);
+      if(error) {
+        err.textContent = '⛔ Le serveur a refusé le changement : ' + error.message + '. Vos identifiants actuels restent valables.';
+        err.style.display = 'block';
+        return;
+      }
+      if(typeof count === 'number' && count === 0) {
+        err.textContent = '⛔ Aucune ligne de configuration n\'a été modifiée : vos identifiants actuels restent valables. Actualisez la page, puis réessayez.';
+        err.style.display = 'block';
+        return;
+      }
+    } catch(e) {
+      err.textContent = '⚠️ Serveur injoignable : rien n\'a été changé. Réessayez dans un instant.';
+      err.style.display = 'block';
+      return;
+    }
+    // Seulement maintenant, la memoire suit le serveur.
+    // 03/10 (v9.645) : la base vient de l'accepter, donc c'est bien la forme exacte qui y
+    // est enregistree — l'ecran de connexion peut s'y fier (drapeau adminIdLu).
+    if(newId) { DB.adminId = newId; DB.adminIdLu = true; }
+    if(newEmail) DB.adminEmail = newEmail;
     document.getElementById('mdp-admin-id').value = '';
     document.getElementById('mdp-admin-email').value = '';
     document.getElementById('mdp-admin-new').value = '';
@@ -25564,27 +26123,40 @@ async function changeMdp(type, id) {
     rGestion();
     return;
   }
-  let val, obj, champ='pass';
-  if(type==='agent')     { val=(document.getElementById('mdp-ag-'+id)||{}).value?.trim();  obj=DB.agents.find(x=>x.id===id); }
-  else if(type==='sousagent') { val=(document.getElementById('mdp-sa-'+id)||{}).value?.trim(); obj=DB.sousAgents.find(x=>x.id===id); }
-  else if(type==='client')   { val=(document.getElementById('mdp-cl-'+id)||{}).value?.trim(); obj=DB.clients.find(x=>x.id===id); }
-  else if(type==='passager') { val=(document.getElementById('mdp-ps-'+id)||{}).value?.trim(); obj=DB.passagers.find(x=>x.id===id); }
-  else if(type==='veh')      { val=(document.getElementById('mdp-veh-'+id)||{}).value?.trim(); obj=DB.vehs.find(x=>x.id===id); champ='code'; }
-  if(!val) { toast('Valeur vide', true); return; }
-  if(!obj) { toast('Introuvable', true); return; }
-  obj[champ] = champ==='pass' ? await hashPw(val) : val;
-  toast('✅ ' + (champ==='code'?'Code accès':'Mot de passe') + ' modifié · ' + (obj.name||obj.prenom||obj.mat||obj.owner));
-  rGestion();
-  // 💾 SAUVEGARDER DANS SUPABASE (BUG FIX: c'était oublié — mots de passe n'étaient jamais persistés!)
-  if(type==='client') sbSaveClient(obj);
-  else if(type==='agent') sbSaveAgent(obj);
-  else if(type==='sousagent') sbSaveSousAgent(obj);
-  else if(type==='passager') sbSavePassager(obj);
-  else if(type==='veh') sbSaveVehicule(obj);
+  // ══ 02/10 (v9.645) — AGENT, SOUS-AGENT ET PASSAGER : LE MEME CHEMIN QUE LE CLIENT ══
+  // sbSaveAgent / sbSaveSousAgent / sbSavePassager n'envoient plus « pass_hash » : ecrire
+  // l'empreinte dans l'objet puis sauvegarder ne ferait RIEN, l'ecran dirait « modifie »
+  // et la personne ne pourrait plus entrer. Tout passe par changer_mdp_compte (serveur),
+  // via _changerMdpParServeur, et le « ✅ » n'arrive qu'apres la reponse.
+  if(type==='agent' || type==='sousagent' || type==='passager') {
+    const champId = type==='agent' ? 'mdp-ag-'+id : (type==='sousagent' ? 'mdp-sa-'+id : 'mdp-ps-'+id);
+    const valeur = ((document.getElementById(champId)||{}).value || '').trim();
+    const cible = type==='agent' ? DB.agents.find(x=>x.id===id)
+                : (type==='sousagent' ? DB.sousAgents.find(x=>x.id===id) : DB.passagers.find(x=>x.id===id));
+    if(!valeur) { toast('Valeur vide', true); return; }
+    if(!cible) { toast('Introuvable', true); return; }
+    const _titre = type==='agent' ? 'Changer le mot de passe de l\'agent'
+                 : (type==='sousagent' ? 'Changer le mot de passe du sous-agent' : 'Changer le mot de passe du passager');
+    const r = await _changerMdpParServeur(type, id, valeur, _titre);
+    if(r.ok !== true) { toast('⛔ ' + r.phrase, true); return; }
+    const _champ = document.getElementById(champId); if(_champ) _champ.value = '';
+    toast('✅ Mot de passe modifié · ' + (cible.name || ((cible.prenom||'') + ' ' + (cible.nom||'')).trim()));
+    rGestion();
+    return;
+  }
+  toast('Type de compte inconnu : ' + type, true);
 }
 
 // ── Actions générales ──
-function toggleAg(id) { const ag=DB.agents.find(x=>x.id===id); if(ag){ag.actif=!ag.actif; sbSaveAgent(ag); toast(ag.actif?'✅ Agent activé':'⏸️ Agent suspendu');rGestion();} }
+// 02/10 (v9.645) : on attend la base avant d'annoncer ; si elle refuse, l'interrupteur
+// revient a sa position et la raison s'affiche.
+async function toggleAg(id) {
+  const ag=DB.agents.find(x=>x.id===id); if(!ag) return;
+  ag.actif=!ag.actif;
+  const _ok = await sbSaveAgent(ag);
+  if(_ok !== true) { ag.actif=!ag.actif; toast('⛔ ' + phraseRefusSauvegarde('Le changement n\'a PAS été enregistré. Réessayez.'), true); rGestion(); return; }
+  toast(ag.actif?'✅ Agent activé':'⏸️ Agent suspendu'); rGestion();
+}
 // ── Habiliter ou retirer à un agent le pouvoir de valider lui-même ses enregistrements (sans passer par l'admin) ──
 async function toggleAgentPeutValider(id) {
   const ag = DB.agents.find(x=>x.id===id);
@@ -25592,20 +26164,31 @@ async function toggleAgentPeutValider(id) {
   
   const ancienneValeur = ag.peutValider;
   ag.peutValider = !ag.peutValider;
-  
+
   console.log('[Agent] Toggle habilitation validation:', ag.name, 'avant=', ancienneValeur, 'après=', ag.peutValider);
-  
+
+  // ══ 03/10 (v9.645) — ON LIT LA REPONSE DE LA BASE, PAS SEULEMENT L'ABSENCE D'EXCEPTION ══
+  // Ce « try/catch » n'attrapait rien : sbSaveAgent ne lance jamais d'exception, il REND
+  // false quand la base refuse. L'ecran annoncait donc « peut desormais valider » meme
+  // quand rien n'avait ete enregistre — et depuis le 02/10 une sauvegarde d'agent qui ne
+  // touche aucune ligne est un refus. Un agent se croyait habilite et ne l'etait pas.
+  // Meme regle que l'interrupteur « actif » (toggleAg) : on remet la position d'avant et
+  // on dit pourquoi.
   try {
-    // Essayer de sauvegarder
-    await sbSaveAgent(ag);
-    console.log('[Agent] Sauvegarde réussie');
-    
+    const _okHab = await sbSaveAgent(ag);
+    if(_okHab !== true) {
+      ag.peutValider = ancienneValeur;
+      toast('⛔ ' + phraseRefusSauvegarde('L\'habilitation n\'a PAS été enregistrée. Réessayez.'), true);
+      rGestion();
+      return;
+    }
     toast(ag.peutValider ? '✅ ' + ag.name + ' peut désormais valider ses enregistrements' : '⏳ ' + ag.name + ' doit désormais passer par la validation admin');
     rGestion();
   } catch(err) {
     console.error('[Agent] Exception:', err);
     ag.peutValider = ancienneValeur;
     toast('❌ Erreur sauvegarde — opération annulée', true);
+    rGestion();
   }
 }
 async function toggleAgentPeutVoirCourses(id) {
@@ -25616,12 +26199,31 @@ async function toggleAgentPeutVoirCourses(id) {
   ag.peutVoirCourses = !ag.peutVoirCourses;
   
   console.log('[Agent] Toggle historique courses:', ag.name, 'avant=', ancienneValeur, 'après=', ag.peutVoirCourses);
-  
+
+  // ══ 03/10 (v9.645) — CE REGLAGE N'EXISTAIT NULLE PART, ET L'ECRAN DISAIT « ✅ » ══
+  // Deux defauts se cumulaient. (1) Le resultat de la sauvegarde n'etait pas lu : le
+  // try/catch n'attrape rien, car sbSaveAgent REND false au lieu de lancer. (2) La
+  // colonne « peut_voir_courses » n'existe pas dans la table des agents en production
+  // (verifie le 03/10) : le helper la retire, la sauvegarde passe, et l'habilitation
+  // s'evapore au rechargement de la page. L'administration habilitait donc un agent
+  // quatre fois de suite en lisant quatre fois « peut desormais consulter ».
+  // On lit maintenant les deux choses, et on le dit.
   try {
-    // Essayer de sauvegarder
-    await sbSaveAgent(ag);
-    console.log('[Agent] Sauvegarde réussie');
-    
+    const _okVc = await sbSaveAgent(ag);
+    if(_okVc !== true) {
+      ag.peutVoirCourses = ancienneValeur;
+      toast('⛔ ' + phraseRefusSauvegarde('L\'habilitation n\'a PAS été enregistrée. Réessayez.'), true);
+      rGestion(); updateNav();
+      return;
+    }
+    if(typeof colonneRefusee === 'function' && colonneRefusee('agents', 'peut_voir_courses')) {
+      ag.peutVoirCourses = ancienneValeur;
+      toast('⚠️ Ce réglage n\'existe pas encore dans la base : la table des agents n\'a pas de case « peut voir les courses ». ' +
+            'L\'habilitation n\'a PAS été enregistrée et elle disparaîtrait au rechargement. ' +
+            'Faites ajouter cette colonne dans Supabase (agents.peut_voir_courses), puis reprenez.', true);
+      rGestion(); updateNav();
+      return;
+    }
     toast(ag.peutVoirCourses ? '🚕 ' + ag.name + ' peut désormais consulter l\'historique des courses' : '🚫 ' + ag.name + ' ne peut plus consulter l\'historique des courses');
     rGestion();
     updateNav();
@@ -26943,7 +27545,7 @@ function editPassager(id) {
     // v9.576 : le verso est modifiable comme le recto — sinon l'administration ne pourrait
     // jamais completer une fiche ancienne, qui n'en a pas.
     {key:'photoPieceVerso',label:"Pièce d'identité — VERSO",type:'photo',rond:false,val:p.photoPieceVerso||''}
-  ], function(){
+  ], async function(){
     p.prenom=ev('prenom')||p.prenom; p.nom=ev('nom')||p.nom;
     p.tel=ev('tel')||p.tel; p.email=ev('email')||p.email; p.piece=ev('piece')||p.piece;
     p.user=ev('user')||p.user;
@@ -26952,9 +27554,19 @@ function editPassager(id) {
     p.photoProfil = evPhoto('photoProfil') || p.photoProfil || '';
     p.photoPiece  = evPhoto('photoPiece')  || p.photoPiece  || '';
     p.photoPieceVerso = evPhoto('photoPieceVerso') || p.photoPieceVerso || '';   // v9.576
-    if(ev('pass')) { hashPw(ev('pass')).then(h => { p.pass=h; sbSavePassager(p); }); }
-    else { sbSavePassager(p); } // AUDIT : les modifications n'étaient jamais persistées
-    closeModal('m-edit'); rGestion(); toast('✅ Passager mis à jour');
+    // 02/10 (v9.645) : le mot de passe ne part plus avec la fiche (sbSavePassager n'ecrit
+    // plus pass_hash) : il passe par le serveur APRES la sauvegarde, et le « ✅ » n'arrive
+    // qu'une fois la base lue. Voir _changerMdpParServeur.
+    const _nouveauMdpPs = ev('pass');
+    const _okPs = await sbSavePassager(p);
+    if(_okPs !== true) { toast('⛔ ' + phraseRefusSauvegarde('La fiche du passager n\'a PAS été enregistrée. Réessayez.'), true); return; }
+    let _avertPs = '';
+    if(_nouveauMdpPs) {
+      const r = await _changerMdpParServeur('passager', p.id, _nouveauMdpPs, 'Changer le mot de passe du passager');
+      if(r.ok !== true) _avertPs = '⚠️ Fiche enregistrée — mot de passe NON changé : ' + r.phrase;
+    }
+    closeModal('m-edit'); rGestion();
+    if(_avertPs) toast(_avertPs, true); else toast('✅ Passager mis à jour' + (_nouveauMdpPs ? ' — mot de passe changé' : ''));
   });
 }
 // ── Validation des enregistrements véhicules/taxis effectués par un agent non habilité ──
@@ -26987,20 +27599,25 @@ function rejeterTaxi(id) {
   if(!t) return;
   envoyerCorbeille('taxis', id, 'Taxi rejeté : ' + t.nom + ' — ' + t.plaque, 'Rejeter cet enregistrement (' + t.nom + ' — ' + t.plaque + ') ? Il sera déplacé vers la corbeille (récupérable 48h).', () => { rGestion(); rTaxis(); });
 }
-function validerPassager(id) {
+// 02/10 (v9.645) : valider ou invalider un passager ATTEND la reponse de la base avant
+// d'annoncer ; un refus remet l'etat d'avant et dit pourquoi. C'est le geste-temoin de la
+// pose du SQL 87 (« valider un passager depuis l'administration »).
+async function validerPassager(id) {
   if(!(isAdmin() || isAgent())) { toast('⛔ Action réservée au personnel', true); return; }
   const p = DB.passagers.find(x=>x.id===id);
   if(!p) return;
   p.valide = true;
-  sbSavePassager(p);
+  const _ok = await sbSavePassager(p);
+  if(_ok !== true) { p.valide = false; rGestion(); toast('⛔ Validation NON enregistrée : ' + phraseRefusSauvegarde('la base a refusé la sauvegarde. Réessayez.'), true); return; }
   rGestion();
   toast('✅ Compte passager validé : ' + p.prenom + ' ' + p.nom);
 }
-function invaliderPassager(id) {
+async function invaliderPassager(id) {
   const p = DB.passagers.find(x=>x.id===id);
   if(!p) return;
   p.valide = false;
-  sbSavePassager(p);
+  const _ok = await sbSavePassager(p);
+  if(_ok !== true) { p.valide = true; rGestion(); toast('⛔ Changement NON enregistré : ' + phraseRefusSauvegarde('la base a refusé la sauvegarde. Réessayez.'), true); return; }
   rGestion();
   toast('⛔ Compte passager invalidé : ' + p.prenom + ' ' + p.nom);
 }
@@ -27280,10 +27897,20 @@ function editAg(id) {
     ag.resp=ev('resp'); ag.pref=ev('pref')||ag.pref; ag.addr=ev('addr');
     ag.tel=ev('tel'); ag.email=ev('email'); ag.code=ev('code')||ag.code;
     ag.pieceType=ev('piece_type')||''; ag.pieceNum=ev('piece_num')||'';
-    if(ev('pass')) { ag.pass = await hashPw(ev('pass')); }
+    // 02/10 (v9.645) : le mot de passe ne part plus avec la fiche (sbSaveAgent n'ecrit plus
+    // pass_hash). Sans ce bloc, un mot de passe tape ici etait PERDU EN SILENCE et l'ecran
+    // disait « mis a jour ». Il passe par le serveur, apres la sauvegarde de la fiche.
+    const _nouveauMdpAg = ev('pass');
     ag.solde=parseInt(ev('solde'))||ag.solde;
-    await sbSaveAgent(ag);
-    closeModal('m-edit'); rGestion(); toast('✅ Agent mis à jour'); updateNav();
+    const _okAg = await sbSaveAgent(ag);
+    if(_okAg !== true) { toast('⛔ ' + phraseRefusSauvegarde('La fiche de l\'agent n\'a PAS été enregistrée. Réessayez.'), true); return; }
+    let _avertAg = '';
+    if(_nouveauMdpAg) {
+      const r = await _changerMdpParServeur('agent', ag.id, _nouveauMdpAg, 'Changer le mot de passe de l\'agent');
+      if(r.ok !== true) _avertAg = '⚠️ Fiche enregistrée — mot de passe NON changé : ' + r.phrase;
+    }
+    closeModal('m-edit'); rGestion(); updateNav();
+    if(_avertAg) toast(_avertAg, true); else toast('✅ Agent mis à jour' + (_nouveauMdpAg ? ' — mot de passe changé' : ''));
   });
 }
 
@@ -27296,12 +27923,25 @@ function editVeh(id) {
     {key:'owner',label:'Propriétaire',val:v.owner},{key:'phone',label:'Téléphone',val:v.phone},
     {key:'addr',label:'Adresse',val:v.addr||''},{key:'gilet',label:'N° Gilet',val:v.gilet||''},
     {key:'vin',label:'VIN / Châssis',val:v.vin||''},{key:'cg',label:'N° Carte grise',val:v.cg||''}
-  ], function(){
+  ], async function(){
+    // 02/10 (v9.645) : on garde l'ancienne valeur des champs que le SQL 88 verrouille
+    // (matricule, chassis), pour les remettre si la base refuse un doublon.
+    const _avant = { mat:v.mat, vin:v.vin };
     v.mat=ev('mat').toUpperCase()||v.mat; v.brand=ev('brand')||v.brand;
     v.model=ev('model')||v.model; v.color=ev('color')||v.color;
     v.year=ev('year')||v.year; v.owner=ev('owner')||v.owner;
     v.phone=ev('phone')||v.phone; v.addr=ev('addr'); v.gilet=ev('gilet');
     v.vin=ev('vin'); v.cg=ev('cg');
+    // ══ 02/10 — ON ATTEND LA BASE AVANT D'ANNONCER « ✅ » ══
+    // Un matricule ou un chassis deja au registre est refuse (vehicules_mat_humain_uidx,
+    // vehicules_vin_humain_uidx) : la phrase du refus s'affiche, la fiche garde ses
+    // anciennes valeurs, et la fenetre reste ouverte pour corriger.
+    const _okVeh = await sbSaveVehicule(v);
+    if(_okVeh !== true) {
+      v.mat = _avant.mat; v.vin = _avant.vin;
+      toast('⛔ ' + phraseRefusSauvegarde('Le véhicule n\'a PAS été enregistré. Réessayez.'), true);
+      return;
+    }
     // Garder le compte client lié cohérent avec les infos du véhicule (même nom, même téléphone)
     if(v.clientId) {
       const cl = DB.clients.find(c=>c.id===v.clientId);
@@ -27313,7 +27953,6 @@ function editVeh(id) {
         sbSaveClient(cl); // AUDIT : synchro client jamais persistée
       }
     }
-    sbSaveVehicule(v); // AUDIT : modifications véhicule jamais persistées
     closeModal('m-edit'); rGestion(); rVehs(); toast('✅ Véhicule mis à jour');
   });
 }
@@ -27325,11 +27964,19 @@ function editTaxi(id) {
     {key:'gilet',label:'N° Gilet',val:t.gilet},{key:'zone',label:'Zone',val:t.zone||''},
     {key:'syndicat',label:'Syndicat',val:t.syndicat||''},{key:'tel',label:'Téléphone',val:t.tel||''},
     {key:'permis',label:'N° Permis',val:t.permis||''}
-  ], function(){
+  ], async function(){
+    const _plaqueAvant = t.plaque;   // 02/10 : remise si la base refuse un doublon
     t.nom=ev('nom')||t.nom; t.plaque=ev('plaque').toUpperCase()||t.plaque;
     t.gilet=ev('gilet')||t.gilet; t.zone=ev('zone'); t.syndicat=ev('syndicat');
     t.tel=ev('tel'); t.permis=ev('permis');
-    sbSaveTaxi(t); // AUDIT : modifications taxi jamais persistées
+    // 02/10 (v9.645) : on attend la base. Une plaque deja enregistree comme taxi est
+    // refusee (taxis_plaque_humain_uidx) : la phrase s'affiche, la fenetre reste ouverte.
+    const _okTx = await sbSaveTaxi(t);
+    if(_okTx !== true) {
+      t.plaque = _plaqueAvant;
+      toast('⛔ ' + phraseRefusSauvegarde('Le taxi n\'a PAS été enregistré. Réessayez.'), true);
+      return;
+    }
     closeModal('m-edit'); rGestion(); rTaxis(); toast('✅ Taxi mis à jour');
   });
 }
@@ -27418,10 +28065,19 @@ function editSA(id) {
     s.name=ev('name')||s.name; s.tel=ev('tel')||s.tel; s.email=ev('email');
     s.code=ev('code')||s.code;
     s.pieceType=ev('piece_type')||''; s.pieceNum=ev('piece_num')||'';
-    if(ev('pass')) { s.pass = await hashPw(ev('pass')); }
+    // 02/10 (v9.645) : meme chemin que « Modifier agent » — le mot de passe passe par le
+    // serveur apres la sauvegarde, et le « ✅ » n'arrive qu'une fois la base lue.
+    const _nouveauMdpSa = ev('pass');
     s.solde=parseInt(ev('solde'))||0;
-    await sbSaveSousAgent(s);
-    closeModal('m-edit'); rGestion(); toast('✅ Sous-agent mis à jour'); updateNav();
+    const _okSa = await sbSaveSousAgent(s);
+    if(_okSa !== true) { toast('⛔ ' + phraseRefusSauvegarde('La fiche du sous-agent n\'a PAS été enregistrée. Réessayez.'), true); return; }
+    let _avertSa = '';
+    if(_nouveauMdpSa) {
+      const r = await _changerMdpParServeur('sousagent', s.id, _nouveauMdpSa, 'Changer le mot de passe du sous-agent');
+      if(r.ok !== true) _avertSa = '⚠️ Fiche enregistrée — mot de passe NON changé : ' + r.phrase;
+    }
+    closeModal('m-edit'); rGestion(); updateNav();
+    if(_avertSa) toast(_avertSa, true); else toast('✅ Sous-agent mis à jour' + (_nouveauMdpSa ? ' — mot de passe changé' : ''));
   });
 }
 
@@ -27614,7 +28270,20 @@ async function saveAg() {
     actif:true
   };
   DB.agents.push(newAg);
-  sbSaveAgent(newAg);
+  // ══ 02/10 (v9.645) — COMPTE NEUF : INSERT AVEC SON EMPREINTE, ET ON ATTEND LA BASE ══
+  // Le drapeau « _neuf » fait partir l'empreinte UNE fois, avec l'insert (voir
+  // _sbSaveAgent). Un refus (doublon, serveur) retire la fiche locale et s'affiche dans
+  // le formulaire, qui reste ouvert pour corriger. Avant, l'ecran disait « Agent cree »
+  // sans attendre.
+  newAg._neuf = true;
+  err.style.display = 'none';
+  const _okNewAg = await sbSaveAgent(newAg);
+  if(_okNewAg !== true) {
+    DB.agents = DB.agents.filter(x => x.id !== newAg.id);
+    err.textContent = '⛔ ' + phraseRefusSauvegarde('Le compte agent n\'a PAS été créé. Réessayez.');
+    err.style.display = 'block';
+    return;
+  }
   envoyerEmailConfirmation(email, 'Création de votre compte agent — Laouni AfriMoto', [
     'Bonjour ' + (resp || name) + ',',
     '',
@@ -28462,7 +29131,15 @@ function rSA() {
   }).join('') || '<div class="empty">Aucun sous-agent</div>';
 }
 
-function toggleSA(id) { const s=DB.sousAgents.find(x=>x.id===id); if(s){s.actif=!s.actif; sbSaveSousAgent(s); toast('Statut mis à jour');rSA();} }
+// 02/10 (v9.645) : on attend la base avant d'annoncer ; si elle refuse, l'interrupteur
+// revient a sa position et la raison s'affiche (meme regle que toggleAg).
+async function toggleSA(id) {
+  const s=DB.sousAgents.find(x=>x.id===id); if(!s) return;
+  s.actif=!s.actif;
+  const _ok = await sbSaveSousAgent(s);
+  if(_ok !== true) { s.actif=!s.actif; toast('⛔ ' + phraseRefusSauvegarde('Le changement n\'a PAS été enregistré. Réessayez.'), true); rSA(); return; }
+  toast(s.actif ? '✅ Sous-agent activé' : '⏸️ Sous-agent suspendu'); rSA();
+}
 function delSA(id) {
   const sa = DB.sousAgents.find(x=>x.id===id);
   if(!sa) return;
@@ -28485,7 +29162,17 @@ async function saveSA() {
   const emailSA = (document.getElementById('sa-email') ? document.getElementById('sa-email').value : '').trim();
   const newSA = {id:gid(), num, name, tel, email:emailSA, code:num, pass: await hashPw(pass), agId, photo, solde:0, actif:true};
   DB.sousAgents.push(newSA);
-  sbSaveSousAgent(newSA);
+  // 02/10 (v9.645) : compte NEUF -> insert avec son empreinte (drapeau « _neuf », voir
+  // _sbSaveSousAgent), et on attend la base avant d'annoncer. Meme regle que saveAgent.
+  newSA._neuf = true;
+  err.style.display = 'none';
+  const _okNewSA = await sbSaveSousAgent(newSA);
+  if(_okNewSA !== true) {
+    DB.sousAgents = DB.sousAgents.filter(x => x.id !== newSA.id);
+    err.textContent = '⛔ ' + phraseRefusSauvegarde('Le compte sous-agent n\'a PAS été créé. Réessayez.');
+    err.style.display = 'block';
+    return;
+  }
   envoyerEmailConfirmation(emailSA, 'Création de votre compte sous-agent — Laouni AfriMoto', [
     'Bonjour ' + name + ',',
     '',
@@ -33211,7 +33898,29 @@ body.mode-passager .nav-inner{display:none!important}
   // et on montre ce que le serveur a repondu \u2014 y compris son \u00ab hint \u00bb, qui explique
   // souvent qu'une fonction existe mais avec une autre signature (code PGRST202).
   function demErreurServeur(error, nom) {
+    // 02/10 (v9.645) : un verrou d'unicite du SQL 88 (code 23505) remonte ici quand la
+    // validation enregistre le vehicule. Sa phrase francaise vient de la table unique du
+    // site (PHRASES_DOUBLON), la meme que dans tous les autres ecrans.
+    var _dup = (typeof phraseDoublon === 'function') ? phraseDoublon(error) : '';
+    if (_dup) return _dup + ' Rien n\'a \u00e9t\u00e9 enregistr\u00e9.';
     var m = (error && error.message) ? String(error.message) : 'le serveur n\'a pas r\u00e9pondu';
+    // \u2550\u2550 03/10 (v9.645) \u2014 UN DEFAUT CONNU DU SERVEUR, DIT EN FRANCAIS \u2550\u2550
+    //
+    // valider_demande inscrit la reference Orange Money au journal des mouvements en
+    // ecrivant un TEXTE dans \u00ab mouvements.cible_id \u00bb, qui est en uuid en production
+    // (verifie le 03/10 : un filtre texte sur cette colonne repond 22P02). PostgreSQL
+    // refuse ce rapprochement (42804) et ANNULE tout l'appel : le vehicule n'est pas
+    // enregistre. La branche ne s'execute que si le guichet encaisse par Orange Money ET
+    // que le dossier porte une reference \u2014 donc jamais tant que le guichet est en
+    // especes, et a chaque validation le jour ou on le passe en Orange Money.
+    // Sans cette phrase, l'agent lisait \u00ab column cible_id is of type uuid\u2026 \u00bb.
+    if (/cible_id/i.test(m) && /uuid/i.test(m)) {
+      return 'Le serveur a refus\u00e9 d\'inscrire la r\u00e9f\u00e9rence du paiement \u00e0 son journal : le v\u00e9hicule '
+           + 'n\'a PAS \u00e9t\u00e9 enregistr\u00e9 et rien n\'a chang\u00e9. Ce n\'est pas une erreur de votre part. '
+           + 'En attendant la correction, encaissez ce dossier en esp\u00e8ces (R\u00e9glages \u2192 guichet public) '
+           + 'et pr\u00e9venez l\'administration : la fonction \u00ab valider_demande \u00bb doit \u00eatre corrig\u00e9e dans '
+           + 'Supabase (colonne cible_id).';
+    }
     var h = (error && error.hint) ? String(error.hint) : '';
     var code = (error && error.code) ? String(error.code) : '';
     if (code === 'PGRST202') {
@@ -34269,12 +34978,34 @@ body.mode-passager .nav-inner{display:none!important}
                  : 'Le serveur n\'a pas indiqu\u00e9 le mode de paiement.'))
        + '</div>';
 
+    // \u2550\u2550 02/10 (v9.645) \u2014 LE QR SE DESSINE ICI DES QUE LE SERVEUR REND LE LIEN \u2550\u2550
+    // suivre_demande rend \u00ab lien_verification \u00bb (SQL 82c) des que le dossier est valide.
+    // Le QR n'a rien de secret : c'est l'adresse publique de verification du vehicule,
+    // encodee TELLE QUELLE. Le code d'acces, lui, reste remis en main propre.
+    // Sans lien (serveur plus ancien, dossier non valide) : rien n'est dessine, rien
+    // n'est invente.
+    var lienQr = (d.lien_verification && String(d.lien_verification).indexOf('http') === 0) ? String(d.lien_verification) : '';
     if (d.vehicule && d.vehicule.num) {
       h += '<div class="sect">Au registre</div>'
          + '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:11px;margin-bottom:12px;font-size:12.5px">'
            + 'Num\u00e9ro au registre : <span style="font-family:monospace;color:#22C55E;font-weight:800">' + esc(String(d.vehicule.num)) + '</span><br>'
-           + '<span style="color:var(--text2);font-size:11.5px">Votre code d\'acc\u00e8s et votre QR se remettent en main propre, chez '
-           + esc(String(dest.nom || 'l\'administration')) + '. Ils ne sont jamais envoy\u00e9s par message.</span>'
+           + (lienQr
+               ? '<div style="text-align:center;margin:10px 0 8px">'
+                 + '<div id="svd-qr-cadre" style="background:#fff;border-radius:10px;padding:10px;display:inline-block"><canvas id="svd-qr"></canvas></div>'
+                 + '<div id="svd-qr-absent" style="display:none;font-size:11.5px;color:#92400e;line-height:1.5">Le dessin du QR est indisponible hors connexion : le lien ci-dessous suffit \u00e0 v\u00e9rifier le v\u00e9hicule.</div>'
+                 + '<div style="font-size:10.5px;color:var(--text2);margin-top:6px;word-break:break-all">' + esc(lienQr) + '</div>'
+                 + '<div style="display:flex;gap:8px;margin-top:8px">'
+                   + '<button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="svdImprimerQr()">\ud83d\udda8\ufe0f Imprimer le QR</button>'
+                   + '<button class="btn-ghost" style="flex:1;padding:10px;font-size:12px" onclick="svdPartagerQr()">\ud83d\udce4 Partager le lien</button>'
+                 + '</div></div>'
+               : '')
+           + '<span style="color:var(--text2);font-size:11.5px">'
+           + (lienQr
+               ? 'Votre code d\'acc\u00e8s se remet en main propre, chez ' + esc(String(dest.nom || 'l\'administration'))
+                 + '. Il n\'est jamais envoy\u00e9 par message. Le QR ci-dessus, lui, peut \u00eatre imprim\u00e9 ou partag\u00e9 : il ne contient pas le code.'
+               : 'Votre code d\'acc\u00e8s et votre QR se remettent en main propre, chez ' + esc(String(dest.nom || 'l\'administration'))
+                 + '. Ils ne sont jamais envoy\u00e9s par message.')
+           + '</span>'
          + '</div>';
     }
 
@@ -34342,8 +35073,73 @@ body.mode-passager .nav-inner{display:none!important}
     var z = document.getElementById('svd-e-dossier');
     z.innerHTML = h;
     z.style.display = '';
+    // Le canvas existe maintenant dans la page : on y dessine le QR du lien du serveur.
+    svdLienQr = lienQr;
+    svdVehQr = lienQr ? (d.vehicule || {}) : null;
+    if (lienQr) demDessinerQr('svd-qr', lienQr, 'svd-qr-cadre', 'svd-qr-absent');
     try { document.getElementById('m-dem-suivi').scrollTop = 0; } catch (err2) {}
   }
+
+  // ══ 02/10 (v9.645) — DESSINER, IMPRIMER, PARTAGER LE QR DU SUIVI ══
+  var svdLienQr = '';
+  var svdVehQr = null;
+
+  // Dessine « lien » dans le canvas donne. Hors connexion (bibliotheque QR absente), on
+  // cache le cadre et on montre la phrase prevue : le lien ecrit en clair suffit.
+  function demDessinerQr(idCanvas, lien, idCadre, idAbsent) {
+    var c = document.getElementById(idCanvas);
+    if (!c) return;
+    if (typeof QRCode === 'undefined') {
+      var cadre = idCadre ? document.getElementById(idCadre) : null; if (cadre) cadre.style.display = 'none';
+      var a = idAbsent ? document.getElementById(idAbsent) : null; if (a) a.style.display = '';
+      return;
+    }
+    try {
+      QRCode.toCanvas(c, lien, { width: 180, margin: 1, color: { dark: '#000000', light: '#ffffff' } },
+        function (e) { if (e) console.error('QR suivi :', e); });
+    } catch (e) { console.error('QR suivi :', e); }
+  }
+
+  window.svdImprimerQr = function () {
+    if (!svdLienQr) return;
+    var c = document.getElementById('svd-qr');
+    var img = (c && typeof QRCode !== 'undefined')
+      ? '<img src="' + c.toDataURL() + '"/>'
+      : '<div style="font-size:48px;margin:14px 0">📡</div><div style="font-size:11px;color:#999">QR indisponible hors connexion : le lien ci-dessous suffit.</div>';
+    var v = svdVehQr || {};
+    var w = window.open('', '_blank', 'width=400,height=600');
+    if (!w) { toast('⚠️ Fenêtre bloquée par le navigateur. Autorisez les pop-ups pour imprimer.', true); return; }
+    w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>QR Laouni AfriMoto</title>'
+      + '<style>body{font-family:Arial,sans-serif;text-align:center;padding:20px;color:#111}'
+      + 'h2{font-size:18px;letter-spacing:2px;color:#0A0A0A;margin-bottom:6px}.sub{font-size:11px;color:#666;letter-spacing:1px;margin-bottom:16px}'
+      + 'img{border:1px solid #ddd;border-radius:8px;padding:10px;width:180px}.infos{font-size:13px;color:#333;margin:10px 0;line-height:1.8}'
+      + '.lien{font-family:monospace;font-size:11px;color:#b8860b;font-weight:700;word-break:break-all;margin:10px 0}'
+      + '.note{font-size:11px;color:#888;margin-top:10px}@media print{.np{display:none}}</style></head><body>'
+      + '<h2>🛡️ LAOUNI AFRIMOTO GN</h2><div class="sub">Registre sécurisé de trajets et véhicules à moteur en Guinée</div>'
+      + '<div class="infos"><b>' + esc(String(v.mat || '')) + '</b>' + (v.vin ? ' · châssis ' + esc(String(v.vin)) : '')
+      + '<br>N° au registre : ' + esc(String(v.num || '')) + '</div>'
+      + img + '<div class="lien">' + esc(svdLienQr) + '</div>'
+      + '<div class="note">Scannez ce QR pour vérifier ce véhicule. Il ne contient pas le code d\'accès.</div>'
+      + '<div class="np" style="margin-top:16px"><button onclick="window.print()" style="background:#0A0A0A;color:#fff;border:none;padding:9px 20px;border-radius:6px;cursor:pointer">🖨️ Imprimer</button>'
+      + ' <button onclick="window.close()" style="background:#eee;border:none;padding:9px 16px;border-radius:6px;cursor:pointer;margin-left:8px">Fermer</button></div>'
+      + '</body></html>');
+    w.document.close();
+  };
+
+  window.svdPartagerQr = async function () {
+    if (!svdLienQr) return;
+    var v = svdVehQr || {};
+    var texte = 'Vérification AfriMoto du véhicule ' + String(v.mat || v.num || '') + ' : ' + svdLienQr;
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Vérification AfriMoto', text: texte, url: svdLienQr }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    try {
+      await navigator.clipboard.writeText(svdLienQr);
+      toast('Lien copié. Collez-le dans WhatsApp ou un SMS : il ouvre la vérification publique du véhicule.');
+    } catch (e) {
+      toast('Le partage automatique est indisponible sur ce téléphone : recopiez le lien affiché sous le QR.', true);
+    }
+  };
 
   function svdBoiteP(id, libelle) {
     return '<div><div class="lbl">' + libelle + '</div>'
@@ -34774,6 +35570,25 @@ body.mode-passager .nav-inner{display:none!important}
     } else {
       h += '<div class="qr-note-txt" style="font-size:12px;margin-bottom:10px">'
         + 'Ce dossier n\'attend pas de d\u00e9cision : son \u00e9tat est \u00ab ' + esc(e.texte) + ' \u00bb.</div>';
+      // \u2550\u2550 03/10 (v9.645) \u2014 LE PROPRIETAIRE QUI REVIENT CHERCHER SON QR \u2550\u2550
+      //
+      // Le QR s'affiche a l'instant de la validation. Mais le proprietaire vient souvent
+      // le chercher plus tard : l'agent rouvrait alors le dossier et n'y trouvait AUCUN
+      // bouton. Il devait sortir du guichet et retrouver la moto dans le registre \u2014 et
+      // rien ne le lui disait.
+      // On peut le rouvrir : ouvrir_demande (SQL 82) ne refuse que les dossiers
+      // \u00ab rejet\u00e9 \u00bb et \u00ab class\u00e9 sans suite \u00bb, et il rend \u00ab vehicule_id \u00bb. On rebranche
+      // donc le QR du vehicule lui-meme \u2014 celui que le site sait deja reproduire
+      // (num\u00e9ro | matricule | ch\u00e2ssis), exactement celui remis a l'enregistrement. Il ne
+      // contient pas le code d'acces, qui se lit dans la fiche du vehicule.
+      var _vidQr = String(d.vehicule_id || '');
+      if (etat === 'validee' && /^[0-9a-fA-F-]{10,40}$/.test(_vidQr)) {
+        h += '<button class="btn-gold" style="width:100%;padding:12px;margin-bottom:10px;font-size:12.5px" '
+          + 'onclick="gdQrVehicule(\'' + _vidQr + '\')">\ud83d\udda8\ufe0f R\u00e9imprimer le QR de ce v\u00e9hicule</button>'
+          + '<div class="qr-note-txt" style="font-size:11px;margin-bottom:10px;line-height:1.5">'
+          + 'C\'est le m\u00eame QR qu\u2019\u00e0 la validation. Le code d\'acc\u00e8s, lui, ne s\'imprime pas : '
+          + 'il se lit dans la fiche du v\u00e9hicule, et chaque lecture est inscrite au journal.</div>';
+      }
     }
     h += '<div class="fld"><div class="lbl">Motif (lu par le propri\u00e9taire)</div>'
       + '<textarea id="gd-motif" rows="3" placeholder="Ex : carte grise illisible, le ch\u00e2ssis ne correspond pas\u2026" '
@@ -34790,8 +35605,26 @@ body.mode-passager .nav-inner{display:none!important}
     try { document.getElementById('m-dem-dossier').scrollTop = 0; } catch (err3) {}
   }
 
+  // ══ 03/10 (v9.645) — REIMPRIMER LE QR D'UN DOSSIER DEJA VALIDE ══
+  // On ne fabrique aucune adresse ici : on appelle la fonction du site qui reproduit le QR
+  // d'un vehicule du registre (afficherQrVehicule), avec ses boutons Imprimer et Fiche PDF.
+  // Si la fiche n'est pas encore sur cet appareil, on le DIT et on dit ou aller.
+  window.gdQrVehicule = function (vehId) {
+    if (!vehId) return;
+    var v = ((typeof DB !== 'undefined' && DB.vehs) || []).find(function (x) { return x.id === vehId; });
+    if (!v || typeof afficherQrVehicule !== 'function') {
+      gdAnnonce = 'La fiche de ce véhicule n\'est pas encore sur cet appareil. Actualisez la page, puis ouvrez sa fiche dans le registre : le bouton QR y réimprime le même code.';
+      gdAnnonceErreur = true;
+      closeModal('m-dem-dossier');
+      rDemandes();
+      return;
+    }
+    closeModal('m-dem-dossier');
+    afficherQrVehicule(vehId);
+  };
+
   // Un geste, un appel, une phrase : la meme mecanique pour les trois boutons.
-  async function gdGeste(nomFonction, params, idBouton, libelleEnCours, phraseSucces) {
+  async function gdGeste(nomFonction, params, idBouton, libelleEnCours, phraseSucces, apresSucces) {
     var auth = await gdCredentials('Confirmez votre identit\u00e9');
     if (!auth) return;
     demCacherErreur('gd-err');
@@ -34832,6 +35665,44 @@ body.mode-passager .nav-inner{display:none!important}
     gdAnnonce = rep.message ? String(rep.message) : phraseSucces;
     closeModal('m-dem-dossier');
     rDemandes();
+    // 02/10 (v9.645) : certains gestes ont une suite a l'ecran (la validation montre le
+    // QR). Elle ne vient qu'APRES la lecture de \u00ab ok \u00bb, jamais avant.
+    if (typeof apresSucces === 'function') {
+      try { await apresSucces(rep); } catch (e) { console.warn('suite du geste :', e && e.message); }
+    }
+  }
+
+  // \u2550\u2550 02/10 (v9.645) \u2014 LE QR A L'INSTANT DE LA VALIDATION \u2550\u2550
+  //
+  // valider_demande rend desormais \u00ab lien_verification \u00bb et \u00ab vehicule \u00bb {num, mat, vin}
+  // (SQL 82c). Le guichet dessine le QR tout de suite, dans le meme modal que pour un
+  // enregistrement fait au guichet (imprimer, fiche PDF). Le QR encode le lien du serveur
+  // tel quel ; il ne contient JAMAIS le code d'acces, qui se lit dans la fiche du vehicule.
+  // Sans lien dans la reponse (serveur plus ancien) : on ne dessine rien, on n'invente rien.
+  async function gdApresValidation(rep) {
+    var lien = (rep && rep.lien_verification && String(rep.lien_verification).indexOf('http') === 0) ? String(rep.lien_verification) : '';
+    if (!lien || typeof montrerQrLien !== 'function') return;
+    var v = rep.vehicule || {};
+    var infos = '<b>' + esc(String(v.mat || '')) + '</b>' + (v.vin ? ' \u00b7 ch\u00e2ssis ' + esc(String(v.vin)) : '')
+      + '<br>N\u00b0 au registre : <span style="font-family:monospace;color:#22C55E;font-weight:800">' + esc(String(v.num || '')) + '</span>'
+      + (rep.numero_suivi ? '<br><span style="font-size:11.5px;color:var(--text2)">Demande ' + esc(String(rep.numero_suivi)) + '</span>' : '');
+    montrerQrLien(lien, '\u2705 V\u00e9hicule enregistr\u00e9 \u2014 QR pr\u00eat', infos,
+      '\u00c0 remettre au propri\u00e9taire : ce QR ouvre la v\u00e9rification publique du v\u00e9hicule. Il ne contient pas le code d\'acc\u00e8s, qui se lit dans la fiche du v\u00e9hicule.');
+    // La fiche PDF complete a besoin de la fiche du vehicule en memoire. On la demande au
+    // serveur (colonnes sans \u00ab code \u00bb), puis on montre le bouton \u2014 et seulement alors.
+    if (rep.vehicule_id) {
+      try {
+        var deja = (DB.vehs || []).find(function (x) { return x.id === rep.vehicule_id; });
+        if (!deja && typeof mapVehicule === 'function') {
+          var r = await supabaseClient.from('vehicules').select(COLONNES_VEHICULES).eq('id', rep.vehicule_id).limit(1);
+          if (!r.error && r.data && r.data.length) { deja = mapVehicule(r.data[0]); DB.vehs.push(deja); }
+        }
+        if (deja) {
+          window._dernierVehFiche = deja.id;
+          var b = document.getElementById('qr-btn-fiche'); if (b) b.style.display = '';
+        }
+      } catch (e) { console.warn('fiche du vehicule apres validation :', e && e.message); }
+    }
   }
 
   window.gdValider = function () {
@@ -34844,7 +35715,8 @@ body.mode-passager .nav-inner{display:none!important}
       // au depot. On n'invente aucun chiffre a sa place.
       gdGeste('valider_demande',
         { p_frais: null, p_paiement_confirme: paye, p_vu_en_personne: vu },
-        'gd-btn-valider', 'Validation\u2026', 'V\u00e9hicule enregistr\u00e9. Le code se lit dans la fiche du v\u00e9hicule.');
+        'gd-btn-valider', 'Validation\u2026', 'V\u00e9hicule enregistr\u00e9. Le code se lit dans la fiche du v\u00e9hicule.',
+        gdApresValidation);
     });
   };
 
@@ -34876,7 +35748,7 @@ body.mode-passager .nav-inner{display:none!important}
   // La deconnexion oublie le mot de passe garde en memoire pour le guichet.
   window.oublierMotDePasseDemandes = function () { gdAuth = null; };
 
-  try { addDebugLog('DEMANDES v9.643 : parcours public, suivi et guichet en place'); } catch (e) {}
+  try { addDebugLog('DEMANDES v9.645 : parcours public, suivi et guichet en place ; QR dès la validation et au suivi'); } catch (e) {}
 })();
 </script>
 
