@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Laouni AfriMoto GN",
   "short_name": "AfriMoto GN",
-  "description": "Laouni AfriMoto GN est le registre officiel securise des vehicules a moteur en Guinee. Enregistrement moto, taxi, voiture, anti-vol, verification QR et trajets.",
+  "description": "Laouni AfriMoto GN est le registre de reference des vehicules a moteur en Guinee. Enregistrement moto, taxi, voiture, anti-vol, verification QR et trajets.",
   "lang": "fr",
   "dir": "ltr",
   "start_url": "/",

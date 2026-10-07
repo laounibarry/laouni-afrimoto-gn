@@ -29,6 +29,10 @@
     {
       "source": "/conditions",
       "destination": "/conditions.html"
+    },
+    {
+      "source": "/suppression-compte",
+      "destination": "/suppression-compte.html"
     }
   ],
   "headers": [
