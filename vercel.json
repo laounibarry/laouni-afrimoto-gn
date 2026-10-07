@@ -21,6 +21,14 @@
     {
       "source": "/.well-known/assetlinks.json",
       "destination": "/assetlinks.json"
+    },
+    {
+      "source": "/confidentialite",
+      "destination": "/confidentialite.html"
+    },
+    {
+      "source": "/conditions",
+      "destination": "/conditions.html"
     }
   ],
   "headers": [
