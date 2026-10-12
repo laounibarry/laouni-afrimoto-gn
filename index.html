@@ -4289,6 +4289,14 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     <div id="rech-admin-info" class="info" style="margin-bottom:12px"></div>
     <div class="fld"><div class="lbl">Montant à créditer (GNF) *</div><input type="number" id="rech-admin-montant" placeholder="Ex: 50000" min="1000"/></div>
     <div class="fld"><div class="lbl">Note (optionnel)</div><input type="text" id="rech-admin-note" placeholder="Ex: Recharge espèces agence Conakry"/></div>
+    <div class="fld">
+      <div class="lbl">Votre mot de passe *</div>
+      <input type="password" id="rech-admin-mdp" placeholder="Celui de votre espace" autocomplete="current-password"/>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:4px;line-height:1.45">
+        Le serveur vérifie que c'est bien vous avant de créditer, et il inscrit
+        l'opération au journal.
+      </div>
+    </div>
     <div id="rech-admin-err" class="warn" style="display:none"></div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn" style="flex:1;padding:13px" onclick="validerRechargeAdmin()">✅ Créditer le compte</button>
@@ -11303,15 +11311,27 @@ async function debiterTaxiCommission(demande) {
 async function rembourserTaxiCommission(demande, motif) {
   const m = Number(demande && demande.commission) || 0;
   if(m <= 0) return;
-  const cl = _clientDuTaxi(demande.taxiId);
-  if(!cl) { try { addDebugLog('REMBOURSEMENT : propri\u00e9taire du taxi introuvable'); } catch(e) {} return; }
-  // Le remboursement VIENT du compte de la societe, qui avait encaisse la commission.
-  const _fait2 = await mouvementSolde('societe', 'societe', 'client', cl.id, m, 'Remboursement commission');
-  if(_fait2 !== true) { cl.solde = (cl.solde || 0) + m; await sbSaveClient(cl); }
-  const nom = ((cl.prenom || '') + ' ' + (cl.nom || '')).trim();
-  logMvt('rech', '\u21a9\ufe0f Remboursement commission course \u2014 ' + motif, m,
-    'Soci\u00e9t\u00e9', nom, { cibleType: 'client', cibleId: cl.id });
-  toast('\u21a9\ufe0f ' + fmt(m) + ' rembours\u00e9s au chauffeur (' + motif + ').');
+  // \u2550\u2550 12/10 \u2014 LE SERVEUR DECIDE DU REMBOURSEMENT, PLUS LE NAVIGATEUR \u2550\u2550
+  // Avant, cette fonction disait au serveur \u00ab donne tant a untel depuis la
+  // caisse \u00bb, et la porte obeissait a n'importe qui (mesure du 05/10 : aucune
+  // serrure). La porte 122 ne recoit que la course : le montant (la commission
+  // encore due), le beneficiaire (le proprietaire du vehicule, repli par
+  // telephone compris), la caisse, et la trace au journal \u2014 tout est verifie
+  // cote serveur, une seule fois (SQL/122). Plus de logMvt ici : la trace est
+  // ecrite par le serveur, une deuxieme ligne ferait un doublon au journal.
+  try {
+    const { data, error } = await supabaseClient.rpc('afri122_rembourser_course',
+      { p_course_id: demande && demande.id });
+    if(!error && data && data.ok === true) {
+      toast('\u21a9\ufe0f ' + fmt(Number(data.montant) || m) + ' rembours\u00e9s au chauffeur (' + motif + ').');
+      return;
+    }
+    if(data && data.raison === 'deja_rembourse') return; // tranchee entre-temps : rien a dire
+    // On garde la raison du serveur : un refus muet coute une journee de recherche.
+    try { addDebugLog('REMBOURSEMENT refus\u00e9 : ' +
+      ((data && ((data.raison || '') + ' ' + (data.detail || ''))) || (error && error.message) || 'sans raison')); } catch(e) {}
+  } catch(e) { try { addDebugLog('REMBOURSEMENT serveur indisponible : ' + ((e && e.message) || e)); } catch(er) {} }
+  toast('\u26a0\ufe0f Le remboursement de ' + fmt(m) + ' n\'a pas pu \u00eatre envoy\u00e9 au chauffeur. Signalez-le.', true);
 }
 
 // v9.341 — REMBOURSER LE PASSAGER D'UNE COURSE, ou qu'on soit.
@@ -15538,8 +15558,33 @@ async function validerRechargeAdmin() {
                  : (DB.user && DB.user.role === 'sousagent') ? 'sousagent' : 'agent';
   const _srcId = (DB.user && (DB.user.saId || DB.user.agId)) || '';
   let _faitParLeServeur = false;
+  // Porte a serrure obligatoire : voir outils/pourquoi-le-site.md
+  const _mdp = (document.getElementById('rech-admin-mdp') || {}).value || '';
+  if(!_mdp.trim()) {
+    err.textContent = '⚠️ Entrez votre mot de passe : le serveur verifie que c\'est bien vous avant de crediter.';
+    err.style.display = 'block';
+    return;
+  }
+  // L'identifiant EXACT accepte par le serveur, celui que la connexion a garde
+  // a cote du jeton. On ne le reconstruit pas a partir de la fiche : la forme
+  // compte (l'administration a la sienne, l'agent a son numero ou son code).
+  let _idPersonnel = '';
   try {
-    const { data: _t, error: _e } = await supabaseClient.rpc('transferer_solde', {
+    const _o = JSON.parse(localStorage.getItem('afrimoto_jeton') || '{}');
+    _idPersonnel = (_o && _o.id) ? String(_o.id) : '';
+  } catch(e) {}
+  if(!_idPersonnel) {
+    _idPersonnel = String((DB.user && (DB.user.num || DB.user.code || DB.user.login)) || '');
+  }
+  if(!_idPersonnel) {
+    err.textContent = '⚠️ Reconnectez-vous : le site ne sait plus sous quel identifiant vous demander votre mot de passe.';
+    err.style.display = 'block';
+    return;
+  }
+
+  try {
+    const { data: _t, error: _e } = await supabaseClient.rpc('afri92_transferer_solde', {
+      p_num: _idPersonnel, p_mot_de_passe: _mdp,
       p_source_type: _srcType, p_source_id: _srcId,
       p_cible_type: rechAdminCible.type === 'client' ? 'client' : 'passager',
       p_cible_id: rechAdminCible.id,
@@ -15552,21 +15597,36 @@ async function validerRechargeAdmin() {
         if(_src) _src.solde = _t.solde_source;
       }
       _faitParLeServeur = true;
-    } else if(!_e && _t && _t.raison === 'solde_insuffisant') {
-      err.textContent = '⚠️ Votre solde ne couvre pas cette recharge.';
+    } else if(!_e && _t) {
+      // ⚠️ LA PHRASE DU SERVEUR PASSE AVANT LA NOTRE. La porte du 92 ecrit
+      // elle-meme, pour chacun de ses vingt refus, une phrase francaise qui
+      // dit quoi faire ensuite. La jeter pour afficher « echec » n'apprend
+      // rien a personne.
+      err.textContent = '⚠️ ' + (_t.message || ('Refuse par le serveur (' + (_t.raison || 'sans raison') + ').'));
       err.style.display = 'block';
       return;
     } else if(_e) {
-      try { addDebugLog('TRANSFERT serveur indisponible : ' + _e.message + ' — repli local'); } catch(x) {}
+      try { addDebugLog('TRANSFERT refuse : ' + _e.message); } catch(x) {}
+      err.textContent = '⚠️ Le serveur n\'a pas pu etre joint. RIEN n\'a ete credite — reessayez.';
+      err.style.display = 'block';
+      return;
     }
-  } catch(x) { try { addDebugLog('TRANSFERT erreur : ' + ((x && x.message) || x)); } catch(y) {} }
-
-  if(!_faitParLeServeur) {
-    // Repli : ancien comportement, tant que la fonction n'est pas installee.
-    obj.solde = (obj.solde||0)+montant;
-    rechAdminCible.type==='client' ? sbSaveClient(obj) : sbSavePassager(obj);
+  } catch(x) {
+    try { addDebugLog('TRANSFERT erreur : ' + ((x && x.message) || x)); } catch(y) {}
+    err.textContent = '⚠️ Le serveur n\'a pas pu etre joint. RIEN n\'a ete credite — reessayez.';
+    err.style.display = 'block';
+    return;
   }
-  
+
+  // ⚠️ PLUS AUCUN REPLI QUI CREDITE. Si on est ici, c'est que le serveur a dit
+  // oui. Dans tous les autres cas on est deja sorti, et rien n'a bouge.
+  if(!_faitParLeServeur) {
+    err.textContent = '⚠️ Le serveur n\'a pas confirme la recharge. RIEN n\'a ete credite.';
+    err.style.display = 'block';
+    return;
+  }
+  try { document.getElementById('rech-admin-mdp').value = ''; } catch(e) {}
+
   // 💳 Enregistrer le transfert EN MÉMOIRE
   const adminObj = { id: DB.user.id, role: 'admin', nom: DB.user.name || 'Admin' };
   await enregistrerTransfert('recharge', adminObj, obj, montant, note || 'Recharge espèces');
