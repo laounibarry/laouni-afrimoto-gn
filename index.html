@@ -933,9 +933,24 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     'piece_delivrance,piece_expiration,piece_photo,piece_photo_verso';
   const COLONNES_SOUS_AGENTS =
     'id,num,code,name,agent_id,tel,email,solde,actif,created_at';
+  // ⚠️ 13/10 — « photo_piece » ET « photo_piece_verso » ONT QUITTÉ CETTE LISTE.
+  //
+  // Deux raisons, et chacune suffirait :
+  //
+  //  1. LA SÉCURITÉ. Ces colonnes se téléchargeaient avec la seule clé
+  //     publique, sans aucun compte : 5,46 Mo de vraies pièces d'identité,
+  //     EXIF compris. Elles se ferment au fichier SQL 128 ; les laisser ici
+  //     ferait échouer tout le chargement (42501) et viderait l'écran.
+  //  2. LA 3G DE CONAKRY. La liste monte à deux cents fiches : on téléchargeait
+  //     deux cents pièces que personne n'avait demandé à voir.
+  //
+  // Les pièces s'ouvrent maintenant une par une, par la porte à serrure
+  // « photos_du_passager » (SQL 127), qui vérifie le rôle et journalise.
+  // « photo_profil » RESTE : c'est une petite adresse, et le chauffeur doit
+  // reconnaître son passager.
   const COLONNES_PASSAGERS =
-    'id,num,prenom,nom,tel,email,user_login,solde,piece,photo_profil,photo_piece,' +
-    'photo_piece_verso,valide,date_consentement,created_at,avertissements,appreciations,' +
+    'id,num,prenom,nom,tel,email,user_login,solde,piece,photo_profil,' +
+    'valide,date_consentement,created_at,avertissements,appreciations,' +
     'details_avertissements,details_appreciations,nationalite,type_piece,profession,' +
     'nom_pere,nom_mere';
 
@@ -7407,6 +7422,61 @@ async function afficherCodeVehicule(vehId, elId) {
 }
 
 // Redemande le mot de passe du membre du personnel, pour une fonction qui l'exige.
+// ════════════════════════════════════════════════════════════════════════════
+// LA PIÈCE D'IDENTITÉ D'UN PASSAGER — PAR LA PORTE À SERRURE (SQL 127)
+//
+// Avant le 13/10, la liste des passagers téléchargeait toutes les pièces en
+// même temps (5,46 Mo), et ces colonnes se lisaient avec la seule clé
+// publique — donc sans aucun compte. Désormais :
+//
+//   • la liste ne les contient plus (voir COLONNES_PASSAGERS) ;
+//   • on les demande UNE PAR UNE au serveur, qui vérifie le rôle et le mot de
+//     passe de celui qui regarde, et inscrit la consultation au journal.
+//
+// Le mot de passe est redemandé à chaque fois : c'est le prix d'une pièce
+// d'identité, et c'est ce que promet la fiche Play Store.
+// ════════════════════════════════════════════════════════════════════════════
+async function ouvrirPieceDuPassager(id, nom, num) {
+  const auth = await _motDePassePersonnel('Ouvrir une pièce d\'identité');
+  if(!auth) return;
+  const role = (typeof curRole !== 'undefined' && curRole) ? curRole : (isAdmin() ? 'admin' : 'agent');
+  let data = null, erreur = '';
+  try {
+    const r = await supabaseClient.rpc('photos_du_passager', {
+      p_role: role, p_num: auth.num, p_mot_de_passe: auth.pw, p_passager_id: id,
+    });
+    data = r.data;
+    if(r.error) erreur = r.error.message || '';
+  } catch(e) { erreur = (e && e.message) || String(e); }
+
+  if(!data || data.ok !== true) {
+    // On garde la raison du serveur : un refus muet fait recommencer dix fois.
+    toast('⛔ ' + ((data && (data.message || data.raison)) || erreur || 'Documents indisponibles.'), true);
+    return;
+  }
+  const photos = [
+    [data.photo_profil, 'Photo de profil'],
+    [data.photo_piece, 'Pièce d\'identité — recto'],
+    [data.photo_piece_verso, 'Pièce d\'identité — verso'],
+  ].filter(x => x[0]);
+  if(!photos.length) { toast('Aucun document pour ' + (nom || 'ce compte') + '.', true); return; }
+
+  const titre = (nom || '').trim() + (num ? ' (' + num + ')' : '');
+  const f = window.open('', '_blank');
+  if(!f) { toast('⛔ Le navigateur a bloqué la fenêtre. Autorisez les fenêtres surgissantes.', true); return; }
+  f.document.write(
+    '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Documents - ' + esc(titre) + '</title>' +
+    '<style>body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:0;padding:18px}' +
+    'h1{font-size:17px;margin:0 0 4px}.n{color:#aaa;font-size:12px;margin-bottom:16px}' +
+    'figure{margin:0 0 20px}figcaption{font-size:13px;color:#F97316;font-weight:700;margin-bottom:6px}' +
+    'img{max-width:100%;border-radius:8px;border:1px solid #333}</style></head><body>' +
+    '<h1>' + esc(titre) + '</h1>' +
+    '<div class="n">Consultation enregistrée au journal — document interne, à ne pas diffuser.</div>' +
+    photos.map(p => '<figure><figcaption>' + esc(p[1]) + '</figcaption><img src="' + esc(p[0]) + '"/></figure>').join('') +
+    '</body></html>');
+  f.document.close();
+}
+
 async function _motDePassePersonnel(titre) {
   const ident = _identifiantPersonnel();
   if(!ident) { toast('⛔ Identifiant du personnel introuvable : reconnectez-vous.', true); return null; }
@@ -25495,7 +25565,7 @@ function rGestion() {
           <div style="display:flex;gap:10px;flex:1;min-width:0">
             <div style="display:flex;gap:5px;flex-shrink:0">
               ${p.photoProfil ? `<img src="${p.photoProfil}" onclick="voirPhotoGrande('${p.photoProfil}','Photo de profil — ${esc(p.prenom)} ${esc(p.nom)} (${p.num})')" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid rgba(249,115,22,.3);cursor:pointer"/>` : `<div style="width:60px;height:60px;border-radius:50%;background:rgba(239,68,68,.1);border:1px dashed rgba(239,68,68,.4);display:flex;align-items:center;justify-content:center;font-size:20px">⚠️</div>`}
-              ${p.photoPiece ? `<img src="${p.photoPiece}" onclick="voirPhotoGrande('${p.photoPiece}','Pièce d\\'identité — ${esc(p.prenom)} ${esc(p.nom)} (${p.num})')" style="width:60px;height:60px;border-radius:8px;object-fit:cover;border:2px solid rgba(249,115,22,.3);cursor:pointer"/>` : `<div style="width:60px;height:60px;border-radius:8px;background:rgba(239,68,68,.1);border:1px dashed rgba(239,68,68,.4);display:flex;align-items:center;justify-content:center;font-size:20px">⚠️</div>`}
+              <button onclick="ouvrirPieceDuPassager('${p.id}','${esc((p.prenom||'') + ' ' + (p.nom||''))}','${esc(p.num||'')}')" title="Voir la pièce d'identité" style="width:60px;height:60px;border-radius:8px;background:rgba(249,115,22,.08);border:2px solid rgba(249,115,22,.3);cursor:pointer;font-size:22px;line-height:1">🪪</button>
             </div>
             <div style="flex:1;min-width:0">
               <div style="font-weight:700;font-size:14px">${esc(p.prenom)} ${esc(p.nom)} ${p.valide?'<span class="tag tag-green" style="font-size:9px">VALIDÉ</span>':'<span class="tag tag-gold" style="font-size:9px">EN ATTENTE</span>'}</div>
