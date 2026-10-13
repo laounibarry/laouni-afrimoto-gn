@@ -3456,7 +3456,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         Suivre une demande déjà déposée
       </button>
     </div>
-    <button style="display:block;width:100%;padding:10px;margin-top:8px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer" onclick="closeModal('m-login');openModal('m-recuperation')">Identifiant ou mot de passe oublié ?</button>
+    <button style="display:block;width:100%;padding:10px;margin-top:8px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer" onclick="closeModal('m-login');recupOuvrir()">Identifiant ou mot de passe oublié ?</button>
     <button id="lien-inscription-passager" style="display:none;width:100%;padding:10px;margin-top:8px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer" onclick="closeModal('m-login');openModal('m-inscription-passager')">Pas encore de compte passager ? S'inscrire</button>
   </div>
 </div>
@@ -3468,13 +3468,32 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <div style="font-size:15px;font-weight:900">🔑 Récupérer mon compte</div>
       <button class="btn-ghost" style="padding:5px 11px;font-size:13px" onclick="closeModal('m-recuperation')">✕</button>
     </div>
-    <div class="qr-note-txt" style="font-size:12px;margin-bottom:12px">
-      Entrez l'adresse email associée à votre compte. Si elle correspond à un compte existant, nous vous indiquerons votre numéro unique et la marche à suivre pour réinitialiser votre mot de passe.
+    <div id="recup-choix">
+      <button class="btn" style="width:100%;padding:13px;margin-bottom:9px;text-align:left" onclick="recupVolet('id')">
+        🆔 J'ai oublié mon identifiant
+        <div style="font-size:11px;font-weight:400;opacity:.85;margin-top:3px">Il sera envoyé à l'adresse e-mail de votre compte.</div>
+      </button>
+      <button class="btn-ghost" style="width:100%;padding:13px;text-align:left" onclick="recupVolet('mdp')">
+        🔑 J'ai oublié mon mot de passe
+        <div style="font-size:11px;font-weight:400;opacity:.85;margin-top:3px">Un code à 6 chiffres vous sera envoyé par e-mail (15 minutes).</div>
+      </button>
     </div>
-    <div class="fld"><div class="lbl">Email *</div><input type="email" id="recup-email" autocomplete="off" placeholder="exemple@email.com"/></div>
-    <div id="recup-err" class="warn" style="display:none"></div>
-    <div id="recup-resultat" style="display:none"></div>
-    <button class="btn" style="width:100%;padding:13px" onclick="rechercherCompteParEmail()">🔍 Rechercher mon compte</button>
+    <div id="recup-v-id" style="display:none">
+      <div class="fld"><div class="lbl">Adresse e-mail du compte *</div><input type="email" id="recup-email" autocomplete="off" placeholder="exemple@email.com"/></div>
+      <button class="btn" style="width:100%;padding:13px" onclick="recupIdentifiant()">📧 M'envoyer mes identifiants</button>
+    </div>
+    <div id="recup-v-mdp" style="display:none">
+      <div class="fld"><div class="lbl">Votre identifiant *</div><input type="text" id="recup-num" autocomplete="off" placeholder="C2367295YL ou P2367295YL" style="font-family:monospace"/></div>
+      <button class="btn" style="width:100%;padding:13px" onclick="recupCode()">📧 M'envoyer le code</button>
+    </div>
+    <div id="recup-v-code" style="display:none">
+      <div class="fld"><div class="lbl">Le code reçu par e-mail (6 chiffres) *</div><input type="text" id="recup-code" inputmode="numeric" maxlength="6" autocomplete="off" style="font-family:monospace;letter-spacing:3px"/></div>
+      <div class="fld"><div class="lbl">Nouveau mot de passe *</div><input type="password" id="recup-mdp1" autocomplete="new-password"/></div>
+      <div class="fld"><div class="lbl">Nouveau mot de passe, encore *</div><input type="password" id="recup-mdp2" autocomplete="new-password"/></div>
+      <button class="btn" style="width:100%;padding:13px" onclick="recupReinitialiser()">✅ Changer mon mot de passe</button>
+    </div>
+    <div id="recup-err" class="warn" style="display:none;margin-top:10px"></div>
+    <div id="recup-resultat" style="display:none;margin-top:10px"></div>
   </div>
 </div>
 
@@ -3554,7 +3573,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <button class="btn" style="flex:1;padding:13px" id="dem-cpt-btn" onclick="demPreparerAjout()">Continuer →</button>
       </div>
       <button class="btn-ghost" style="width:100%;padding:10px;margin-top:9px;font-size:12px"
-              onclick="closeModal('m-dem-parcours');openModal('m-recuperation')">
+              onclick="closeModal('m-dem-parcours');recupOuvrir()">
         Mot de passe oublié ?
       </button>
     </div>
@@ -5847,56 +5866,107 @@ async function envoyerEmailRecuperation(destinataire, identifiant, typeCompte, i
 
   return false;
 }
-async function rechercherCompteParEmail() {
+// ══ 13/10 — LA RECUPERATION PASSE PAR LES PORTES DU FICHIER 123 ══
+//
+// L'ancien chemin (identifiant_par_email, lien d'une heure) datait d'avant la
+// panne Resend et faisait doublon avec l'application. Desormais le site et
+// l'application empruntent LES MEMES portes serveur (SQL 123) :
+//   - afri123_identifiant_oublie(email)  → les identifiants partent a l'adresse ;
+//   - afri123_mdp_oublie(role, num)      → un code a 6 chiffres, 15 min, 5 essais ;
+//   - afri123_mdp_reinitialiser(...)     → verifie le code, ecrit l'EMPREINTE.
+// Le mot de passe ne quitte jamais le navigateur : hashPw (meme sel que
+// l'application) calcule l'empreinte ici. Les reponses du serveur sont NEUTRES
+// expres (compte connu ou pas) : l'ecran affiche donc le meme message partout,
+// sinon il servirait d'annuaire des comptes.
+let recupRole = '', recupNum = '';
+function recupOuvrir() {
+  // La fenetre repart toujours du premier volet : rouvrir ne doit jamais
+  // montrer le code d une demande precedente.
+  recupRole = ''; recupNum = '';
+  for(const v of ['recup-v-id', 'recup-v-mdp', 'recup-v-code']) {
+    const e = document.getElementById(v); if(e) e.style.display = 'none';
+  }
+  const c = document.getElementById('recup-choix'); if(c) c.style.display = 'block';
+  for(const i of ['recup-email', 'recup-num', 'recup-code', 'recup-mdp1', 'recup-mdp2']) {
+    const e = document.getElementById(i); if(e) e.value = '';
+  }
+  const err = document.getElementById('recup-err'); if(err) err.style.display = 'none';
+  const r = document.getElementById('recup-resultat'); if(r) r.style.display = 'none';
+  openModal('m-recuperation');
+}
+function recupVolet(quoi) {
+  document.getElementById('recup-choix').style.display = 'none';
+  document.getElementById('recup-v-' + quoi).style.display = 'block';
+  document.getElementById('recup-err').style.display = 'none';
+}
+function recupErreur(t) {
+  const e = document.getElementById('recup-err');
+  e.textContent = t; e.style.display = 'block';
+}
+function recupMessage(html) {
+  const r = document.getElementById('recup-resultat');
+  r.innerHTML = '<div class="qr-note-txt" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;font-size:12px">' + html + '</div>';
+  r.style.display = 'block';
+  document.getElementById('recup-err').style.display = 'none';
+}
+async function recupIdentifiant() {
   const email = document.getElementById('recup-email').value.trim();
-  const err = document.getElementById('recup-err');
-  const resultat = document.getElementById('recup-resultat');
-  err.style.display = 'none';
-  resultat.style.display = 'none';
-
-  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    err.textContent = '⚠️ Entrez une adresse email valide.';
-    err.style.display = 'block';
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { recupErreur('⚠️ Entrez une adresse e-mail valide.'); return; }
+  try {
+    await supabaseClient.rpc('afri123_identifiant_oublie', { p_email: email });
+  } catch(e) { try { addDebugLog('RECUP identifiant : ' + ((e && e.message) || e)); } catch(er) {} }
+  recupMessage('📧 <b>Si cette adresse porte un compte, vos identifiants viennent d\'y être envoyés.</b> Regardez aussi les courriers indésirables.');
+}
+async function recupCode() {
+  const num = document.getElementById('recup-num').value.trim().toUpperCase();
+  // Le role se lit sur la premiere lettre de l'identifiant : C pour l'espace
+  // chauffeur/proprietaire, P pour le passager. Les agents, eux, se recuperent
+  // aupres de l'administration — jamais par courriel.
+  const role = num.startsWith('C') ? 'client' : num.startsWith('P') ? 'passager' : '';
+  if(!num) { recupErreur('⚠️ Entrez votre identifiant.'); return; }
+  if(!role) { recupErreur('⚠️ L\'identifiant commence par C (chauffeur/propriétaire) ou P (passager). Pour un compte d\'agent : appelez le 610-11-10-15.'); return; }
+  recupRole = role; recupNum = num;
+  let masque = '';
+  try {
+    const { data } = await supabaseClient.rpc('afri123_mdp_oublie', { p_role: role, p_num: num });
+    if(data && data.email_masque) masque = String(data.email_masque);
+  } catch(e) { try { addDebugLog('RECUP code : ' + ((e && e.message) || e)); } catch(er) {} }
+  document.getElementById('recup-v-mdp').style.display = 'none';
+  document.getElementById('recup-v-code').style.display = 'block';
+  recupMessage(masque
+    ? '📧 <b>Code envoyé à ' + masque + '</b> — il est valable 15 minutes, pour 5 essais.'
+    : '📧 <b>Si ce compte a une adresse e-mail, un code vient d\'y être envoyé</b> (15 minutes, 5 essais).');
+}
+async function recupReinitialiser() {
+  const code = document.getElementById('recup-code').value.trim();
+  const m1 = document.getElementById('recup-mdp1').value;
+  const m2 = document.getElementById('recup-mdp2').value;
+  if(!/^[0-9]{6}$/.test(code)) { recupErreur('⚠️ Le code a exactement 6 chiffres.'); return; }
+  if(m1.length < 4) { recupErreur('⚠️ Le mot de passe doit faire au moins quatre caractères.'); return; }
+  if(m1 !== m2) { recupErreur('⚠️ Les deux mots de passe ne concordent pas.'); return; }
+  let data = null;
+  try {
+    // L'empreinte seulement — le mot de passe reste dans le navigateur.
+    const empreinte = await hashPw(m1);
+    const r = await supabaseClient.rpc('afri123_mdp_reinitialiser',
+      { p_role: recupRole, p_num: recupNum, p_code: code, p_pass_hash: empreinte });
+    data = r.data;
+    if(r.error) { try { addDebugLog('RECUP reinit : ' + r.error.message); } catch(e) {} }
+  } catch(e) { try { addDebugLog('RECUP reinit : ' + ((e && e.message) || e)); } catch(er) {} }
+  if(data && data.ok === true) {
+    recupMessage('✅ <b>Mot de passe changé.</b> Connectez-vous avec le nouveau.');
+    document.getElementById('recup-v-code').style.display = 'none';
+    try { toast('✅ Mot de passe changé — connectez-vous.'); } catch(e) {}
     return;
   }
-
-  // ══ 15/09 — LA RECHERCHE PAR E-MAIL SE FAIT SUR LE SERVEUR, ET NE REVIENT PAS ══
-  //
-  // FUITE : cette fonction lisait « select('*').ilike('email') » sur clients et passagers
-  // avec la clef publique — donc la fiche entiere, empreinte du mot de passe comprise, de
-  // quiconque dont on connaissait l'adresse. Et si l'envoi echouait, elle AFFICHAIT le
-  // numero unique… qui est aussi le code de l'espace proprietaire (31 vehicules sur 31).
-  // Enfin le lien envoye etait fabrique ici, sans signature : n'importe qui pouvait en
-  // ecrire un pour n'importe quel compte.
-  //
-  // Desormais le serveur (identifiant_par_email) cherche le compte, fabrique un jeton a
-  // usage unique, envoie lui-meme l'e-mail — et NE RENVOIE RIEN au navigateur. La reponse
-  // a l'ecran est la meme que l'adresse existe ou non.
-  resultat.innerHTML =
-    '<div class="qr-note-txt" style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:12px;font-size:12px">⏳ Vérification en cours...</div>';
-  resultat.style.display = 'block';
-
-  let joint = false;
-  try {
-    const { error } = await supabaseClient.rpc('identifiant_par_email', { p_email: email });
-    joint = !error;
-    if(error) { try { addDebugLog('RECUPERATION par e-mail indisponible : ' + error.message); } catch(e) {} }
-  } catch(e) {
-    try { addDebugLog('RECUPERATION par e-mail : ' + ((e && e.message) || e)); } catch(er) {}
-  }
-
-  if(joint) {
-    resultat.innerHTML =
-      '<div class="qr-note-txt" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;font-size:12px">' +
-      '📧 <b>Demande enregistrée.</b> Si cette adresse correspond à un compte, vous recevrez un email avec votre numéro unique, la marche à suivre et un lien de réinitialisation (valable 1 heure). Pensez à vérifier vos courriers indésirables.' +
-      '</div>';
-  } else {
-    // Aucun identifiant a l'ecran, jamais : on renvoie vers un agent.
-    resultat.innerHTML =
-      '<div class="qr-note-txt" style="background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:12px;font-size:12px">' +
-      '⚠️ Envoi impossible momentanément. Réessayez plus tard, ou présentez-vous chez un agent agréé avec une pièce d\'identité pour réinitialiser votre mot de passe.' +
-      '</div>';
-  }
+  // On garde la raison du serveur : un refus muet fait abandonner les gens.
+  const raison = (data && data.raison) || '';
+  const restants = data && typeof data.essais_restants === 'number' ? data.essais_restants : null;
+  recupErreur(
+    raison === 'code_errone' ? ('⛔ Code erroné.' + (restants != null ? ' Il reste ' + restants + ' essai' + (restants > 1 ? 's' : '') + '.' : '')) :
+    raison === 'code_expire' ? '⏳ Ce code n\'est plus valable. Recommencez pour en recevoir un nouveau.' :
+    raison === 'trop_d_essais' ? '⛔ Trop d\'essais. Recommencez pour recevoir un nouveau code.' :
+    '⚠️ Le changement n\'a pas abouti. Réessayez.');
 }
 
 // ── Accès dédiés et discrets pour Admin et Agent/Sous-agent (séparés du modal de connexion public) ──

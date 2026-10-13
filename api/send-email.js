@@ -88,21 +88,23 @@ function pdfAttestation(att) {
   corps += '0 0 0 rg\n';
 
   let y = 740;
-  L(60, y, 16, 'F2', att.titre || 'Attestation'); y -= 18;
-  if(att.sous_titre) { L(60, y, 11, 'F1', att.sous_titre); y -= 16; }
+  L(60, y, 18, 'F2', att.titre || 'Attestation'); y -= 20;
+  if(att.sous_titre) { L(60, y, 12.5, 'F1', att.sous_titre); y -= 17; }
   y -= 12;
+  // 13/10 — demande du fondateur : la police des lignes en plus grand (13 au
+  // lieu de 11, interligne 23) ; la page A4 tient toujours 24 lignes pleines.
   const lignes = Array.isArray(att.lignes) ? att.lignes.slice(0, 28) : [];
   for(const paire of lignes) {
     const lab = String((paire && paire[0]) || '');
     const val = String((paire && paire[1]) || '');
-    if(!lab && !val) { y -= 9; continue; } // une paire vide aère le document
-    L(60, y, 11, 'F2', lab + (lab ? ' :' : ''));
-    L(225, y, 11, 'F1', val);
-    y -= 19;
+    if(!lab && !val) { y -= 11; continue; } // une paire vide aère le document
+    L(60, y, 13, 'F2', lab + (lab ? ' :' : ''));
+    L(240, y, 13, 'F1', val);
+    y -= 23;
     if(y < 110) break;
   }
   y = Math.min(y - 14, 96);
-  for(const p of String(att.pied || '').split('\n').slice(0, 3)) { L(60, y, 9, 'F1', p); y -= 12; }
+  for(const p of String(att.pied || '').split('\n').slice(0, 3)) { L(60, y, 10, 'F1', p); y -= 13; }
 
   const objs = [
     '<< /Type /Catalog /Pages 2 0 R >>',
