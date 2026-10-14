@@ -927,10 +927,20 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     'trajet_unique_desactive,verrou_app_actif,tri_note_actif,tri_note_rayon,' +
     'photo_taxi_obligatoire,selfie_periodicite_jours,commission_payeur,rayon_arrivee_m,' +
     'prix_km_defaut,prix_min_course,prix_km_zones,frais_annonce,appareil_unique_actif';
+  // ⚠️ 14/10 — « piece_photo » ET « piece_photo_verso » ONT QUITTÉ CETTE LISTE.
+  //
+  // Même raison que pour les passagers (voir COLONNES_PASSAGERS) : ces colonnes
+  // se lisaient avec la seule clé publique, donc sans aucun compte. Elles sont
+  // vides aujourd'hui — mais la première pièce d'agent déposée aurait été
+  // publique. Elles se ferment au fichier SQL 131 ; les laisser ici ferait
+  // échouer tout le chargement (42501) et viderait l'écran des agents.
+  //
+  // La pièce s'ouvre maintenant une par une, par la porte à serrure
+  // « afri131_photos_agent », qui vérifie le rôle et journalise.
   const COLONNES_AGENTS =
     'id,num,code,name,resp,pref,addr,city,tel,email,solde,actif,peut_valider,created_at,' +
     'date_naissance,lieu_naissance,profession,nom_pere,nom_mere,piece_type,piece_num,' +
-    'piece_delivrance,piece_expiration,piece_photo,piece_photo_verso';
+    'piece_delivrance,piece_expiration';
   const COLONNES_SOUS_AGENTS =
     'id,num,code,name,agent_id,tel,email,solde,actif,created_at';
   // ⚠️ 13/10 — « photo_piece » ET « photo_piece_verso » ONT QUITTÉ CETTE LISTE.
@@ -7477,6 +7487,52 @@ async function ouvrirPieceDuPassager(id, nom, num) {
   f.document.close();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// LA PIÈCE D'IDENTITÉ D'UN AGENT — PAR LA PORTE À SERRURE (SQL 131)
+//
+// Même règle que pour les passagers : la liste ne porte plus les photos, on
+// les demande une par une au serveur, qui vérifie qui regarde et journalise.
+// L'administration voit tout le monde ; un agent ne voit que la sienne.
+// ════════════════════════════════════════════════════════════════════════════
+async function ouvrirPieceDeLAgent(id, nom, num) {
+  const auth = await _motDePassePersonnel('Ouvrir une pièce d\'identité');
+  if(!auth) return;
+  const role = (typeof curRole !== 'undefined' && curRole) ? curRole : (isAdmin() ? 'admin' : 'agent');
+  let data = null, erreur = '';
+  try {
+    const r = await supabaseClient.rpc('afri131_photos_agent', {
+      p_role: role, p_num: auth.num, p_mot_de_passe: auth.pw, p_agent_id: id,
+    });
+    data = r.data;
+    if(r.error) erreur = r.error.message || '';
+  } catch(e) { erreur = (e && e.message) || String(e); }
+
+  if(!data || data.ok !== true) {
+    toast('⛔ ' + ((data && (data.message || data.raison)) || erreur || 'Documents indisponibles.'), true);
+    return;
+  }
+  const photos = [
+    [data.piece_photo, 'Pièce d\'identité — recto'],
+    [data.piece_photo_verso, 'Pièce d\'identité — verso'],
+  ].filter(x => x[0]);
+  if(!photos.length) { toast('Aucune pièce enregistrée pour ' + (nom || 'cet agent') + '.', true); return; }
+
+  const titre = (nom || '').trim() + (num ? ' (' + num + ')' : '');
+  const f = window.open('', '_blank');
+  if(!f) { toast('⛔ Le navigateur a bloqué la fenêtre. Autorisez les fenêtres surgissantes.', true); return; }
+  f.document.write(
+    '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Pièce - ' + esc(titre) + '</title>' +
+    '<style>body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:0;padding:18px}' +
+    'h1{font-size:17px;margin:0 0 4px}.n{color:#aaa;font-size:12px;margin-bottom:16px}' +
+    'figure{margin:0 0 20px}figcaption{font-size:13px;color:#F97316;font-weight:700;margin-bottom:6px}' +
+    'img{max-width:100%;border-radius:8px;border:1px solid #333}</style></head><body>' +
+    '<h1>' + esc(titre) + '</h1>' +
+    '<div class="n">Consultation enregistrée au journal — document interne, à ne pas diffuser.</div>' +
+    photos.map(p => '<figure><figcaption>' + esc(p[1]) + '</figcaption><img src="' + esc(p[0]) + '"/></figure>').join('') +
+    '</body></html>');
+  f.document.close();
+}
+
 async function _motDePassePersonnel(titre) {
   const ident = _identifiantPersonnel();
   if(!ident) { toast('⛔ Identifiant du personnel introuvable : reconnectez-vous.', true); return null; }
@@ -8386,7 +8442,9 @@ function openProfilAgent() {
     ${ag.pieceNum ? `<div class="row"><span style="font-size:12px;opacity:.7">Numéro</span><span style="font-size:13px;font-weight:600;font-family:monospace">${esc(ag.pieceNum)}</span></div>` : ''}
     ${ag.pieceDelivrance ? `<div class="row"><span style="font-size:12px;opacity:.7">Délivrance</span><span style="font-size:13px;font-weight:600">${fd(ag.pieceDelivrance)}</span></div>` : ''}
     ${ag.pieceExpiration ? `<div class="row"><span style="font-size:12px;opacity:.7">Expiration</span><span style="font-size:13px;font-weight:600">${fd(ag.pieceExpiration)}</span></div>` : ''}
-    ${ag.piecePhoto ? `<div style="margin-top:10px;text-align:center"><img src="${ag.piecePhoto}" style="max-width:100%;border-radius:10px;border:1px solid rgba(249,115,22,.3)"/></div>` : ''}
+    <!-- 14/10 : la pièce ne se télécharge plus avec la liste des agents.
+         Elle s'ouvre une par une, par la porte à serrure (SQL 131). -->
+    <div style="margin-top:10px;text-align:center"><button class="btn-ghost" style="padding:10px 16px;font-size:12.5px" onclick="ouvrirPieceDeLAgent('${agId}','${esc(ag.name || ag.resp || '')}','${esc(ag.num || '')}')">🪪 Voir la pièce d'identité</button></div>
     ` : ''}
 
     <div style="display:flex;gap:8px;margin-top:16px;flex-direction:column">
