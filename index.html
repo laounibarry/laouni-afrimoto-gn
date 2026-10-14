@@ -35074,6 +35074,35 @@ body.mode-passager .nav-inner{display:none!important}
       if (refs.photo_piece_verso && !deja.piece_verso) d.photo_piece_verso = refs.photo_piece_verso;
     }
 
+    // \u2550\u2550 14/10 \u2014 LA POSITION, AU MOMENT D'ENVOYER \u2550\u2550
+    //
+    // Decision du fondateur. Au moment d'ENVOYER et pas au debut : entre les
+    // deux il se passe dix a vingt minutes (six photos), et c'est a l'envoi
+    // que la personne est avec le vehicule. Elle sert a l'agent, qui saura ou
+    // le trouver, et au registre, qui se protege des enregistrements
+    // frauduleux (SQL 130).
+    //
+    // \u26a0\ufe0f ON N'EMPECHE JAMAIS L'ENVOI : un refus ne doit pas effacer vingt
+    // minutes de travail honnete, et \u00ab a refuse sa position \u00bb est deja un
+    // renseignement pour le serveur.
+    btn.textContent = 'Position\u2026';
+    try {
+      const pos = await new Promise((ok) => {
+        if (!navigator.geolocation) { ok(null); return; }
+        let fini = false;
+        const finir = (v) => { if (!fini) { fini = true; ok(v); } };
+        navigator.geolocation.getCurrentPosition(
+          (p) => finir(p), () => finir(null),
+          { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 });
+        setTimeout(() => finir(null), 13000);
+      });
+      if (pos && pos.coords) {
+        d.lat = String(pos.coords.latitude);
+        d.lng = String(pos.coords.longitude);
+        if (pos.coords.accuracy != null) d.precision_m = String(Math.round(pos.coords.accuracy));
+      }
+    } catch (e) { /* sans position : la demande part quand meme */ }
+
     btn.textContent = 'Envoi du dossier\u2026';
     var rep = null, err = null;
     try {
