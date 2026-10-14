@@ -2178,7 +2178,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     const _neuf = (ag._neuf === true);
     const row = { id:ag.id, num:ag.num||'', nom:ag.name||'', responsable:ag.resp||null,
       prefecture:ag.pref||null, adresse:ag.addr||null, ville:ag.city||'', code:ag.code||ag.num||'',
-      telephone:ag.tel||null, email:ag.email||null, solde:ag.solde||0,
+      telephone:ag.tel||null, email:ag.email||null,  /* 14/10 : plus de solde ici */
       actif:ag.actif!==false, peut_valider:ag.peutValider||false,
       peut_voir_courses:ag.peutVoirCourses||false,
       photo_url:ag.photo||null,
@@ -2212,7 +2212,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     const _neuf = (sa._neuf === true);
     const row = { id:sa.id, num:sa.num||'', nom:sa.name||'', agent_id:sa.agId||null,
       prefecture:sa.pref||null, adresse:sa.addr||null, ville:sa.city||'', code:sa.code||sa.num||'',
-      telephone:sa.tel||null, email:sa.email||null, solde:sa.solde||0,
+      telephone:sa.tel||null, email:sa.email||null,  /* 14/10 : plus de solde ici */
       actif:sa.actif!==false, photo_url:sa.photo||null };
     if(_neuf) row.pass_hash = await _empreinteUtile(sa.pass);
     const alts = { nom:'name', agent_id:'ag_id', prefecture:'pref', adresse:'addr',
@@ -2235,7 +2235,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
     // Changer un mot de passe passe par le serveur : changer_mon_mot_de_passe,
     // changer_mdp_compte, reinitialiser_mot_de_passe.
     const row = { id:cl.id, num:cl.num||'', prenom:cl.prenom||'', nom:cl.nom||'',
-      telephone:cl.tel||null, email:cl.email||null, user_login:cl.user||null, solde:cl.solde||0,
+      telephone:cl.tel||null, email:cl.email||null, user_login:cl.user||null,  /* 14/10 : plus de solde */
       permis:cl.permis||null, vehicule_id:cl.vid||null, suspendu:cl.suspendu||false,
       suspendu_auto_maj:cl.suspenduAutoMaj||false,
       avertissements:cl.avertissements||0, // ⚠️
@@ -2272,7 +2272,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   async function _sbSavePassager(ps) {
     const _neuf = (ps._neuf === true);
     const row = { id:ps.id, num:ps.num||'', prenom:ps.prenom||'', nom:ps.nom||'',
-      telephone:ps.tel||null, email:ps.email||null, user_login:ps.user||null, solde:ps.solde||0,
+      telephone:ps.tel||null, email:ps.email||null, user_login:ps.user||null,  /* 14/10 : plus de solde */
       // v9.516 : LA PHOTO DE PROFIL N'ETAIT JAMAIS ENREGISTREE. Deux erreurs se cumulaient :
       // on lisait « ps.photo » alors que l'inscription remplit « ps.photoProfil », et on
       // ecrivait dans « photo_url » (repli « photo ») alors que la colonne s'appelle
@@ -10534,7 +10534,7 @@ function confirmerDemandeCourse() {
   if(!_commissionAuTaxi()) { // v9.366 : le passager ne paie que si l'admin l'a decide ainsi
     // v9.539 : la commission du passager arrive au compte de la societe.
     mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Commission course')
-      .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
+      .then(function(f){ if(f !== true) { try { toast('⚠️ La commission n a pas pu etre prelevee. Signalez-le a un agent.', true); } catch(e) {} } });
     logMvt('rech', '🚕 Commission course taxi — ' + ps.prenom + ' ' + ps.nom + ' → ' + t.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {sourceType:'passager',sourceId:ps.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
   }
   const _nvDemande = {
@@ -10662,7 +10662,7 @@ async function demarrerRechercheAutomatique(commissionDejaPayee) {
   // Frais prélevés UNE SEULE FOIS (jamais si on reprend une recherche déjà payée précédemment)
   if(!dejaPayee && !_commissionAuTaxi()) { // v9.366
     mouvementSolde('passager', ps.id, 'societe', 'societe', commission, 'Frais de recherche')
-      .then(function(f){ if(f !== true) { ps.solde = (ps.solde||0) - commission; sbSavePassager(ps); } });
+      .then(function(f){ if(f !== true) { try { toast('⚠️ La commission n a pas pu etre prelevee. Signalez-le a un agent.', true); } catch(e) {} } });
     logMvt('rech', '🚕 Frais de recherche course taxi — ' + ps.prenom + ' ' + ps.nom, commission, ps.prenom+' '+ps.nom, 'Société (commission)', {sourceType:'passager',sourceId:ps.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
   }
 
@@ -11498,7 +11498,7 @@ async function debiterTaxiCommission(demande) {
   if(!_faitServeur) {
     // Repli : l'ancienne methode, qui exige d'avoir la fiche du chauffeur sous la main.
     const _fait = await mouvementSolde('client', cl.id, 'societe', 'societe', m, 'Commission course');
-    if(_fait !== true) { cl.solde = (cl.solde || 0) - m; await sbSaveClient(cl); }
+    if(_fait !== true) { try { addDebugLog('COMMISSION non prelevee : le serveur a refuse'); } catch(e) {} }
   }
   const nom = cl ? ((cl.prenom || '') + ' ' + (cl.nom || '')).trim() : (demande.taxiNom || '');
   logMvt('rech', '\ud83c\udfcd\ufe0f Commission course taxi \u2014 ' + (demande.taxiNom || nom), m,
@@ -26235,6 +26235,51 @@ async function annulerMouvement(mouvId, benefType, benefId, montant) {
   // exigeaient les colonnes manquantes — voir journal-mouvements.sql.
   if(m.annule) { toast('⚠️ Cette transaction est déjà annulée.', true); return; }
 
+  // ══ 14/10 — ANNULER DEVIENT UN SEUL GESTE, FAIT PAR LE SERVEUR ═══════════
+  //
+  // Ce qui suivait était en trois morceaux faits depuis le navigateur : retirer
+  // au bénéficiaire, rendre à l'émetteur, puis marquer « annulé ». Trois appels
+  // séparés, donc trois occasions de s'arrêter au milieu — et le troisième
+  // écrivait directement dans le journal, ce que la clé publique ne doit plus
+  // pouvoir faire (sinon n'importe qui annule n'importe quelle recette, et le
+  // bilan ment sans qu'une ligne ne bouge).
+  //
+  // La porte « afri135_annuler_mouvement » fait les trois ENSEMBLE, après avoir
+  // demandé le mot de passe de l'administration. Si elle échoue, rien n'a bougé.
+  //
+  // ⚠️ LE REPLI EST VOLONTAIRE : tant que le fichier SQL 135 n'est pas posé, la
+  // porte n'existe pas et PostgREST répond PGRST202. On reprend alors l'ancien
+  // chemin — sinon pousser ce site AVANT le SQL éteindrait le bouton.
+  {
+    const auth = await _motDePassePersonnel('Annuler un mouvement');
+    if(!auth) { toast('Annulation abandonnée.', true); return; }
+    let rep = null, err = '';
+    try {
+      const r = await supabaseClient.rpc('afri135_annuler_mouvement', {
+        p_num: auth.num, p_mot_de_passe: auth.pw, p_mouvement_id: String(mouvId),
+      });
+      rep = r.data;
+      if(r.error) err = r.error.message || '';
+    } catch(e) { err = (e && e.message) || String(e); }
+
+    const porteAbsente = /PGRST202|Could not find the function|does not exist/i.test(err);
+    if(!porteAbsente) {
+      if(rep && rep.ok === true) {
+        m.annule = true;
+        if(typeof rep.solde_beneficiaire === 'number') {
+          const l = benefType === 'client' ? DB.clients : benefType === 'agent' ? DB.agents : null;
+          const o = l && l.find(x => x.id === benefId); if(o) o.solde = rep.solde_beneficiaire;
+        }
+        toast('✅ ' + (rep.message || ('Transaction annulée · ' + fmt(montant) + ' retirés au bénéficiaire')));
+        rHistorique(); updateNav();
+        return;
+      }
+      toast('⛔ ' + ((rep && (rep.message || rep.raison)) || err || 'L\'annulation n\'a pas abouti. Rien n\'a bougé.'), true);
+      return;
+    }
+    try { addDebugLog('ANNULATION : porte 135 absente, ancien chemin'); } catch(e) {}
+  }
+
   // ── Le retrait au beneficiaire ──
   const _cible = benefType === 'client' ? 'client' : (benefType === 'agent' ? 'agent' : null);
   if(!_cible) { toast('❌ Bénéficiaire inconnu, annulation impossible.', true); return; }
@@ -27059,7 +27104,7 @@ function majClient(kind, id) {
   const idVeh = estTaxi ? ('taxi ' + (x.plaque||'')) : ((x.mat || x.vin || '') + (x.brand ? ' — ' + x.brand + ' ' + (x.model||'') : ''));
   askConfirm('Mettre à jour l\'enregistrement de ' + idVeh + ' pour ' + fmt(prix) + ' (débité de votre solde) ?', () => {
     mouvementSolde('client', cl.id, 'societe', 'societe', prix, 'Mise a jour enregistrement')
-      .then(function(f){ if(f !== true) { cl.solde = (cl.solde||0) - prix; sbSaveClient(cl); } });
+      .then(function(f){ if(f !== true) { try { toast('⚠️ Le montant n a pas pu etre preleve. Signalez-le a un agent.', true); } catch(e) {} } });
     appliquerMaj(x, estTaxi, prix, ((cl.prenom||'')+' '+(cl.nom||'')).trim());
     updateNav();
     if(DB.user && DB.user.role === 'owner') { try { rOwner(); } catch(e) {} }
@@ -29354,26 +29399,85 @@ function selectClientRecharge(clId, prefix) {
     </div>`;
 }
 
-function doRechClient(clId, prefix) {
+// ════════════════════════════════════════════════════════════════════════════
+// RECHARGER UN COMPTE — PAR LE SERVEUR, JAMAIS PAR LE NAVIGATEUR
+//
+// ⚠️ 14/10/2026 — CE QUE FAISAIENT CES TROIS BOUTONS, ET POURQUOI C'ETAIT
+// INTENABLE.
+//
+// « doRechClient », « doRechPassager » et « doRechAgentToSA » creditaient un
+// compte EN ECRIVANT LE SOLDE DEPUIS LE NAVIGATEUR : « cl.solde = cl.solde +
+// montant » puis sauvegarde de la fiche. Aucun appel au serveur, aucun mot de
+// passe, aucune verification. L'argent naissait dans la page.
+//
+// Mesure du 14/10 : la cle publique — celle qui est ecrite dans cette page et
+// que tout le monde peut lire — pouvait modifier « clients.solde »,
+// « passagers.solde », « agents.solde » et « mouvements.montant ». Les trois
+// boutons n'etaient donc meme pas necessaires pour se donner de l'argent : ils
+// montraient seulement le chemin.
+//
+// Desormais tout passe par « afri92_transferer_solde », la porte a serrure du
+// fichier 92 : elle demande le mot de passe de celui qui recharge, verifie que
+// la source a bien la somme, debite et credite ENSEMBLE, et inscrit le
+// mouvement. Le meme chemin que l'ecran de recharge de l'administration, qui
+// lui l'utilisait deja (plus haut dans ce fichier).
+//
+// La fonction ci-dessous est partagee par les trois boutons : une seule porte,
+// une seule serrure, une seule phrase de refus a tenir a jour.
+// ════════════════════════════════════════════════════════════════════════════
+async function _rechargerParLeServeur(cibleType, cibleId, montant, nomLisible) {
+  if(!(Number(montant) > 0)) { toast('Montant requis', true); return false; }
+  const auth = await _motDePassePersonnel('Recharger ' + (nomLisible || 'ce compte'));
+  if(!auth) return false;
+
+  // Un agent recharge DEPUIS SON PROPRE SOLDE ; l'administration met l'argent
+  // en circulation. C'est le serveur qui vérifie les deux cas.
+  const estAgent = (typeof isAgent === 'function' && isAgent()) && !isAdmin();
+  const srcType = estAgent ? 'agent' : 'admin';
+  const srcId = estAgent ? ((DB.user && DB.user.agId) || '') : '';
+
+  let data = null, erreur = '';
+  try {
+    const r = await supabaseClient.rpc('afri92_transferer_solde', {
+      p_num: auth.num, p_mot_de_passe: auth.pw,
+      p_source_type: srcType, p_source_id: srcId,
+      p_cible_type: cibleType, p_cible_id: cibleId,
+      p_montant: Number(montant), p_motif: 'Recharge',
+    });
+    data = r.data;
+    if(r.error) erreur = r.error.message || '';
+  } catch(e) { erreur = (e && e.message) || String(e); }
+
+  if(!data || data.ok !== true) {
+    // ⚠️ LA PHRASE DU SERVEUR PASSE AVANT LA NOTRE : la porte du 92 écrit
+    // elle-même, pour chacun de ses refus, une phrase française qui dit quoi
+    // faire. La remplacer par « erreur » ferait perdre cette aide.
+    toast('⛔ ' + ((data && (data.message || data.raison)) || erreur || 'La recharge n\'a pas abouti.'), true);
+    return false;
+  }
+
+  // On reporte les soldes RENDUS PAR LE SERVEUR : jamais un calcul d'ici.
+  const poser = (t, id, v) => {
+    if(v == null) return;
+    const liste = t === 'client' ? DB.clients : t === 'passager' ? DB.passagers
+                : t === 'agent' ? DB.agents : t === 'sousagent' ? DB.sousAgents : null;
+    if(!liste) return;
+    const o = liste.find(x => x.id === id); if(o) o.solde = v;
+  };
+  poser(cibleType, cibleId, data.solde_cible);
+  if(srcId) poser(srcType, srcId, data.solde_source);
+
+  toast('✅ ' + (nomLisible || 'Compte') + ' rechargé de ' + fmt(montant));
+  try { rRecharge(); updateNav(); } catch(e) {}
+  return true;
+}
+
+async function doRechClient(clId, prefix) {
   const mont = parseInt(document.getElementById(prefix+'-mont').value)||0;
-  if(!mont) { toast('Montant requis', true); return; }
   const cl = DB.clients.find(c=>c.id===clId);
   if(!cl) return;
-
-  if(isAgent() && !isAdmin()) {
-    const ag = DB.agents.find(a=>a.id===DB.user.agId);
-    if(!ag || ag.solde < mont) { toast('Solde agent insuffisant', true); return; }
-    ag.solde -= mont;
-    cl.solde = (cl.solde||0) + mont;
-    sbSaveAgent(ag); sbSaveClient(cl);
-    logMvt('rech','Recharge Agent → Client '+cl.prenom+' '+cl.nom, mont, ag.name, cl.prenom+' '+cl.nom, {cibleType:'client',cibleId:cl.id,sourceType:'agent',sourceId:ag.id});
-  } else {
-    cl.solde = (cl.solde||0) + mont;
-    sbSaveClient(cl);
-    logMvt('rech','Recharge Admin → Client '+cl.prenom+' '+cl.nom, mont, 'Admin', cl.prenom+' '+cl.nom, {cibleType:'client',cibleId:cl.id});
-  }
-  toast('✅ '+cl.prenom+' '+cl.nom+' rechargé de '+fmt(mont));
-  rRecharge(); updateNav();
+  await _rechargerParLeServeur('client', cl.id, mont,
+    ((cl.prenom||'') + ' ' + (cl.nom||'')).trim());
 }
 
 // ── Recherche/recharge passager par numéro unique OU téléphone (admin et agent) ──
@@ -29418,68 +29522,41 @@ function selectPassagerRecharge(pId, prefix) {
       </div>
     </div>`;
 }
-function doRechPassager(pId, prefix) {
+async function doRechPassager(pId, prefix) {
   const mont = parseInt(document.getElementById(prefix+'-mont').value)||0;
-  if(!mont) { toast('Montant requis', true); return; }
   const ps = DB.passagers.find(p=>p.id===pId);
   if(!ps) return;
-
-  if(isAgent() && !isAdmin()) {
-    const ag = DB.agents.find(a=>a.id===DB.user.agId);
-    if(!ag || ag.solde < mont) { toast('Solde agent insuffisant', true); return; }
-    ag.solde -= mont;
-    ps.solde = (ps.solde||0) + mont;
-    sbSaveAgent(ag); sbSavePassager(ps);
-    logMvt('rech','Recharge Agent → Passager '+ps.prenom+' '+ps.nom, mont, ag.name, ps.prenom+' '+ps.nom, {cibleType:'passager',cibleId:ps.id,sourceType:'agent',sourceId:ag.id});
-  } else {
-    ps.solde = (ps.solde||0) + mont;
-    sbSavePassager(ps);
-    logMvt('rech','Recharge Admin → Passager '+ps.prenom+' '+ps.nom, mont, 'Admin', ps.prenom+' '+ps.nom, {cibleType:'passager',cibleId:ps.id});
-  }
-  toast('✅ '+ps.prenom+' '+ps.nom+' rechargé de '+fmt(mont));
-  rRecharge(); updateNav();
+  await _rechargerParLeServeur('passager', ps.id, mont,
+    ((ps.prenom||'') + ' ' + (ps.nom||'')).trim());
 }
 
-function doRechAgentToSA() {
+async function doRechAgentToSA() {
   const saId = document.getElementById('rasa-sa').value;
   const mont = parseInt(document.getElementById('rasa-mont').value)||0;
-  if(!saId||!mont) { toast('Sous-agent et montant requis', true); return; }
+  if(!saId) { toast('Sous-agent requis', true); return; }
+  // On garde ce contrôle de rattachement : il appartient à l'écran, pas à la
+  // caisse. Le serveur, lui, vérifiera que l'agent part bien de SON compte.
   const sa = DB.sousAgents.find(s=>s.id===saId && s.agId===DB.user.agId);
   if(!sa) { toast('Sous-agent introuvable', true); return; }
-  const ag = DB.agents.find(a=>a.id===DB.user.agId);
-  if(!ag || ag.solde < mont) { toast('Solde agent insuffisant', true); return; }
-  ag.solde -= mont;
-  sa.solde += mont;
-  sbSaveAgent(ag); sbSaveSousAgent(sa);
-  logMvt('rech','Recharge Agent → Sous-agent '+sa.name, mont, ag.name, sa.name, {cibleType:'sousagent',cibleId:sa.id,sourceType:'agent',sourceId:ag.id});
-  toast('✅ '+sa.name+' rechargé de '+fmt(mont));
-  rRecharge(); updateNav();
+  await _rechargerParLeServeur('sousagent', sa.id, mont, sa.name);
 }
 
-function doRechAgent() {
+async function doRechAgent() {
   const agId=document.getElementById('ra-agent').value;
   const mont=parseInt(document.getElementById('ra-mont').value)||0;
-  if(!agId||!mont){toast('Agent et montant requis',true);return;}
+  if(!agId){toast('Agent requis',true);return;}
   const ag=DB.agents.find(a=>a.id===agId);
   if(!ag) return;
-  ag.solde += mont;
-  sbSaveAgent(ag);
-  logMvt('rech','Recharge Admin → '+ag.name,mont,'Admin',ag.name,{cibleId:ag.id,cibleType:'agent'});
-  toast('✅ '+ag.name+' rechargé de '+fmt(mont));
-  rRecharge(); updateNav();
+  await _rechargerParLeServeur('agent', ag.id, mont, ag.name);
 }
 
-function doRechSA() {
+async function doRechSA() {
   const saId=document.getElementById('rsa-sa').value;
   const mont=parseInt(document.getElementById('rsa-mont').value)||0;
-  if(!saId||!mont){toast('Sous-agent et montant requis',true);return;}
+  if(!saId){toast('Sous-agent requis',true);return;}
   const sa=DB.sousAgents.find(s=>s.id===saId);
   if(!sa) return;
-  sa.solde += mont;
-  sbSaveSousAgent(sa);
-  logMvt('rech','Recharge Admin → Sous-agent '+sa.name,mont,'Admin',sa.name,{cibleId:sa.id,cibleType:'sousagent'});
-  toast('✅ '+sa.name+' rechargé de '+fmt(mont));
-  rRecharge(); updateNav();
+  await _rechargerParLeServeur('sousagent', sa.id, mont, sa.name);
 }
 
 // ════════════════════════════════════════════════
