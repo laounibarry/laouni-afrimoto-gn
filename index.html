@@ -2459,7 +2459,22 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
   }
   const sbSaveAlerte = sbIgnoreErr(_sbSaveAlerte, 'sbSaveAlerte');
 
-  async function _sbLogMvt(m) {
+  // ⚠️ 15/10 — UNE TRACE S'AJOUTE, ELLE NE SE RÉÉCRIT PAS.
+  //
+  // Cette fonction faisait un « upsert », c'est-à-dire « insère, et si la ligne
+  // existe déjà, modifie-la ». PostgreSQL vérifie alors le droit de MODIFIER
+  // les colonnes, même quand il n'y a rien à modifier. Or on s'apprête à
+  // retirer ce droit à la clé publique : « mouvements.montant » et
+  // « mouvements.annule » sont encore réécrivables par n'importe qui, ce qui
+  // permet de changer le montant d'une recette passée ou d'annuler une ligne
+  // bien réelle — le bilan mentirait sans qu'un seul solde ne bouge.
+  //
+  // Tel quel, fermer ce droit aurait éteint les 75 écritures de journal du
+  // site d'un coup. En INSERT pur, elles continuent de passer.
+  //
+  // Le second paramètre sert au seul endroit qui revient sur une ligne déjà
+  // écrite (l'annulation) : il demande un vrai UPDATE, explicitement.
+  async function _sbLogMvt(m, mode) {
     const row = { id:m.id, type:m.type||'', description:m.desc||'', montant:m.montant||0,
       de:m.de||'Système', vers:m.vers||'—', role:m.role||'public',
       date:m.date||new Date().toISOString(),
@@ -2467,7 +2482,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       cible_id:m.cibleId||null, cible_type:m.cibleType||null,
       source_id:m.sourceId||null, source_type:m.sourceType||null };
     const alts = { description:'desc' };
-    return await sbUpsertSouple('mouvements', row, alts);
+    return await sbUpsertSouple('mouvements', row, alts, mode || 'insert');
   }
   const sbLogMvt = sbIgnoreErr(_sbLogMvt, 'sbLogMvt');
 
@@ -7389,6 +7404,14 @@ function _identifiantPersonnel() {
   if(DB.user.role === 'agent') {
     const a = (DB.agents || []).find(x => x.id === DB.user.agId);
     return a ? String(a.num || a.code || '') : '';
+  }
+  // 15/10 : le sous-agent manquait. Ses deux boutons de recharge écrivaient le
+  // solde depuis le navigateur, et annonçaient « rechargé » sans que rien ne
+  // parte en base. Ils passent désormais par la porte à serrure, qui a besoin
+  // de SON numéro d'accès.
+  if(DB.user.role === 'sousagent') {
+    const s = (DB.sousAgents || []).find(x => x.id === DB.user.saId);
+    return s ? String(s.num || s.code || '') : '';
   }
   return '';
 }
@@ -13538,7 +13561,7 @@ function saSearchClient() {
     '</div>';
 }
 
-function saRechargePassagerFinal(pId) {
+async function saRechargePassagerFinal(pId) {
   const sa = DB.sousAgents.find(x=>x.id===DB.user.saId);
   const ps = DB.passagers.find(p=>p.id===pId);
   const mont = parseInt(document.getElementById('sa-rmont-final-psg').value)||0;
@@ -13547,17 +13570,20 @@ function saRechargePassagerFinal(pId) {
   if(sa.solde < mont) {
     toast('Solde insuffisant — vous avez ' + fmt(sa.solde), true); return;
   }
-  sa.solde -= mont;
-  ps.solde = (ps.solde||0) + mont;
-  sbSaveSousAgent(sa); sbSavePassager(ps); // AUDIT : recharge jamais persistée
-  logMvt('rech', 'Recharge SA→Passager ' + ps.prenom + ' ' + ps.nom, mont, sa.name, ps.prenom+' '+ps.nom, {cibleId:ps.id,cibleType:'passager',sourceId:sa.id,sourceType:'sousagent'});
-  toast('✅ ' + ps.prenom + ' ' + ps.nom + ' rechargé de ' + fmt(mont) + ' · Votre solde : ' + fmt(sa.solde));
+  // ⚠️ 15/10 — « AUDIT : recharge jamais persistée » : le commentaire était
+  // déjà là, le défaut aussi. Ces deux lignes écrivaient le solde dans la
+  // page, l'écran annonçait « ✅ rechargé », et rien ne partait en base — le
+  // sous-agent croyait avoir rechargé son client. Tout passe désormais par la
+  // porte à serrure, qui débite le sous-agent et crédite le passager ENSEMBLE,
+  // après lui avoir demandé son mot de passe.
+  if(!await _rechargerParLeServeur('passager', ps.id,
+       mont, ((ps.prenom||'') + ' ' + (ps.nom||'')).trim())) return;
   document.getElementById('sa-search').value = '';
   document.getElementById('sa-search-result').innerHTML = '';
   rSousAgent(); updateNav();
 }
 
-function saRechargeClientFinal(cId) {
+async function saRechargeClientFinal(cId) {
   const sa = DB.sousAgents.find(x=>x.id===DB.user.saId);
   const cl = DB.clients.find(c=>c.id===cId);
   const mont = parseInt(document.getElementById('sa-rmont-final').value)||0;
@@ -13566,12 +13592,10 @@ function saRechargeClientFinal(cId) {
   if(sa.solde < mont) {
     toast('Solde insuffisant — vous avez ' + fmt(sa.solde), true); return;
   }
-  // Déduction automatique du solde sous-agent
-  sa.solde -= mont;
-  cl.solde = (cl.solde||0) + mont;
-  sbSaveSousAgent(sa); sbSaveClient(cl); // AUDIT : recharge jamais persistée
-  logMvt('rech', 'Recharge SA→Client ' + cl.prenom + ' ' + cl.nom, mont, sa.name, cl.prenom+' '+cl.nom, {cibleId:cl.id,cibleType:'client',sourceId:sa.id,sourceType:'sousagent'});
-  toast('✅ ' + cl.prenom + ' ' + cl.nom + ' rechargé de ' + fmt(mont) + ' · Votre solde : ' + fmt(sa.solde));
+  // Même défaut, même réparation que pour le passager juste au-dessus : le
+  // serveur débite le sous-agent et crédite le client ensemble, ou rien.
+  if(!await _rechargerParLeServeur('client', cl.id,
+       mont, ((cl.prenom||'') + ' ' + (cl.nom||'')).trim())) return;
   // Vider la recherche
   document.getElementById('sa-search').value = '';
   document.getElementById('sa-search-result').innerHTML = '';
@@ -29451,11 +29475,14 @@ async function _rechargerParLeServeur(cibleType, cibleId, montant, nomLisible) {
   const auth = await _motDePassePersonnel('Recharger ' + (nomLisible || 'ce compte'));
   if(!auth) return false;
 
-  // Un agent recharge DEPUIS SON PROPRE SOLDE ; l'administration met l'argent
-  // en circulation. C'est le serveur qui vérifie les deux cas.
-  const estAgent = (typeof isAgent === 'function' && isAgent()) && !isAdmin();
-  const srcType = estAgent ? 'agent' : 'admin';
-  const srcId = estAgent ? ((DB.user && DB.user.agId) || '') : '';
+  // Un agent et un sous-agent rechargent DEPUIS LEUR PROPRE SOLDE ;
+  // l'administration, elle, met l'argent en circulation. C'est le serveur qui
+  // vérifie les trois cas, et c'est le mot de passe qui prouve qui agit.
+  const estSA = (typeof isSA === 'function' && isSA());
+  const estAgent = (typeof isAgent === 'function' && isAgent()) && !isAdmin() && !estSA;
+  const srcType = estSA ? 'sousagent' : estAgent ? 'agent' : 'admin';
+  const srcId = estSA ? ((DB.user && DB.user.saId) || '')
+              : estAgent ? ((DB.user && DB.user.agId) || '') : '';
 
   let data = null, erreur = '';
   try {
@@ -30178,18 +30205,42 @@ function annulerRecharge(id) {
     (exp ? '\u2795 ' + _nomCompte(exp) + ' sera RECR\u00c9DIT\u00c9 de ' + fmt(montant)
          : '\u2795 Personne n\'est recr\u00e9dit\u00e9 : cet argent avait \u00e9t\u00e9 cr\u00e9\u00e9 par l\'administration, il est simplement retir\u00e9.'),
     async function() {
-      benef.solde = (benef.solde || 0) - montant;
-      await _sauverCompte(m.cibleType, benef);
+      // ⚠️ 15/10 — CET ÉCRAN NE MARCHAIT PLUS, ET IL DISAIT QUE SI.
+      //
+      // Il écrivait « benef.solde = benef.solde - montant » puis sauvegardait
+      // la fiche. Depuis que les sauvegardes de fiche n'envoient plus le solde
+      // (14/10) et que la base le refuse à la clé publique (15/10), le solde
+      // changeait à l'écran et nulle part ailleurs : l'annulation était
+      // affichée comme réussie et n'avait rien annulé du tout.
+      //
+      // Les deux mouvements passent désormais par le serveur, qui débite et
+      // crédite lui-même. S'il refuse le premier, on s'arrête avant d'avoir
+      // touché à quoi que ce soit.
+      const _pris = await mouvementSolde(m.cibleType, m.cibleId, 'societe', 'societe',
+                                         montant, 'Annulation de transfert');
+      if(_pris !== true) {
+        toast('⛔ L\'annulation n\'a pas pu se faire : ' + _nomCompte(benef) +
+              ' n\'a plus cette somme, ou le serveur a refusé. RIEN n\'a bougé.', true);
+        return;
+      }
 
       if(exp) {
-        exp.solde = (exp.solde || 0) + montant;
-        await _sauverCompte(expType, exp);
+        const _rendu = await mouvementSolde('societe', 'societe', expType, m.sourceId,
+                                            montant, 'Retour sur annulation');
+        if(_rendu !== true) {
+          // La somme n'est pas perdue : elle est restée sur le compte de la
+          // société, et la ligne de journal ci-dessous le dit.
+          toast('⚠️ Somme reprise à ' + _nomCompte(benef) + ', mais elle n\'a pas pu être ' +
+                'rendue à ' + _nomCompte(exp) + ' : elle est sur le compte de la société.', true);
+        }
       }
 
       m.annule = true;
       m.annulePar = DB.user ? (DB.user.name || DB.user.role) : 'Admin';
       m.annuleDate = new Date().toISOString();
-      await sbLogMvt(m);
+      // ⚠️ « update » explicite : c'est le SEUL endroit qui revient sur une
+      // ligne de journal déjà écrite. Partout ailleurs, une trace s'ajoute.
+      await sbLogMvt(m, 'update');
 
       logMvt('rech', '\u21a9\ufe0f Annulation transfert \u2014 ' + _nomCompte(benef) +
         ' \u2192 ' + (exp ? _nomCompte(exp) : 'exp\u00e9diteur'), montant,
