@@ -8624,7 +8624,19 @@ function releveHtml(lignes, type, id, soldeActuel) {
   }
   let totalEntre = 0, totalSorti = 0;
   const corps = lignes.map(function(m){
-    const annule = (m.annule === true);
+    // ⚠️ UNE ANNULATION LAISSE DEUX LIGNES, ET AUCUNE NE DOIT COMPTER.
+    //
+    // Quand l'administration annule une recharge, le serveur marque la ligne
+    // d'origine « annulée » ET inscrit une contre-écriture, pour que le geste
+    // soit traçable. La ligne d'origine était déjà exclue du total ; la
+    // contre-écriture, elle, s'y ajoutait. Une recharge de 10 000 reçue puis
+    // annulée affichait donc « 10 000 dépensés » à un passager qui n'avait
+    // rien dépensé — il avait reçu, puis on lui avait repris.
+    //
+    // Les deux lignes restent VISIBLES, en gris : il faut qu'il voie ce qui
+    // s'est passé. Mais ni l'une ni l'autre n'entre dans les totaux, qui
+    // reflètent ainsi le solde réel.
+    const annule = (m.annule === true) || (String(m.type) === 'annulation');
     // Il est la SOURCE : l'argent sort de sa poche. Il est la CIBLE : il entre.
     const sort = (String(m.source_type) === type && String(m.source_id) === String(id));
     const mt = Number(m.montant) || 0;
@@ -8640,7 +8652,9 @@ function releveHtml(lignes, type, id, soldeActuel) {
           '<div style="font-size:13px;font-weight:700;line-height:1.35">' + esc(m.description || 'Mouvement') + '</div>' +
           '<div style="font-size:11px;color:var(--text2);margin-top:3px">' + dd + '</div>' +
           '<div style="font-size:11px;color:var(--text2)">' + (sort ? 'Vers : ' + esc(m.vers || '—') : 'De : ' + esc(m.de || '—')) + '</div>' +
-          (annule ? '<div style="font-size:11px;color:#9CA3AF;font-weight:700;margin-top:2px">Mouvement annulé</div>' : '') +
+          (annule ? '<div style="font-size:11px;color:#9CA3AF;font-weight:700;margin-top:2px">' +
+                    (String(m.type) === 'annulation' ? 'Annulation d\'un mouvement' : 'Mouvement annulé') +
+                    '</div>' : '') +
         '</div>' +
         '<div style="font-weight:900;font-size:15px;white-space:nowrap;color:' +
           (annule ? '#9CA3AF' : (sort ? '#EF4444' : '#22C55E')) + '">' +
@@ -26233,6 +26247,59 @@ function rGestion() {
 }
 
 // ── Changement de mot de passe (admin seulement) ──
+// ════════════════════════════════════════════════════════════════════════════
+//  ANNULER UN MOUVEMENT — UNE SEULE PORTE POUR LES DEUX ÉCRANS
+//
+//  Annuler, c'est trois gestes : retirer au bénéficiaire, rendre à l'émetteur,
+//  marquer la ligne. Le site les faisait séparément depuis le navigateur —
+//  trois occasions de s'arrêter au milieu — et le troisième écrivait
+//  directement dans le journal, ce que la clé publique ne doit plus pouvoir
+//  faire : sinon n'importe qui annule n'importe quelle recette, et le bilan
+//  ment sans qu'un seul solde ne bouge.
+//
+//  « afri135_annuler_mouvement » fait les trois ENSEMBLE, après le mot de passe
+//  de l'administration. Si elle échoue, rien n'a bougé.
+//
+//  Rend : true (c'est fait) · false (refusé, et rien n'a bougé) ·
+//         'porte-absente' (le SQL n'est pas encore posé — reprendre l'ancien
+//         chemin, ce que l'appelant sait faire).
+//
+//  ⚠️ LE REPLI EST VOLONTAIRE : il permet de pousser ce site AVANT le SQL sans
+//  éteindre les boutons. Il disparaîtra quand le 136 sera posé partout.
+// ════════════════════════════════════════════════════════════════════════════
+async function _annulerParLeServeur(mouvId, m, titre) {
+  const auth = await _motDePassePersonnel(titre || 'Annuler un mouvement');
+  if(!auth) { toast('Annulation abandonnée.', true); return false; }
+
+  let rep = null, err = '';
+  try {
+    const r = await supabaseClient.rpc('afri135_annuler_mouvement', {
+      p_num: auth.num, p_mot_de_passe: auth.pw, p_mouvement_id: String(mouvId),
+    });
+    rep = r.data;
+    if(r.error) err = r.error.message || '';
+  } catch(e) { err = (e && e.message) || String(e); }
+
+  if(/PGRST202|Could not find the function|does not exist/i.test(err)) {
+    try { addDebugLog('ANNULATION : porte serveur absente, ancien chemin'); } catch(e) {}
+    return 'porte-absente';
+  }
+
+  if(rep && rep.ok === true) {
+    if(m) {
+      m.annule = true;
+      if(typeof rep.solde_beneficiaire === 'number') m.soldeBenef = rep.solde_beneficiaire;
+    }
+    // ⚠️ LA PHRASE DU SERVEUR PASSE AVANT LA NÔTRE : la porte écrit elle-même,
+    // pour chacun de ses cas, une phrase française qui dit ce qui s'est passé.
+    toast('✅ ' + (rep.message || 'Mouvement annulé.'));
+    return true;
+  }
+  toast('⛔ ' + ((rep && (rep.message || rep.raison)) || err ||
+        'L\'annulation n\'a pas abouti. Rien n\'a bougé.'), true);
+  return false;
+}
+
 // ════ ANNULATION DE TRANSACTIONS ════
 async function annulerMouvement(mouvId, benefType, benefId, montant) {
   if(!await demanderConfirmation('Annuler ce mouvement ?',
@@ -26259,68 +26326,21 @@ async function annulerMouvement(mouvId, benefType, benefId, montant) {
   // exigeaient les colonnes manquantes — voir journal-mouvements.sql.
   if(m.annule) { toast('⚠️ Cette transaction est déjà annulée.', true); return; }
 
-  // ══ 14/10 — ANNULER DEVIENT UN SEUL GESTE, FAIT PAR LE SERVEUR ═══════════
-  //
-  // Ce qui suivait était en trois morceaux faits depuis le navigateur : retirer
-  // au bénéficiaire, rendre à l'émetteur, puis marquer « annulé ». Trois appels
-  // séparés, donc trois occasions de s'arrêter au milieu — et le troisième
-  // écrivait directement dans le journal, ce que la clé publique ne doit plus
-  // pouvoir faire (sinon n'importe qui annule n'importe quelle recette, et le
-  // bilan ment sans qu'une ligne ne bouge).
-  //
-  // La porte « afri135_annuler_mouvement » fait les trois ENSEMBLE, après avoir
-  // demandé le mot de passe de l'administration. Si elle échoue, rien n'a bougé.
-  //
-  // ⚠️ LE REPLI EST VOLONTAIRE : tant que le fichier SQL 135 n'est pas posé, la
-  // porte n'existe pas et PostgREST répond PGRST202. On reprend alors l'ancien
-  // chemin — sinon pousser ce site AVANT le SQL éteindrait le bouton.
+  // ══ ANNULER EST UN SEUL GESTE, FAIT PAR LE SERVEUR ═══════════════════════
+  // Voir « _annulerParLeServeur » : les deux écrans d'annulation passent par
+  // la même porte. Ici, « rien » veut dire que la porte n'existe pas encore et
+  // qu'il faut reprendre l'ancien chemin, juste en dessous.
   {
-    const auth = await _motDePassePersonnel('Annuler un mouvement');
-    if(!auth) { toast('Annulation abandonnée.', true); return; }
-    let rep = null, err = '';
-    try {
-      const r = await supabaseClient.rpc('afri135_annuler_mouvement', {
-        p_num: auth.num, p_mot_de_passe: auth.pw, p_mouvement_id: String(mouvId),
-      });
-      rep = r.data;
-      if(r.error) err = r.error.message || '';
-    } catch(e) { err = (e && e.message) || String(e); }
-
-    const porteAbsente = /PGRST202|Could not find the function|does not exist/i.test(err);
-    if(!porteAbsente) {
-      if(rep && rep.ok === true) {
-        m.annule = true;
-        if(typeof rep.solde_beneficiaire === 'number') {
+    const _r = await _annulerParLeServeur(mouvId, m, 'Annuler un mouvement');
+    if(_r !== 'porte-absente') {
+      if(_r === true) {
+        if(typeof m.soldeBenef === 'number') {
           const l = benefType === 'client' ? DB.clients : benefType === 'agent' ? DB.agents : null;
-          const o = l && l.find(x => x.id === benefId); if(o) o.solde = rep.solde_beneficiaire;
+          const o = l && l.find(x => x.id === benefId); if(o) o.solde = m.soldeBenef;
+          delete m.soldeBenef;
         }
-        toast('✅ ' + (rep.message || ('Transaction annulée · ' + fmt(montant) + ' retirés au bénéficiaire')));
         rHistorique(); updateNav();
-        return;
       }
-      toast('⛔ ' + ((rep && (rep.message || rep.raison)) || err || 'L\'annulation n\'a pas abouti. Rien n\'a bougé.'), true);
-      return;
-    }
-    try { addDebugLog('ANNULATION : porte 135 absente, ancien chemin'); } catch(e) {}
-
-    // ⚠️ AVANT DE TOUCHER A L'ARGENT, VERIFIER QU'ON POURRA ECRIRE LA FIN.
-    //
-    // L'ancien chemin fait trois gestes : retirer, rendre, marquer « annulé ».
-    // Si le SQL 135 a fermé l'écriture du journal mais que PostgREST n'a pas
-    // encore relu son schéma (quelques secondes), le PGRST202 ci-dessus nous
-    // amène ici — et le marquage échouerait APRES que l'argent a bougé. Le
-    // bénéficiaire serait débité sans que le mouvement soit marqué, et on
-    // pourrait l'annuler une seconde fois.
-    //
-    // On écrit donc la ligne avec SA PROPRE valeur : rien ne change, mais le
-    // serveur dit s'il nous laisserait faire. S'il refuse, on s'arrête avant
-    // d'avoir rien déplacé.
-    const { error: _peutEcrire } = await supabaseClient
-      .from('mouvements').update({ annule: m.annule === true }).eq('id', mouvId);
-    if(_peutEcrire) {
-      toast('⛔ L\'annulation est momentanément indisponible : le serveur vient d\'être mis à jour. ' +
-            'Réessayez dans une minute. RIEN n\'a bougé.', true);
-      try { addDebugLog('ANNULATION refusée (journal fermé) : ' + _peutEcrire.message); } catch(e) {}
       return;
     }
   }
@@ -30213,9 +30233,14 @@ function annulerRecharge(id) {
       // changeait à l'écran et nulle part ailleurs : l'annulation était
       // affichée comme réussie et n'avait rien annulé du tout.
       //
-      // Les deux mouvements passent désormais par le serveur, qui débite et
-      // crédite lui-même. S'il refuse le premier, on s'arrête avant d'avoir
-      // touché à quoi que ce soit.
+      // Il passe par la même porte que l'autre écran d'annulation. Tant que
+      // celle-ci n'est pas posée, on reprend l'ancien chemin juste en dessous.
+      const _r = await _annulerParLeServeur(m.id, m, 'Annuler un transfert');
+      if(_r !== 'porte-absente') {
+        if(_r === true) { delete m.soldeBenef; rHistorique(); updateNav(); }
+        return;
+      }
+
       const _pris = await mouvementSolde(m.cibleType, m.cibleId, 'societe', 'societe',
                                          montant, 'Annulation de transfert');
       if(_pris !== true) {
