@@ -26422,6 +26422,52 @@ async function changeMdpAdmin() {
     // SQL 87, un upsert qui porte admin_pass_hash est refuse en entier, alors qu'un
     // « update ... where id = 1 » passe (banc). On n'envoie donc QUE ce qui change, par
     // update, et un refus s'affiche au lieu d'un « mis a jour » mensonger.
+    // ══ 15/10 — CE CHANGEMENT SE FAIT DESORMAIS SUR LE SERVEUR ═══════════
+    //
+    // Cet écran écrivait directement dans « config_admin » après avoir vérifié,
+    // DANS LE NAVIGATEUR, que la personne était connectée en administrateur.
+    // Un contrôle dans le navigateur ne protège personne : il suffit de ne pas
+    // passer par l'écran. Mesuré le 15/10 : avec la seule clé publique,
+    // n'importe qui pouvait remplacer le mot de passe de l'administration par
+    // le sien — et de là ouvrir toutes les portes à serrure qu'on avait posées.
+    //
+    // La porte demande le mot de passe ACTUEL. C'est la seule preuve que c'est
+    // bien vous, et elle ne se contourne pas.
+    {
+      const auth = await _motDePassePersonnel('Changer vos identifiants d\'administration');
+      if(!auth) {
+        err.textContent = '⚠️ Changement abandonné : vos identifiants actuels restent valables.';
+        err.style.display = 'block';
+        return;
+      }
+      let rep = null, e2 = '';
+      try {
+        const r = await supabaseClient.rpc('afri137_changer_identifiants_admin', {
+          p_num: auth.num, p_mot_de_passe: auth.pw,
+          p_nouvel_id: newId || '', p_nouvel_email: newEmail || '', p_nouveau_mdp: nv || '',
+        });
+        rep = r.data;
+        if(r.error) e2 = r.error.message || '';
+      } catch(ex) { e2 = (ex && ex.message) || String(ex); }
+
+      // ⚠️ Repli tant que le SQL 137 n'est pas posé : sinon pousser ce site
+      // avant le fichier éteindrait l'écran.
+      if(!/PGRST202|Could not find the function|does not exist/i.test(e2)) {
+        if(rep && rep.ok === true) {
+          if(newId) { DB.adminId = newId; DB.adminIdLu = true; }
+          if(newEmail) DB.adminEmail = newEmail;
+          toast('✅ ' + (rep.message || 'Identifiants modifiés.'));
+          try { rGestion(); } catch(ex) {}
+          return;
+        }
+        err.textContent = '⛔ ' + ((rep && (rep.message || rep.raison)) || e2 ||
+          'Le changement n\'a pas abouti. Vos identifiants actuels restent valables.');
+        err.style.display = 'block';
+        return;
+      }
+      try { addDebugLog('IDENTIFIANTS ADMIN : porte 137 absente, ancien chemin'); } catch(ex) {}
+    }
+
     const _patch = {};
     if(newId) _patch.admin_id = newId;
     if(newEmail) _patch.admin_email = newEmail;
