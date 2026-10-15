@@ -26278,6 +26278,27 @@ async function annulerMouvement(mouvId, benefType, benefId, montant) {
       return;
     }
     try { addDebugLog('ANNULATION : porte 135 absente, ancien chemin'); } catch(e) {}
+
+    // ⚠️ AVANT DE TOUCHER A L'ARGENT, VERIFIER QU'ON POURRA ECRIRE LA FIN.
+    //
+    // L'ancien chemin fait trois gestes : retirer, rendre, marquer « annulé ».
+    // Si le SQL 135 a fermé l'écriture du journal mais que PostgREST n'a pas
+    // encore relu son schéma (quelques secondes), le PGRST202 ci-dessus nous
+    // amène ici — et le marquage échouerait APRES que l'argent a bougé. Le
+    // bénéficiaire serait débité sans que le mouvement soit marqué, et on
+    // pourrait l'annuler une seconde fois.
+    //
+    // On écrit donc la ligne avec SA PROPRE valeur : rien ne change, mais le
+    // serveur dit s'il nous laisserait faire. S'il refuse, on s'arrête avant
+    // d'avoir rien déplacé.
+    const { error: _peutEcrire } = await supabaseClient
+      .from('mouvements').update({ annule: m.annule === true }).eq('id', mouvId);
+    if(_peutEcrire) {
+      toast('⛔ L\'annulation est momentanément indisponible : le serveur vient d\'être mis à jour. ' +
+            'Réessayez dans une minute. RIEN n\'a bougé.', true);
+      try { addDebugLog('ANNULATION refusée (journal fermé) : ' + _peutEcrire.message); } catch(e) {}
+      return;
+    }
   }
 
   // ── Le retrait au beneficiaire ──
