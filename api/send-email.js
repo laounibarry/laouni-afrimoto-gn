@@ -138,11 +138,31 @@ export default async function handler(req, res) {
   // CORS complet
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-afrimoto-cle');
 
   if(req.method === 'OPTIONS') return res.status(200).end();
   if(req.method === 'GET') return res.status(200).json({ status: 'ok', message: 'API send-email opérationnelle' });
   if(req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // ══ 19/10/2026 — LA PORTE N'EST PLUS OUVERTE À N'IMPORTE QUI ══
+  //
+  // Trouvé par l'audit : cette adresse acceptait tout appelant. Quelqu'un
+  // pouvait vider le quota (200 courriels par mois en secours) ou écrire au
+  // nom du domaine. Désormais la base envoie une clé dans l'en-tête
+  // « x-afrimoto-cle » (SQL 151), et elle doit être la même que MAIL_SECRET
+  // dans les variables d'environnement Vercel.
+  //
+  // ⚠️ TOLÉRANT TANT QUE LA VARIABLE N'EST PAS POSÉE : sans MAIL_SECRET côté
+  // Vercel, rien ne change — sinon le jour du déploiement, tous les courriels
+  // tomberaient avant que le fondateur ait eu le temps de coller la clé.
+  // Dès qu'elle est posée, tout appel sans la bonne clé est refusé.
+  const CLE_ATTENDUE = (process.env.MAIL_SECRET || '').trim();
+  if(CLE_ATTENDUE) {
+    const CLE_RECUE = String(req.headers['x-afrimoto-cle'] || '').trim();
+    if(CLE_RECUE !== CLE_ATTENDUE) {
+      return res.status(401).json({ error: 'cle manquante ou invalide' });
+    }
+  }
 
   try {
     const { to, subject, text, pieces, attestation } = req.body || {};

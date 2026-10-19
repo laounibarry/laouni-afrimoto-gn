@@ -9973,9 +9973,24 @@ function _remplirAdresseDepart(lat, lng) {
         const nom = _libelleAdresse(j);   // v9.610 : numero du batiment et point de repere
         if(!nom) return;
         if(_pointPriseEnCharge && _pointPriseEnCharge.source === 'gps') _pointPriseEnCharge.nom = nom;
+        // Le dernier nom que le GPS a releve : il sert a reconnaitre, au moment
+        // de commander, un champ encore rempli par le GPS (et non par la main).
+        window._dernierNomGps = nom;
         const dep = document.getElementById('pa-depart');
-        if(dep && (!dep.value || dep.value === 'Ma position actuelle' || dep.dataset.auto === '1')) { dep.value = nom; dep.dataset.auto = '1'; }
-        _dernierDepartSaisi = nom;
+        // ══ 19/10 — LE GPS NE MEMORISE SON ADRESSE QUE SI C'EST LUI QUI REMPLIT ══
+        //
+        // « _dernierDepartSaisi = nom » était posé HORS de ce « if » : à chaque
+        // relevé (dès 60 m de déplacement), le GPS écrasait la DERNIÈRE SAISIE
+        // mémorisée — même quand le passager venait de taper l'adresse d'un
+        // ami. Or cette mémoire est précisément le repli utilisé quand les
+        // champs ont été recréés vides : dans ce cas, le chauffeur recevait
+        // l'adresse DU PASSAGER à la place de celle qu'il avait tapée. C'est
+        // le défaut constaté par le fondateur le 18/10. Désormais le GPS ne
+        // mémorise son adresse que lorsqu'il a vraiment rempli le champ.
+        if(dep && (!dep.value || dep.value === 'Ma position actuelle' || dep.dataset.auto === '1')) {
+          dep.value = nom; dep.dataset.auto = '1';
+          _dernierDepartSaisi = nom;
+        }
         const st = document.getElementById('pa-position-statut');
         if(st && _pointPriseEnCharge && _pointPriseEnCharge.source === 'gps') st.innerHTML = '📍 Prise en charge : <b>' + esc(nom) + '</b>';
       }).catch(() => {});
@@ -20433,7 +20448,10 @@ function saveTrajet() {
   if(!dep) { toast('⚠️ Entrez votre lieu de départ.', true); return; }
   if(!arr) { toast('⚠️ Entrez votre destination.', true); return; }
   if(!dh) { toast('⚠️ Sélectionnez une date et heure de départ.', true); return; }
-  if(pl < 1) { toast('⚠️ Le nombre de places doit être entre 1 et 8.', true); return; }
+  // 19/10 — le message promettait une limite de 8 que ce code n'a jamais vérifiée ;
+  // depuis la 1.0.255 l'application publie jusqu'à 30 places (minibus), et le serveur
+  // n'a jamais plafonné. On dit ce qui est vrai : au moins une place.
+  if(pl < 1) { toast('⚠️ Indiquez au moins une place.', true); return; }
   if(prix <= 0) { toast('⚠️ Entrez un prix par place.', true); return; }
 
   // ══ 28/09 — LE PLAN DES SIÈGES EST OBLIGATOIRE, ET IL DOIT TOMBER JUSTE ══
@@ -20670,7 +20688,10 @@ async function _publierTrajetDefinitif() {
       logMvt('trajet','Publication trajet — '+cl.prenom+' '+cl.nom+' depuis '+pref,_fraisPris,cl.prenom+' '+cl.nom,'Système',{sourceType:'client',sourceId:cl.id,cibleType:'societe'}); // v9.571 : le payeur est la SOURCE, pas la cible.
     }
 
-    try { _envoyerEmailConfirmationTrajet(_pub); } catch(e) {}
+    // 19/10 — le courriel de publication part désormais du SERVEUR (SQL 149), avec les
+    // frais réellement payés et la règle des frais rendus ; celui d'ici inventait un
+    // « revenu potentiel » et partait du navigateur en EmailJS. Débranché.
+    // try { _envoyerEmailConfirmationTrajet(_pub); } catch(e) {}
     logMvt('trajet','Trajet '+dep+' → '+arr+' par '+cond,0);
 
     // Le message vient du serveur : il dit ce qui a VRAIMENT été enregistré
@@ -20816,9 +20837,13 @@ function getNomPlaceDynamique(zone, numero, totalDansZone) {
     if(numero === 2) return 'Milieu';
     if(numero === 3) return 'Droite';
   } else {
-    const ordre = ['Droit', 'Milieu Droit', 'Milieu Gauche', 'Gauche'];
-    if(numero <= 4) return ordre[numero - 1];
-    return (numero % 2 === 1) ? 'Droit' : 'Gauche';
+    // ══ 19/10 — À QUATRE PLACES ET PLUS, ON COMPTE, ON NE DEVINE PLUS ══
+    // L'ancienne table nommait le siège n°1 « Droit » alors que le plan le
+    // dessine le plus à gauche, et au-delà de quatre la parité donnait onze
+    // étiquettes identiques sur une banquette de minibus. « Place N » est
+    // toujours vrai, ne se répète jamais, et dit la même chose que
+    // l'application et que le courriel de réservation (SQL 147).
+    return 'Place ' + numero;
   }
 }
 
@@ -21492,12 +21517,18 @@ async function saveReservationTrajet() {
         ' Code de départ : ' + pinDepart +
         ' · Paiement en espèces directement au chauffeur le jour du trajet.');
 
-  if(email) {
-    envoyerEmailConfirmationAvecPlaces(email, prenom, nom, tel, _tApres, _siegesPris, pinDepart);
-  }
-
-  // 📧 ENVOYER EMAIL AU CHAUFFEUR pour qu'il sache qu'il y a une nouvelle réservation
-  envoyerEmailChauffeurReservation(_tApres, prenom, nom, tel, _siegesPris);
+  // ══ 19/10 — LES DEUX COURRIELS PARTENT DU SERVEUR, PLUS D'ICI ══
+  //
+  // « reserver_trajet » fait partir lui-même les deux courriers (passager et
+  // conducteur) depuis la base — complets et identiques pour tous depuis le
+  // SQL 147 : véhicule, conducteur et son téléphone, sièges traduits, total,
+  // consignes, et la VRAIE règle d'annulation (3 heures, décidée le 28/09).
+  // Les envois qui partaient d'ici étaient devenus des DOUBLONS, avec leurs
+  // défauts à eux (« 350 000 GNF GNF », « 1 heure avant », téléphone vide) —
+  // et chaque envoi depuis le navigateur mangeait le quota EmailJS de 200
+  // courriers par mois, avec une clé lisible par n'importe qui dans la page.
+  // envoyerEmailConfirmationAvecPlaces(...) et
+  // envoyerEmailChauffeurReservation(...) ne sont donc plus appelées ici.
 }
 
 function envoyerEmailChauffeurReservation(trajet, prenom, nom, tel, places_positions) {
@@ -22725,7 +22756,10 @@ async function chauffeurConfirmerPassager(trajetId, reservationId) {
             'rechargez-la, puis recommencez. Rien n\'a changé et aucun passager n\'a été prévenu.', true);
       return;
     }
-    notifierPassagersTrajet(t, 'debut_trajet');
+    // 19/10 — le courriel « départ confirmé » part désormais du SERVEUR (SQL 149), pour
+    // chaque passager avec sa place, et au conducteur avec la liste complète ; quel que
+    // soit l'écran où le dernier code a été validé. Débranché ici pour ne pas doubler.
+    // notifierPassagersTrajet(t, 'debut_trajet');
     logMvt('debut_trajet', '🚗 Départ réel du trajet ' + esc(t.depart) + ' → ' + esc(t.arrivee), 0, '', 'Trajet');
     rClientContent();
     toast('🚗 Tous les passagers sont confirmés — départ RÉEL enregistré, bon voyage !');
@@ -23241,8 +23275,10 @@ async function chauffeurAnnulerTrajetConfirme(trajetId) {
                    {cibleType:'client', cibleId: DB.user.id}); } catch(e) {}
     }
 
-    // Les passagers sont prévenus APRÈS : jamais sur une annulation refusée.
-    try { notifierPassagersTrajet(_tA, 'annulation_chauffeur'); } catch(e) {}
+    // 19/10 — les passagers sont prévenus par le SERVEUR dès que le trajet passe en
+    // « annulé » (SQL 149) : chacun reçoit le MOTIF, quel que soit l'écran d'où vient
+    // l'annulation. L'envoi d'ici partait du navigateur, sans motif. Débranché.
+    // try { notifierPassagersTrajet(_tA, 'annulation_chauffeur'); } catch(e) {}
 
     rClientContent();
     try { rTrajets(); } catch(e) {}
@@ -23269,7 +23305,8 @@ async function chauffeurAnnulerTrajetConfirme(trajetId) {
     const parent = DB.trajets.find(x => x.id === t.parentId && x.statut === 'en_cours');
     if(parent) { parent.placesDispos += (t.places || 0); await sbSaveTrajet(parent); }
   }
-  notifierPassagersTrajet(t, 'annulation_chauffeur');
+  // 19/10 — prévenu par le SERVEUR dès le passage en « annulé » (SQL 149), avec le motif.
+  // notifierPassagersTrajet(t, 'annulation_chauffeur');
   rClientContent();
   toast('✅ Trajet annulé' + ((t.reservations&&t.reservations.length) ? ' · les ' + t.reservations.length + ' passager(s) ont été notifiés par email' : ''));
 }
@@ -33892,6 +33929,54 @@ body.mode-passager .nav-inner{display:none!important}
     if (!ref) { toast('\u26a0\ufe0f Position requise. Autorisez la g\u00e9olocalisation.', true);
                 try { obtenirPositionPassager(); } catch (x) {} return; }
 
+    // \u2550\u2550 19/10 \u2014 LE TEXTE ET LE POINT DOIVENT DESIGNER LE MEME ENDROIT \u2550\u2550
+    //
+    // Constate par le fondateur le 18/10 : il avait TAPE l'adresse d'un ami,
+    // sans toucher la carte ni choisir de suggestion. Le texte partait juste
+    // (le chauffeur l'a lu et est bien arrive), mais lat/lng restaient SA
+    // position a lui \u2014 et c'est sur eux que reposent le choix du chauffeur le
+    // plus proche, le prix, le marqueur des deux cartes et le bouton de
+    // navigation du chauffeur. S'il avait appuye sur \u00ab naviguer \u00bb, il serait
+    // parti chez le passager, pas chez l'ami.
+    //
+    // Quand le point vient du GPS et que le texte tape ne ressemble pas au nom
+    // que le GPS a releve, on geocode donc le texte :
+    //   \u00b7 trouve a plus de 300 m : c'est une commande POUR AILLEURS \u2014 le point
+    //     geocode fait foi, et l'ecran le dit ;
+    //   \u00b7 trouve a moins de 300 m : le passager a simplement precise l'endroit
+    //     ou il est \u2014 le GPS, plus exact qu'un geocodage, est garde ;
+    //   \u00b7 introuvable : on DEMANDE, plutot que d'envoyer un chauffeur au
+    //     mauvais endroit. S'il ne part pas d'ou il est, il pointe la carte.
+    try {
+      var _texteManuel = dep && dep !== 'Ma position actuelle' &&
+          (!ref.nom || String(ref.nom).trim() !== dep) &&
+          (!window._dernierNomGps || String(window._dernierNomGps).trim() !== dep);
+      var _pointGps = !ref.source || ref.source === 'gps';
+      if (_texteManuel && _pointGps) {
+        var _rep = null;
+        try {
+          var _rq = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gn,sn,ml,ci,lr,sl,gw&accept-language=fr&q=' + encodeURIComponent(dep));
+          var _js = _rq.ok ? await _rq.json() : null;
+          if (_js && _js.length && _js[0].lat != null) _rep = { lat: parseFloat(_js[0].lat), lng: parseFloat(_js[0].lon) };
+        } catch (x) { _rep = null; }
+        if (_rep) {
+          var _dm = (typeof distanceMetres === 'function')
+            ? distanceMetres(ref.lat, ref.lng, _rep.lat, _rep.lng)
+            : (Math.abs(ref.lat - _rep.lat) + Math.abs(ref.lng - _rep.lng)) * 111000;
+          if (_dm > 300) {
+            ref = { lat: _rep.lat, lng: _rep.lng, nom: dep, source: 'texte' };
+            _pointPriseEnCharge = ref;
+            var _st19 = document.getElementById('pa-position-statut');
+            if (_st19) _st19.innerHTML = '\u2705 Prise en charge : <b>' + esc(dep) + '</b>';
+            toast('\ud83d\udccd Le chauffeur sera envoy\u00e9 \u00e0 : ' + dep);
+          }
+        } else if (!window.confirm('Vous partez bien de l\u2019endroit o\u00f9 vous \u00eates en ce moment ?\n\nSi la prise en charge est AILLEURS (' + dep + '), appuyez sur Annuler, puis choisissez une adresse propos\u00e9e ou pointez le d\u00e9part sur la carte.')) {
+          toast('\u26a0\ufe0f Choisissez une adresse propos\u00e9e, ou pointez le d\u00e9part sur la carte : c\u2019est l\u00e0 que le chauffeur ira.', true);
+          return;
+        }
+      }
+    } catch (x) {}
+
     var ps = DB.passagers.find(function (x) { return x.id === DB.user.id; });
     if (!ps) { toast('\u26d4 Compte passager introuvable.', true); return; }
 
@@ -36376,6 +36461,81 @@ body.mode-passager .nav-inner{display:none!important}
   window.oublierMotDePasseDemandes = function () { gdAuth = null; };
 
   try { addDebugLog('DEMANDES v9.645 : parcours public, suivi et guichet en place ; QR dès la validation et au suivi'); } catch (e) {}
+})();
+</script>
+
+<script>
+// ══ 19/10 — L'ŒIL SUR TOUS LES MOTS DE PASSE, POSÉ UNE FOIS POUR TOUTES ══
+//
+// Le fondateur l'a demandé le 18/10 : « l'œil pour afficher, partout où on
+// écrit un mot de passe ». Le site en comptait 24 champs : 15 avaient leur
+// œil, recopié à la main en deux variantes, et 9 n'en avaient pas — dont la
+// confirmation de « Changer mon mot de passe », juste sous deux champs qui,
+// eux, l'avaient, et les deux champs de la récupération de compte.
+//
+// Plutôt que de retoucher neuf endroits (et d'oublier le dixième, le jour où
+// un écran est ajouté), ce bloc pose l'œil LUI-MÊME sur tout champ de mot de
+// passe qui n'en a pas : au chargement, puis à chaque ajout dans la page —
+// car six de ces champs n'existent pas au chargement, ils sont fabriqués par
+// openEdit(), demanderMotDePasse() ou _afficherResetPage().
+//
+// Les champs déjà équipés ne sont pas touchés : leurs œils dépendent de la
+// position du bouton (previousElementSibling), les emballer les casserait.
+//
+// ⚠️ L'ŒIL N'AFFAIBLIT RIEN. Ce qui protège un mot de passe, c'est qu'il ne
+// parte jamais en clair et ne soit pas réécrivable de l'extérieur. Le
+// masquer à celui qui le tape ne protège que d'un regard par-dessus
+// l'épaule — et c'est lui qui décide s'il y a quelqu'un derrière lui.
+(function () {
+  function aDejaUnOeil(inp) {
+    if (inp.dataset.oeil === '1') return true;
+    var s = inp.nextElementSibling;
+    if (s && s.tagName === 'BUTTON') {
+      var oc = s.getAttribute('onclick') || '';
+      if (oc.indexOf('previousElementSibling') >= 0 || oc.indexOf('togglePw') >= 0) return true;
+      if ((s.textContent || '').indexOf('👁') >= 0) return true; // 👁
+    }
+    return false;
+  }
+  function poserOeil(inp) {
+    if (!inp || inp.type !== 'password' || aDejaUnOeil(inp)) return;
+    inp.dataset.oeil = '1';
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-label', 'Afficher le mot de passe');
+    b.title = 'Afficher le mot de passe';
+    b.textContent = '👁️';
+    // Posé sur le bord droit du champ sans rien pousser : une marge négative
+    // le fait chevaucher, le champ garde sa largeur et sa ligne.
+    b.style.cssText = 'margin-left:-36px;position:relative;z-index:2;background:transparent;'
+      + 'border:none;cursor:pointer;font-size:15px;padding:0 8px;line-height:1;vertical-align:middle;opacity:.8';
+    try { inp.style.paddingRight = '38px'; } catch (e) {}
+    b.addEventListener('click', function () {
+      var clair = inp.type === 'text';
+      inp.type = clair ? 'password' : 'text';
+      b.title = clair ? 'Afficher le mot de passe' : 'Masquer le mot de passe';
+      b.setAttribute('aria-label', b.title);
+      try { inp.focus(); } catch (e) {}
+    });
+    inp.insertAdjacentElement('afterend', b);
+  }
+  function balayer() {
+    try {
+      var l = document.querySelectorAll('input[type="password"]');
+      for (var i = 0; i < l.length; i++) poserOeil(l[i]);
+    } catch (e) {}
+  }
+  var prevu = false;
+  function plusTard() {
+    if (prevu) return;
+    prevu = true;
+    requestAnimationFrame(function () { prevu = false; balayer(); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', balayer);
+  else balayer();
+  try {
+    new MutationObserver(plusTard).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
 })();
 </script>
 
