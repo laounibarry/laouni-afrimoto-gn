@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.645';
+window.AFRIMOTO_VERSION = 'v9.646';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -581,13 +581,16 @@ body.is-staff .page,body.is-dark .page{background:transparent}
 
 /* ── HERO PUBLIC ── */
 .hero-pub{border-radius:16px;overflow:hidden;margin-bottom:18px;background:linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%);padding:24px 20px;position:relative}
-.hero-pub::after{content:"🏍️";position:absolute;right:16px;bottom:-4px;font-size:72px;opacity:.12}
+.hero-pub::after{content:"🏍️";position:absolute;right:16px;bottom:-4px;font-size:72px;opacity:.12;pointer-events:none}
 .hero-pub-tag{display:inline-block;background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;border-radius:20px;margin-bottom:10px;border:1px solid rgba(255,255,255,.3)}
 .hero-pub-title{font-size:26px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:6px;font-family:'Poppins',sans-serif;text-shadow:0 2px 8px rgba(0,0,0,.2)}
 .hero-pub-title span{color:#ffe0b2}
 .hero-pub-sub{font-size:12px;color:rgba(255,255,255,.7);margin-bottom:16px}
 .hero-pub-badges{display:flex;gap:8px;flex-wrap:wrap}
 .hero-pub-badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px}
+.hero-pub-cta{position:relative;z-index:1;display:block;width:100%;margin-top:16px;padding:14px 16px;background:#fff;color:#c2410c;border:none;border-radius:12px;font-size:15px;font-weight:900;font-family:inherit;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero-pub-cta:active{transform:translateY(1px)}
+.hero-pub-suivi{position:relative;z-index:1;margin-top:10px;text-align:center;font-size:12px;font-weight:700;color:rgba(255,255,255,.9);text-decoration:underline;cursor:pointer}
 
 /* ── SEARCH BOX ── */
 .search-box{background:linear-gradient(135deg,#fff8f0,#ffffff);border:1.5px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(249,115,22,.08);margin-bottom:18px}
@@ -2757,7 +2760,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 <!-- NAV BOTTOM PUBLIC -->
 <div id="nav-bottom">
   <button onclick="goPage('home')" id="nb-home" class="nb-act"><span class="nb-icon">🏠</span>Accueil</button>
-  <button onclick="goPage('vehs')" id="nb-vehs"><span class="nb-icon">🏍️</span>Motos</button>
+  <button onclick="goPage('alertes')" id="nb-alertes"><span class="nb-icon">🔔</span>Alertes</button>
   <button onclick="goPage('trajets')" id="nb-trajets"><span class="nb-icon">🚙</span>Voyager</button>
   <button onclick="goPage('mes-trajets')" id="nb-mes-trajets"><span class="nb-icon">🎫</span>Mes trajets</button>
   <button onclick="goPage('annonces')" id="nb-annonces"><span class="nb-icon">🏷️</span>Annonces</button>
@@ -2777,6 +2780,8 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <span class="hero-pub-badge">📱 QR Code</span>
       <span class="hero-pub-badge">🚨 Anti-vol</span>
     </div>
+    <button class="hero-pub-cta" onclick="ouvrirDemandeEnregistrement()">📨 Enregistrer mon véhicule</button>
+    <div class="hero-pub-suivi" onclick="ouvrirSuiviDemande()">🔎 J'ai déjà déposé une demande — la suivre</div>
   </div>
 
   <!-- SEARCH BOX AFRIVORA -->
@@ -5023,11 +5028,10 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
       <button class="btn-ghost" style="padding:5px 11px;font-size:18px;line-height:1" onclick="closeModal('m-alerte')">✕</button>
     </div>
 
-    <!-- Nom + Prénom -->
-    <div class="grid2">
-      <div class="fld"><div class="lbl">Prénom *</div><input type="text" id="al-prenom" placeholder="Mamadou"/></div>
-      <div class="fld"><div class="lbl">Nom *</div><input type="text" id="al-nom" placeholder="Diallo"/></div>
-    </div>
+    <div class="qr-note-txt" style="font-size:12px;line-height:1.5;margin-bottom:12px">Pour éviter les fausses alertes, il faut un compte passager validé par un agent. Votre nom et votre téléphone sont pris dans votre compte.</div>
+    <div class="fld"><div class="lbl">N° de passager *</div><input type="text" id="al-num" placeholder="P1234567AB" autocomplete="username" autocapitalize="characters" spellcheck="false"/></div>
+    <div class="fld"><div class="lbl">Mot de passe *</div><input type="password" id="al-mdp" autocomplete="current-password"/></div>
+    <button type="button" style="display:block;width:100%;padding:4px 0 12px;background:transparent;border:none;color:#60A5FA;font-size:12px;text-decoration:underline;cursor:pointer;text-align:left" onclick="closeModal('m-alerte');openModal('m-inscription-passager')">Pas encore de compte passager ? S'inscrire</button>
 
     <!-- Option masquer prénom -->
     <div id="al-masquer-wrap" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.15);border-radius:8px;margin-bottom:12px;cursor:pointer" onclick="toggleMasquerPrenom()">
@@ -5039,12 +5043,6 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
         <div id="al-masquer-dot" style="width:22px;height:22px;border-radius:50%;background:#E8F0E8;transition:all .2s;margin-left:0"></div>
       </div>
       <input type="hidden" id="al-masquer-prenom" value="0"/>
-    </div>
-
-    <!-- Téléphone -->
-    <div class="fld">
-      <div class="lbl">Téléphone * <span style="color:#EF4444;font-size:10px;font-weight:400">🔒 Jamais visible au public</span></div>
-      <input type="tel" id="al-tel" placeholder="+224 6xx xxx xxx"/>
     </div>
 
     <!-- Préfecture de départ — sélecteur défilant -->
@@ -5069,7 +5067,7 @@ body.is-staff .qr-note-txt,body.is-dark .qr-note-txt{color:var(--staff-text)}
 
     <div id="alerr" class="warn" style="display:none"></div>
     <div style="display:flex;gap:8px">
-      <button class="btn-orange" style="flex:1;padding:13px;border-radius:8px" onclick="saveAlerte()">🔔 Envoyer l'alerte</button>
+      <button class="btn-orange" id="al-envoyer" style="flex:1;padding:13px;border-radius:8px" onclick="saveAlerte()">🔔 Envoyer l'alerte</button>
       <button class="btn-ghost" style="padding:13px 16px" onclick="closeModal('m-alerte')">Annuler</button>
     </div>
   </div>
@@ -5725,8 +5723,10 @@ function goPage(id, skipHistory) {
     try { _detacherEcran(); } catch(e) {}
   }
   if(renders[id]) renders[id]();
-  // Nav bottom public
-  ['home','vehs','trajets','annonces'].forEach(p => {
+  // Nav bottom public : Accueil · Alertes · Voyager · Mes trajets · Annonces
+  // (21/10 : Alertes a pris la place de Motos, comme dans l'application ; et
+  // « Mes trajets » manquait a cette liste, son bouton ne s'allumait jamais).
+  ['home','alertes','trajets','mes-trajets','annonces'].forEach(p => {
     const b = document.getElementById('nb-'+p);
     if(b) b.className = p===id ? 'nb-act' : '';
   });
@@ -6056,7 +6056,21 @@ function openModal(id) {
     const b = document.getElementById('an-veh-bloc'); if(b) b.style.display = 'none';
     const h = document.getElementById('an-veh'); if(h) h.value = '';
   }
-  if(id === 'm-alerte') renderPrefSelector('al-pref-list','al-pref','al-dep','');
+  if(id === 'm-alerte') {
+    renderPrefSelector('al-pref-list','al-pref','al-dep','');
+    // Le formulaire s'ouvre vide : jamais le numéro ni le mot de passe de la personne
+    // d'avant (cybercafé). ouvrirAlertePassager remplit le numéro juste après.
+    try { ['al-num','al-mdp'].forEach(function (k) { const e = document.getElementById(k); if(e) e.value = ''; }); } catch(e) {}
+    // L'heure de Guinée (UTC+0) : maintenant et maintenant + 60 jours.
+    try {
+      const dh = document.getElementById('al-dh');
+      if(dh) {
+        const f = function (d) { return d.toISOString().slice(0, 16); };
+        dh.min = f(new Date());
+        dh.max = f(new Date(Date.now() + 60*24*3600*1000));
+      }
+    } catch(e) {}
+  }
   if(id === 'm-trajet') renderPrefSelector('tr-pref-list','tr-pref','tr-dep','');
   if(id === 'm-ag') renderPrefSelector('ag-pref-list','ag-pref','ag-city','');
   // Réinitialiser le formulaire de récupération de compte (champ + résultat précédent + erreur)
@@ -6080,6 +6094,9 @@ function closeModal(id) {
 // Vider le toast si modal fermé  try { const t = document.getElementById('toast'); if(t) { t.textContent = ''; t.classList.remove('show'); } } catch(e) {}
   const el = document.getElementById(id);
   if(el) { el.classList.remove('open'); document.body.style.overflow=''; }
+  // 21/10 (SQL 156) : le mot de passe du compte passager ne reste jamais dans le
+  // formulaire d'alerte une fois fermé — un ordinateur de cybercafé se partage.
+  if(id === 'm-alerte') { try { const m = document.getElementById('al-mdp'); if(m) m.value = ''; } catch(e) {} }
   // Filet de sécurité : ces modals sont toujours accompagnés d'une alarme sonore/vibration —
   // on l'arrête systématiquement à la fermeture, quel que soit le chemin emprunté.
   if(id === 'm-recherche-auto' || id === 'm-course-entrante') {
@@ -6398,12 +6415,16 @@ function corbActionSel(action) {
   askConfirm(
     (action==='restaurer' ? '♻️ Restaurer ' : '🗑️ Effacer définitivement ') + nb + ' élément(s) ?',
     () => {
+      // 21/10 (SQL 156) : une alerte ne se restaure pas ; on ne la compte pas.
+      const estAlerte = function (id) { const e = (DB.corbeille||[]).find(c => c.id === id); return !!(e && e.listeOrigine === 'alertes'); };
+      const nbAlertes = action==='restaurer' ? ids.filter(estAlerte).length : 0;
       ids.forEach(id => {
-        if(action==='restaurer') restaurerCorbeille(id);
+        if(action==='restaurer') { if(!estAlerte(id)) restaurerCorbeille(id); }
         else supprimerDefinitivement(id);
       });
       window._corbSel = new Set();
-      toast((action==='restaurer' ? '♻️ ' : '🗑️ ') + nb + ' élément(s) ' + (action==='restaurer' ? 'restauré(s)' : 'effacé(s) définitivement'));
+      toast((action==='restaurer' ? '♻️ ' : '🗑️ ') + (nb - nbAlertes) + ' élément(s) ' + (action==='restaurer' ? 'restauré(s)' : 'effacé(s) définitivement')
+        + (nbAlertes ? ' · ' + nbAlertes + ' alerte(s) non restaurée(s) : le passager la repose depuis son compte' : ''));
     }
   );
 }
@@ -6411,6 +6432,12 @@ async function restaurerCorbeille(corbeilleId) {
   if(!isAdmin()) { toast('⛔ Action réservée à l\'administrateur', true); return; }
   const entree = DB.corbeille.find(c => c.id === corbeilleId);
   if(!entree) { toast('Élément introuvable', true); return; }
+  // 21/10 (SQL 156) : une alerte ne naît plus que d'un compte passager. La recréer
+  // depuis la corbeille serait refusé par le serveur — on le dit au lieu d'échouer.
+  if(entree.listeOrigine === 'alertes') {
+    toast('Une alerte supprimée ne se restaure pas : le passager la repose depuis son compte.', true);
+    return;
+  }
   
   addDebugLog('♻️ RESTAURER: "' + entree.label + '"');
   
@@ -9641,6 +9668,9 @@ function rPassager() {
     '<div style="display:flex;gap:8px;margin-bottom:12px">' +
       // v9.450 : "Commander sur la carte" retire a la demande de l'utilisateur — la commande se fait par le formulaire
       '<button onclick="openRecharge()" style="flex:1;background:rgba(234,179,8,.10);border:1.5px solid rgba(234,179,8,.4);border-radius:14px;padding:12px 6px;cursor:pointer;text-align:center;color:var(--text1);touch-action:manipulation"><div style="font-size:20px">💳</div><div style="font-size:11px;font-weight:800;margin-top:3px">Recharger mon solde</div></button>' +
+      // 21/10 (SQL 156) : une alerte de trajet exige un compte passager. Le passager
+      // connecté la pose d'ici, son numéro déjà rempli ; il ne tape que son mot de passe.
+      '<button onclick="ouvrirAlertePassager(\'' + esc(ps.num || '') + '\')" style="flex:1;background:rgba(249,115,22,.10);border:1.5px solid rgba(249,115,22,.4);border-radius:14px;padding:12px 6px;cursor:pointer;text-align:center;color:var(--text1);touch-action:manipulation"><div style="font-size:20px">🔔</div><div style="font-size:11px;font-weight:800;margin-top:3px">Créer une alerte de trajet</div></button>' +
     '</div>' +
     // — Choisir un taxi soi-meme (replie pour ne pas encombrer) —
     '<div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">' +
@@ -14261,7 +14291,7 @@ function openNotifChauffeurs() {
     '<div class="info-gold" style="margin-bottom:0">' +
     '<b>' + alertesActives.length + ' alerte(s) passager active(s)</b><br>' +
     Object.values(trajetsUniques).map(t =>
-      '🔔 <b>' + t.depart + ' → ' + t.arrivee + '</b> · ' + t.count + ' passager(s)' +
+      '🔔 <b>' + esc(t.depart) + ' → ' + esc(t.arrivee) + '</b> · ' + t.count + ' passager(s)' +
       (t.dates.length ? ' · ' + fdt(t.dates[0]) : '')
     ).join('<br>') +
     '</div>';
@@ -16214,7 +16244,7 @@ function afficherFichePubliqueQR(v) {
       <div style="width:34px;height:34px;background:#f97316;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px">🛡️</div>
       <div>
         <div style="font-weight:900;font-size:14px;color:#111">LAOUNI <span style="color:#f97316">AFRIMOTO</span></div>
-        <div style="font-size:9px;color:#9CA3AF;letter-spacing:1px">VÉRIFICATION OFFICIELLE · GUINÉE</div>
+        <div style="font-size:9px;color:#9CA3AF;letter-spacing:1px">VÉRIFICATION AFRIMOTO · GUINÉE</div>
       </div>
     </div>
 
@@ -16577,7 +16607,7 @@ function afficherErreurQR(identifiant) {
       <div style="width:34px;height:34px;background:#f97316;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px">🛡️</div>
       <div>
         <div style="font-weight:900;font-size:14px;color:#111">LAOUNI <span style="color:#f97316">AFRIMOTO</span></div>
-        <div style="font-size:9px;color:#9CA3AF;letter-spacing:1px">VÉRIFICATION OFFICIELLE · GUINÉE</div>
+        <div style="font-size:9px;color:#9CA3AF;letter-spacing:1px">VÉRIFICATION AFRIMOTO · GUINÉE</div>
       </div>
     </div>
     <div style="margin:32px 16px;text-align:center">
@@ -23540,7 +23570,7 @@ function rAlertes() {
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(a.depart)} → ${esc(a.arrivee)}</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:2px">
-            👤 ${canSeeAll ? nomComplet : prenomPublic}
+            👤 ${esc(canSeeAll ? nomComplet : prenomPublic)}
             ${a.masquerPrenom && !canSeeAll ? '<span style="font-size:10px;color:var(--text2)"> · prénom masqué</span>' : ''}
           </div>
           ${canSeeAll
@@ -23549,7 +23579,7 @@ function rAlertes() {
           }
           ${a.dateHeure ? `<div style="font-size:12px;color:#60A5FA;margin-top:3px">📅 ${fdt(a.dateHeure)}</div>` : ''}
           <div style="font-size:12px;color:#EAB308;margin-top:2px">💺 ${a.places||1} place(s) souhaitée(s)</div>
-          <div style="margin-top:5px"><span class="tag ${a.statut==='active'?'tag-gold':'tag-green'}" style="font-size:9px">${a.statut.toUpperCase()}</span></div>
+          <div style="margin-top:5px"><span class="tag ${a.statut==='active'?'tag-gold':'tag-green'}" style="font-size:9px">${esc(String(a.statut||'').toUpperCase())}</span></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
           ${canSeeAll ? `<a href="https://wa.me/${(a.tel||'').replace(/\D/g,'')}" target="_blank" style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;text-align:center">📲 WA</a>` : ''}
@@ -23560,9 +23590,30 @@ function rAlertes() {
   }).join('') : '<div class="empty">🔔<br>Aucune alerte active</div>';
 }
 
-function traiterAlerte(id) {
+async function traiterAlerte(id) {
   const a = DB.alertes.find(x=>x.id===id);
-  if(a) { a.statut='traitée'; sbSaveAlerte(a); rAlertes(); toast('✅ Alerte traitée'); }
+  if(!a) return;
+  // 21/10 : une modification de la seule colonne « statut » — plus une ré-écriture de
+  // toute la ligne, qui demandait le droit de CRÉER une alerte (SQL 156). Et on attend
+  // la réponse : l'écran ne dit « traitée » que si le serveur l'a écrit.
+  let ok = false;
+  try { ok = await sbUpsertSouple('alertes', {id:a.id, statut:'traitée'}, null, 'update'); } catch(e) { ok = false; }
+  if(ok === true) {
+    a.statut = 'traitée';
+    rAlertes(); try { rGestion(); } catch(e) {}
+    toast('✅ Alerte traitée');
+  } else {
+    // La vraie raison, pas « vérifiez la connexion » : sbUpsertSouple l'a notée.
+    const refus = (typeof dernierRefusSauvegarde === 'function') ? dernierRefusSauvegarde() : null;
+    if(refus && refus.brut === 'aucune ligne touchee') {
+      // Effacée entre-temps (périmée, ou supprimée par un collègue) : on la retire de l'écran.
+      DB.alertes = DB.alertes.filter(x => x.id !== id);
+      rAlertes(); try { rGestion(); } catch(e) {}
+      toast('⚠️ Cette alerte n\'existe plus (supprimée ou expirée).', true);
+    } else {
+      toast('⚠️ ' + ((refus && refus.phrase) ? refus.phrase : 'L\'alerte n\'a pas pu être marquée traitée. Vérifiez la connexion et réessayez.'), true);
+    }
+  }
 }
 
 function toggleMasquerPrenom() {
@@ -23585,10 +23636,46 @@ function toggleMasquerPrenom() {
   }
 }
 
-function saveAlerte() {
-  const prenom = document.getElementById('al-prenom').value.trim();
-  const nom    = document.getElementById('al-nom').value.trim();
-  const tel    = document.getElementById('al-tel').value.trim();
+// ══ 21/10 — UNE ALERTE VIENT D'UN COMPTE PASSAGER (SQL 156) ══
+//
+// Décision du fondateur : « pour créer une alerte il faut avoir un compte passager,
+// pour éviter les fausses alertes ». Ce formulaire écrivait lui-même la ligne, avec un
+// prénom, un nom et un téléphone tapés à la main que personne ne vérifiait. Il passe
+// désormais par la porte « afri156_creer_alerte » : numéro de passager et mot de passe
+// (un compte validé par un agent), le nom et le téléphone sont pris dans le compte, au
+// plus 3 alertes à venir, sans doublon. La table refuse toute alerte nouvelle écrite
+// directement (AF156).
+function alPhraseRefus(rep) {
+  var raison = String((rep && rep.raison) || '');
+  var m = String((rep && rep.message) || '').trim();
+  switch (raison) {
+    case 'compte_refuse': return 'Numéro de passager ou mot de passe incorrect.';
+    case 'compte_non_valide': return 'Votre compte passager attend encore la validation d\'un agent. Une fois validé, vous pourrez poser une alerte.';
+    case 'liste_noire': return 'Ce compte ne peut plus poser d\'alerte : trois réservations non honorées ont été enregistrées. Contactez un agent agréé.';
+    case 'compte_sans_telephone': return 'Votre compte passager n\'a pas de numéro de téléphone : les chauffeurs ne pourraient pas vous joindre. Faites-le ajouter par un agent agréé.';
+    case 'date_passee': return 'Cette heure est déjà passée. Choisissez un départ à venir.';
+    case 'trop_loin': return 'Une alerte se pose au plus 60 jours avant le départ.';
+    case 'places': return 'Le nombre de places doit être entre 1 et 30.';
+    case 'deja_posee': return 'Vous avez déjà une alerte pour ce trajet ce jour-là.';
+    case 'trop_d_alertes': return 'Vous avez déjà 3 alertes en attente. Attendez qu\'une passe, ou demandez à un agent d\'en retirer une.';
+    default: return m || 'L\'alerte a été refusée par le serveur. Réessayez ; si le message revient, appelez le 00224 610-11-10-15.';
+  }
+}
+
+// Depuis l'espace passager : le formulaire s'ouvre avec le numéro déjà rempli.
+function ouvrirAlertePassager(num) {
+  openModal('m-alerte');
+  try {
+    const n = document.getElementById('al-num');
+    if(n) n.value = String(num || '');
+    const m = document.getElementById('al-mdp');
+    if(m) m.value = '';
+  } catch(e) {}
+}
+
+async function saveAlerte() {
+  const num    = (document.getElementById('al-num').value || '').trim().toUpperCase();
+  const mdp    = document.getElementById('al-mdp').value || '';
   const dep    = document.getElementById('al-dep').value.trim();
   const arr    = document.getElementById('al-arr').value.trim();
   const dh     = document.getElementById('al-dh').value;
@@ -23596,44 +23683,63 @@ function saveAlerte() {
   const places = parseInt(document.getElementById('al-places').value) || 1;
   const masquerPrenom = document.getElementById('al-masquer-prenom').value === '1';
   const err = document.getElementById('alerr');
+  const dire = function (t) { err.textContent = t; err.style.display = 'block'; };
 
-  if(!pref)          { err.textContent='⚠️ Sélectionnez votre préfecture / commune de départ.'; err.style.display='block'; return; }
-  if(!prenom||!nom)  { err.textContent='⚠️ Prénom et nom obligatoires.'; err.style.display='block'; return; }
-  if(!tel)           { err.textContent='⚠️ Numéro de téléphone obligatoire.'; err.style.display='block'; return; }
-  if(!dep||!arr)     { err.textContent='⚠️ Villes de départ et d\'arrivée obligatoires.'; err.style.display='block'; return; }
-  if(!dh)            { err.textContent='⚠️ Date et heure de départ obligatoires.'; err.style.display='block'; return; }
-  if(places < 1)     { err.textContent='⚠️ Le nombre de places doit être au moins 1.'; err.style.display='block'; return; }
+  if(!pref)          { dire('⚠️ Sélectionnez votre préfecture / commune de départ.'); return; }
+  if(!num)           { dire('⚠️ Entrez votre numéro de passager (il commence par P). Pas encore de compte ? Inscrivez-vous juste en dessous.'); return; }
+  if(!mdp)           { dire('⚠️ Entrez le mot de passe de votre compte passager.'); return; }
+  if(!dep||!arr)     { dire('⚠️ Villes de départ et d\'arrivée obligatoires.'); return; }
+  if(!dh)            { dire('⚠️ Date et heure de départ obligatoires.'); return; }
+  if(places < 1 || places > 30) { dire('⚠️ Le nombre de places doit être entre 1 et 30.'); return; }
+  // L'heure saisie est celle de la Guinée (UTC+0) : on la lit comme telle, quel que
+  // soit le fuseau de l'ordinateur.
+  const quand = new Date(dh.length === 16 ? dh + ':00Z' : dh + 'Z');
+  if(!isNaN(quand) && quand.getTime() <= Date.now()) { dire('⚠️ Cette heure est déjà passée. Choisissez un départ à venir.'); return; }
+  if(!isNaN(quand) && quand.getTime() > Date.now() + 60*24*3600*1000) { dire('⚠️ Une alerte se pose au plus 60 jours avant le départ.'); return; }
+  err.style.display = 'none';
 
-  const newAlerte = {
-    id:gid(),
-    prenom, nom,
-    passager: prenom + ' ' + nom,
-    masquerPrenom,
-    tel,
-    pref, depart:dep, arrivee:arr,
-    dateHeure:dh,
-    places,
-    statut:'active',
-    date:new Date().toISOString()
-  };
-  DB.alertes.unshift(newAlerte);
-  sbSaveAlerte(newAlerte);
+  const btn = document.getElementById('al-envoyer');
+  const texteBtn = btn ? btn.textContent : '';
+  if(btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
+  try {
+    const { data, error } = await supabaseClient.rpc('afri156_creer_alerte', {
+      p_num: num, p_mot_de_passe: mdp, p_pref: pref, p_depart: dep, p_arrivee: arr,
+      p_date_heure: dh, p_places: places, p_masquer_prenom: masquerPrenom
+    });
+    if(error) {
+      const code = String(error.code || '');
+      dire(code === 'PGRST202'
+        ? '⚠️ Le serveur ne connaît pas encore la nouvelle porte des alertes. Réessayez plus tard ; si cela dure, appelez le 00224 610-11-10-15 (code PGRST202).'
+        : '⚠️ L\'alerte n\'a pas pu être envoyée. Vérifiez votre connexion et réessayez.' + (code ? ' (' + code + ')' : ''));
+      return;
+    }
+    if(!data || data.ok !== true) { dire('⚠️ ' + alPhraseRefus(data)); return; }
 
-  // Reset formulaire
-  ['al-prenom','al-nom','al-tel','al-dep','al-arr','al-dh','al-pref'].forEach(id=>{
-    const e=document.getElementById(id); if(e) e.value='';
-  });
-  document.getElementById('al-places').value = '1';
-  // Reset toggle masquer prénom
-  const inp=document.getElementById('al-masquer-prenom');
-  const btn=document.getElementById('al-masquer-btn');
-  const dot=document.getElementById('al-masquer-dot');
-  if(inp) inp.value='0';
-  if(btn) { btn.style.background='rgba(10,10,10,.2)'; btn.style.borderColor='rgba(10,10,10,.3)'; }
-  if(dot) { dot.style.background='#E8F0E8'; dot.style.marginLeft='0'; }
+    // L'alerte posée, relue telle que le serveur l'a écrite (nom et téléphone du compte).
+    try {
+      const { data: ligne } = await supabaseClient.from('alertes').select('*').eq('id', data.id).maybeSingle();
+      if(ligne) DB.alertes.unshift(typeof mapAlerte === 'function' ? mapAlerte(ligne) : ligne);
+    } catch(e) {}
 
-  closeModal('m-alerte'); rAlertes(); rTrajets();
-  toast('🔔 Alerte envoyée ! Les chauffeurs seront notifiés.');
+    // On garde le numéro (même personne), jamais le mot de passe.
+    ['al-mdp','al-dep','al-arr','al-dh','al-pref'].forEach(id=>{
+      const e=document.getElementById(id); if(e) e.value='';
+    });
+    document.getElementById('al-places').value = '1';
+    const inp=document.getElementById('al-masquer-prenom');
+    const btnM=document.getElementById('al-masquer-btn');
+    const dot=document.getElementById('al-masquer-dot');
+    if(inp) inp.value='0';
+    if(btnM) { btnM.style.background='rgba(10,10,10,.2)'; btnM.style.borderColor='rgba(10,10,10,.3)'; }
+    if(dot) { dot.style.background='#E8F0E8'; dot.style.marginLeft='0'; }
+
+    closeModal('m-alerte'); rAlertes(); rTrajets();
+    toast('🔔 Alerte envoyée ! Les chauffeurs seront notifiés.');
+  } catch(e) {
+    dire('⚠️ L\'alerte n\'a pas pu être envoyée. Vérifiez votre connexion et réessayez.');
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = texteBtn || '🔔 Envoyer l\'alerte'; }
+  }
 }
 
 // ════════════════════════════════════════════════
@@ -25129,9 +25235,9 @@ function rGestion() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;font-size:13px">${esc(a.depart)} → ${esc(a.arrivee)}</div>
-            <div style="font-size:11px;color:var(--text2)">👤 ${a.passager||'Anonyme'} · <a href="tel:${esc(a.tel)}" style="color:#f97316;font-weight:700;text-decoration:none">📞 ${esc(a.tel)}</a> · 💺 ${a.places||1}</div>
+            <div style="font-size:11px;color:var(--text2)">👤 ${esc(a.passager||'Anonyme')} · <a href="tel:${esc(a.tel)}" style="color:#f97316;font-weight:700;text-decoration:none">📞 ${esc(a.tel)}</a> · 💺 ${a.places||1}</div>
             <div style="font-size:11px;color:var(--text2)">${fdt(a.date)}</div>
-            <span class="tag ${a.statut==='active'?'tag-gold':'tag-green'}" style="font-size:9px">${a.statut.toUpperCase()}</span>
+            <span class="tag ${a.statut==='active'?'tag-gold':'tag-green'}" style="font-size:9px">${esc(String(a.statut||'').toUpperCase())}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
             ${a.statut==='active'?`<button class="btn" style="font-size:10px;padding:5px 8px" onclick="traiterAlerte('${a.id}')">✅</button>`:''}
@@ -28218,7 +28324,7 @@ function chauffeurBloqueParNom(nom) {
 function delAlerte(id) {
   const a = DB.alertes.find(x=>x.id===id);
   if(!a) return;
-  envoyerCorbeille('alertes', id, 'Alerte : ' + a.depart + ' → ' + a.arrivee, 'Supprimer cette alerte ? Récupérable pendant 48h dans la corbeille.', () => { rGestion(); rAlertes(); });
+  envoyerCorbeille('alertes', id, 'Alerte : ' + a.depart + ' → ' + a.arrivee, 'Supprimer cette alerte ? Elle ne pourra pas être restaurée : le passager devra la reposer depuis son compte.', () => { rGestion(); rAlertes(); });
 }
 
 // ── MODALS ÉDITION ──
@@ -34658,6 +34764,8 @@ body.mode-passager .nav-inner{display:none!important}
           return 'Votre solde ne couvre pas les frais d\'enregistrement de ce dossier. Rechargez votre compte, puis revenez valider : le dossier reste en attente, rien n\'a \u00e9t\u00e9 enregistr\u00e9.';
         case 'telephone_deja_client':
           return 'Ce t\u00e9l\u00e9phone appartient d\u00e9j\u00e0 \u00e0 un compte client existant. Recevez la personne, v\u00e9rifiez sa pi\u00e8ce d\'identit\u00e9, et si c\'est bien elle, faites red\u00e9poser la demande depuis son compte (num\u00e9ro d\'acc\u00e8s + mot de passe) pour que le v\u00e9hicule entre dans ce compte sans en cr\u00e9er un second.';
+        case 'email_deja_client':
+          return 'Cette adresse e-mail appartient d\u00e9j\u00e0 \u00e0 un compte propri\u00e9taire / chauffeur. Si c\'est le compte du demandeur, le v\u00e9hicule doit entrer dans CE compte : son num\u00e9ro de client ici, ou un d\u00e9p\u00f4t \u00ab j\'ai d\u00e9j\u00e0 un compte \u00bb. Sinon, renvoyez le dossier \u00e0 corriger pour une autre adresse.';
         case 'client_introuvable':
           return 'Le compte du propri\u00e9taire n\'a pas \u00e9t\u00e9 retrouv\u00e9. Rejetez ce dossier et faites-le red\u00e9poser, ou cr\u00e9ez l\'enregistrement vous-m\u00eame depuis \u00ab Enregistrer un v\u00e9hicule \u00bb.';
         case 'categorie_manquante':
@@ -34711,6 +34819,8 @@ body.mode-passager .nav-inner{display:none!important}
         return 'La marque et le modèle sont obligatoires. Ils sont inscrits sur la carte grise.';
       case 'proprietaire_incomplet':
         return 'Le prénom, le nom et le téléphone du propriétaire sont obligatoires. Remplissez-les, puis renvoyez.';
+      case 'email_deja_client':
+        return 'Cette adresse e-mail appartient déjà à un compte propriétaire / chauffeur. Si c\'est le vôtre, choisissez « j\'ai déjà un compte » et connectez-vous ; sinon donnez une autre adresse.';
       case 'categorie_inconnue':
         return 'La catégorie choisie n\'existe plus chez l\'administration. Fermez et rouvrez ce formulaire pour recharger la liste, puis choisissez-en une autre.';
       case 'agent_introuvable':
