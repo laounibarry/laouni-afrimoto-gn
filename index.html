@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.646';
+window.AFRIMOTO_VERSION = 'v9.647';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -24853,7 +24853,8 @@ async function chargerTresorerie(){
   const net = (Number(d.entrees)||0) - (Number(d.sorties)||0);
   const detenu = Object.values(d.soldes_detenus || {}).reduce((t,v)=>t+(Number(v)||0), 0);
   const NATURES = { rech:'Commissions de course', trajet:'Publication de trajets',
-                    enreg:'Frais d\'enregistrement', annonce:'Annonces', admin:'Écritures admin' };
+                    enreg:'Frais d\'enregistrement', annonce:'Annonces', admin:'Écritures admin',
+                    retrait:'Retraits de solde en espèces' };
 
   const carte = (titre, valeur, couleur, note) =>
     '<div style="flex:1;min-width:180px;background:rgba(255,255,255,.04);border:1px solid ' + couleur +
@@ -25988,8 +25989,18 @@ function rGestion() {
     // Les categories existent bel et bien, mais elles se lisent dans la DESTINATION et la
     // DESCRIPTION, pas dans le type. Verifie sur vos donnees : 225 frais, 46 recharges,
     // 20 commissions, 687 mouvements de trajet.
+    // ══ 26/10 — LE RETRAIT, ET POURQUOI IL A SON CASIER ══
+    //
+    // Depuis les fichiers 159 et 160, un chauffeur rend son solde a un agent,
+    // un sous-agent le rend a SON agent, un agent le rend a l'administration.
+    // Ces ecritures portent le type « retrait ».
+    //
+    // Sans ces deux lignes, elles tombaient dans « autres » : aucun bouton ne
+    // permettait de les retrouver, et le telephone et le site racontaient deux
+    // histoires differentes sur le meme argent.
     const _categorie = (m) => {
       if(m.annule) return 'annules';
+      if(m.type === 'retrait') return 'retraits';
       if(m.type === 'trajet') return 'trajets';
       if(m.type !== 'rech') return 'autres';
       const desc = nrm(m.desc || '');
@@ -25997,6 +26008,14 @@ function rGestion() {
       if(nrm(m.vers || '').indexOf('commission') >= 0) return 'commissions';
       return 'recharges';
     };
+
+    // ⚠️ UN RETRAIT N'EST PAS UNE ENTREE. Le montant est ecrit en positif dans
+    // la base — c'est une somme deplacee — mais il QUITTE le solde de celui
+    // qui retire pour devenir des billets. Compte comme les autres, il
+    // gonflait les « credits » d'un argent qui sort, et la ligne s'affichait
+    // en vert avec un « + ». On lui donne son vrai signe ici, une seule fois,
+    // et les totaux comme les lignes le suivent.
+    const _signe = (m) => (m.type === 'retrait' ? -1 : 1) * (m.montant || 0);
 
     let mouvementsFiltres = tousLesMovements.filter(m => {
       const typeMatch = filterType === 'all' || _categorie(m) === filterType;
@@ -26011,16 +26030,16 @@ function rGestion() {
     // 📊 CALCULER STATISTIQUES
     const stats = {
       total: mouvementsFiltres.length,
-      totalCredit: mouvementsFiltres.filter(m => m.montant > 0).reduce((a, m) => a + (m.montant || 0), 0),
-      totalDebit: mouvementsFiltres.filter(m => m.montant < 0).reduce((a, m) => a + (m.montant || 0), 0),
-      netChange: mouvementsFiltres.reduce((a, m) => a + (m.montant || 0), 0),
+      totalCredit: mouvementsFiltres.filter(m => _signe(m) > 0).reduce((a, m) => a + _signe(m), 0),
+      totalDebit: mouvementsFiltres.filter(m => _signe(m) < 0).reduce((a, m) => a + _signe(m), 0),
+      netChange: mouvementsFiltres.reduce((a, m) => a + _signe(m), 0),
       byType: {}
     };
     
     mouvementsFiltres.forEach(m => {
       if(!stats.byType[m.type]) stats.byType[m.type] = { count: 0, total: 0 };
       stats.byType[m.type].count++;
-      stats.byType[m.type].total += (m.montant || 0);
+      stats.byType[m.type].total += _signe(m);
     });
     
     // 🏠 HEADER + FILTRES
@@ -26061,9 +26080,20 @@ function rGestion() {
         <button class="btn${filterType === 'commissions' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'commissions'; rGestion()">📈 Commissions</button>
         <button class="btn${filterType === 'frais' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'frais'; rGestion()">💳 Frais</button>
         <button class="btn${filterType === 'trajets' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'trajets'; rGestion()">🚗 Trajets</button>
+        <button class="btn${filterType === 'retraits' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'retraits'; rGestion()">🏧 Retraits</button>
         <button class="btn${filterType === 'annules' ? '' : '-ghost'}" style="font-size:11px;padding:6px 12px" onclick="window._mvtFilterType = 'annules'; rGestion()">❌ Annulés</button>
       </div>
       
+      ${filterType === 'retraits' ? `
+        <div style="background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.35);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11.5px;line-height:1.7;color:var(--text2)">
+          <b style="color:var(--text)">Toutes les lignes sont là, mais elles ne sortent pas toutes de la caisse.</b><br>
+          L'argent ne quitte la maison qu'une fois : quand un <b>chauffeur</b> ou un
+          <b>passager</b> est payé. Un agent qui rend son solde à l'administration, ou un
+          sous-agent qui rend le sien à son agent, déplace de l'argent <b>à l'intérieur de
+          la maison</b> — ces lignes-là comptent pour zéro dans les Sorties, sinon les
+          5 000 d'un chauffeur en afficheraient 10 000.
+        </div>` : ''}
+
       <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
         <button class="btn${filterPeriod === '7j' ? '' : '-ghost'}" style="font-size:10px;padding:6px 10px" onclick="window._mvtFilterPeriod = '7j'; rGestion()">7j</button>
         <button class="btn${filterPeriod === '30j' ? '' : '-ghost'}" style="font-size:10px;padding:6px 10px" onclick="window._mvtFilterPeriod = '30j'; rGestion()">30j</button>
@@ -26087,12 +26117,12 @@ function rGestion() {
       html += mouvementsFiltres.slice(0, 100).map((m, idx) => {
         const isOpen = window._mvtOpen === m.id;
         const iconMap = {
-          rech: '💵', commission: '📊', frais: '💸', trajets: '🚗', transfert_out: '💳➡️', transfert_in: '💳⬅️', rech_annule: '❌💵',
+          rech: '💵', retrait: '🏧', commission: '📊', frais: '💸', trajets: '🚗', transfert_out: '💳➡️', transfert_in: '💳⬅️', rech_annule: '❌💵',
           appreciation: '👍', avertissement: '⚠️', suspension: '⛔'
         };
         const icon = iconMap[m.type] || '📝';
-        const isCredit = (m.montant || 0) > 0;
-        const montantAbs = Math.abs(m.montant || 0);
+        const isCredit = _signe(m) > 0;
+        const montantAbs = Math.abs(_signe(m));
         
         return `
           <div class="card" style="margin-bottom:8px;border-left:4px solid ${isCredit ? '#22C55E' : '#EF4444'}">
