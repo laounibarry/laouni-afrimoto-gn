@@ -84,37 +84,117 @@
     html, body { margin: 0; padding: 0; height: 100%; background: #FFFFFF; }
     #afrimoto-attente {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 18px;
+      align-items: center; justify-content: center;
       font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
       background: #FFFFFF; z-index: 2147483647;
+      /* L'écran s'efface doucement quand l'application a dessiné : une
+         disparition sèche se lit comme un clignotement. */
+      transition: opacity .35s ease; opacity: 1;
     }
-    #afrimoto-attente img { width: 76px; height: 76px; border-radius: 18px; }
+    #afrimoto-attente.parti { opacity: 0; pointer-events: none; }
+    #afrimoto-attente .marque {
+      width: 92px; height: 92px; border-radius: 22px; display: block;
+      box-shadow: 0 10px 30px rgba(249,115,22,.22);
+    }
     #afrimoto-attente .nom {
-      font-size: 17px; font-weight: 800; color: #111827; letter-spacing: .2px;
+      margin-top: 20px;
+      font-size: 19px; font-weight: 900; color: #111827; letter-spacing: .4px;
     }
     #afrimoto-attente .nom span { color: #f97316; }
-    #afrimoto-attente .mot { font-size: 12.5px; color: #6B7280; }
+    #afrimoto-attente .mot {
+      margin-top: 6px; font-size: 12.5px; color: #6B7280; letter-spacing: .2px;
+    }
     #afrimoto-attente .barre {
-      width: 168px; height: 3px; border-radius: 3px; background: #F3F4F6;
+      margin-top: 26px;
+      width: 150px; height: 3px; border-radius: 3px; background: #F3F4F6;
       overflow: hidden;
     }
     #afrimoto-attente .barre i {
-      display: block; width: 40%; height: 100%; background: #f97316;
-      border-radius: 3px; animation: afrimoto-va 1.1s ease-in-out infinite;
+      display: block; width: 38%; height: 100%; background: #f97316;
+      border-radius: 3px; animation: afrimoto-va 1.15s ease-in-out infinite;
     }
     @keyframes afrimoto-va {
-      0%   { transform: translateX(-100%); }
-      100% { transform: translateX(350%); }
+      0%   { transform: translateX(-110%); }
+      100% { transform: translateX(370%); }
+    }
+    #afrimoto-attente .pied {
+      position: absolute; bottom: 26px;
+      font-size: 11px; color: #9CA3AF; letter-spacing: .3px;
     }
   </style>
 </head>
 <body>
+  <!-- ⚠️ LE LOGO EST CELUI DE L'APPLICATION, pas celui du vieux site.
+       « L'image doit être changée » : l'ancien /icons/icon-192.png est un
+       vélo vert qui n'est plus la marque. Celui-ci est le bouclier orange
+       d'AfriMoto, le même que sur le téléphone — « aucune différence ». -->
   <div id="afrimoto-attente">
-    <img src="/icons/icon-192.png" alt="Laouni AfriMoto GN"/>
+    <img class="marque" src="/assets/assets/logo.png" alt="Laouni AfriMoto GN"
+         width="92" height="92" fetchpriority="high"/>
     <div class="nom">LAOUNI <span>AFRIMOTO</span></div>
+    <div class="mot">Registre sécurisé des véhicules · Guinée</div>
     <div class="barre"><i></i></div>
-    <div class="mot">Registre sécurisé · Guinée</div>
+    <div class="pied">LAOUNI SARLU · Conakry</div>
   </div>
+
+  <script>
+    // ══════════════════════════════════════════════════════════════════════
+    //  ⚠️ ENLEVER L'ÉCRAN D'ATTENTE — FLUTTER NE LE FAIT PAS TOUT SEUL
+    //
+    //  Ce bloc est posé par-dessus tout, au premier plan absolu. Sans les
+    //  lignes ci-dessous, il resterait là APRÈS le démarrage : l'application
+    //  tournerait derrière, invisible, et personne ne pourrait la toucher.
+    //
+    //  « flutter-first-frame » est l'évènement que Flutter envoie quand il a
+    //  dessiné sa PREMIÈRE image — pas quand il a fini de charger. C'est le
+    //  bon moment : l'écran est prêt, on peut s'effacer.
+    // ══════════════════════════════════════════════════════════════════════
+    (function () {
+      var bloc = document.getElementById('afrimoto-attente');
+      if (!bloc) return;
+      var parti = false;
+
+      function effacer() {
+        if (parti) return;
+        parti = true;
+        bloc.classList.add('parti');
+        // On attend la fin du fondu avant de retirer, sinon il disparaît sec.
+        setTimeout(function () {
+          if (bloc && bloc.parentNode) bloc.parentNode.removeChild(bloc);
+        }, 400);
+      }
+
+      window.addEventListener('flutter-first-frame', effacer);
+
+      // ⚠️ ET SI LA PREMIÈRE IMAGE N'ARRIVE JAMAIS. C'est exactement ce qui
+      //  s'est passé le 01/11 : écran d'attente, et rien d'autre, sans fin.
+      //  On ne laisse plus personne devant une barre qui tourne : au bout de
+      //  vingt-cinq secondes, on le DIT, et on propose de réessayer.
+      setTimeout(function () {
+        if (parti) return;
+        var mot = bloc.querySelector('.mot');
+        var barre = bloc.querySelector('.barre');
+        if (barre) barre.style.display = 'none';
+        if (mot) {
+          mot.innerHTML =
+            'Le chargement prend plus de temps que prévu.<br>' +
+            'Vérifiez votre connexion, puis réessayez.';
+          mot.style.color = '#B45309';
+          mot.style.lineHeight = '1.5';
+          mot.style.maxWidth = '280px';
+          mot.style.textAlign = 'center';
+        }
+        var bouton = document.createElement('button');
+        bouton.textContent = 'Réessayer';
+        bouton.style.cssText =
+          'margin-top:18px;padding:11px 26px;border:0;border-radius:11px;' +
+          'background:#f97316;color:#fff;font-size:14px;font-weight:700;' +
+          'font-family:inherit;cursor:pointer';
+        bouton.onclick = function () { location.reload(); };
+        bloc.appendChild(bouton);
+      }, 25000);
+    })();
+  </script>
 
   <script src="flutter_bootstrap.js" async></script>
 </body>
