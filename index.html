@@ -342,7 +342,7 @@ v9.535 - Palier 5 : le temps reel n ecoute plus que ce qui concerne CET utilisat
     canal veh:<id>, l envoi push a la verification et au signalement d un vehicule vole, et le temps reel sur la 
    table verifications
 */
-window.AFRIMOTO_VERSION = 'v9.647';
+window.AFRIMOTO_VERSION = 'v9.648';
 console.log('%cLAOUNI AFRIMOTO ' + window.AFRIMOTO_VERSION, 'color:#f97316;font-weight:bold;font-size:14px');
 
 // v9.489 : etiquette affichee sur les deux cartes. Elle indique la version du SITE et, quand on
@@ -16266,10 +16266,20 @@ function afficherFichePubliqueQR(v) {
           </div>
         </div>
       ` : `
+        <!-- ══ 01/11/2026 — « CERTIFIÉ » EST UN MOT QU'AFRIMOTO N'A PAS LE DROIT DE DIRE ══
+             Sa remarque : « si la force de l'ordre voit ce terme lors d'une vérification
+             et que le propriétaire n'a pas encore fait sa carte grise — c'était enregistré
+             sans carte grise — ce sera une contradiction. »
+             AfriMoto sait DEUX choses : ce véhicule est dans SON registre, et il n'y est
+             pas déclaré volé. Rien sur la carte grise, l'assurance, le contrôle technique.
+             Même famille que « officiel » (banni le 07/10) et « national » (le 21/10) :
+             prêter à une société privée une autorité d'État qu'elle n'a pas.
+             L'application dit exactement la même chose depuis la 1.0.281. ══ -->
         <div style="background:linear-gradient(135deg,#16A34A,#15803D);padding:24px 20px;text-align:center">
           <div style="font-size:56px;margin-bottom:8px">✅</div>
-          <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px">VÉHICULE CERTIFIÉ</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.85)">Enregistré sur Laouni AfriMoto GN</div>
+          <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px">ENREGISTRÉ</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.85)">Au registre AfriMoto · non déclaré volé</div>
+          <div style="font-size:11.5px;line-height:1.35;color:rgba(255,255,255,.78);margin-top:10px;padding:0 4px">AfriMoto ne contrôle ni la carte grise, ni l'assurance, ni le contrôle technique. Ce résultat ne les remplace pas.</div>
         </div>
       `}
     </div>
