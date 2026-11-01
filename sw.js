@@ -1,102 +1,57 @@
-/* Laouni AfriMoto GN - service worker
-   Strategie RESEAU D'ABORD : l'utilisateur voit TOUJOURS la derniere version
-   du site. Le cache ne sert que de secours quand il n'y a pas de connexion. */
-const CACHE = 'afrimoto-v1';
+// ════════════════════════════════════════════════════════════════════════════
+//  L'ANCIEN SERVICE WORKER SE RETIRE — 01/11/2026
+//
+//  Le site n'est plus une page écrite à la main : c'est l'application Flutter.
+//  Ce fichier-ci servait l'ancien site depuis la mémoire du navigateur, et
+//  c'est précisément le piège : quelqu'un qui a déjà ouvert AfriMoto a ce
+//  programme installé chez lui. Sans rien faire, il continuerait de recevoir
+//  l'ANCIEN site pour toujours — jamais le nouveau, et sans comprendre
+//  pourquoi.
+//
+//  Un navigateur revérifie TOUJOURS ce fichier-ci au moment où l'on navigue.
+//  Il reçoit donc cette version, qui :
+//    1. vide tout ce qui avait été gardé en mémoire ;
+//    2. se désinscrit elle-même ;
+//    3. recharge les fenêtres ouvertes, pour que le nouveau site paraisse
+//       tout de suite au lieu d'attendre la visite suivante.
+//
+//  Flutter installe ensuite le sien (flutter_service_worker.js), qui garde en
+//  mémoire les quelques mégaoctets du moteur graphique : c'est lui qui rend
+//  les ouvertures suivantes rapides.
+//
+//  ⚠️ NE PAS SUPPRIMER CE FICHIER. Supprimé, il répondrait « introuvable », et
+//  certains navigateurs garderaient l'ancien programme actif plus longtemps.
+//  Il doit répondre, et dire de se retirer.
+// ════════════════════════════════════════════════════════════════════════════
 
-self.addEventListener('install', function (e) {
+self.addEventListener('install', () => {
+  // On ne fait pas la queue derrière l'ancien : on prend la main tout de suite.
   self.skipWaiting();
 });
 
-self.addEventListener('activate', function (e) {
-  e.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE; })
-                             .map(function (k) { return caches.delete(k); }));
-    }).then(function () { return self.clients.claim(); })
-  );
+self.addEventListener('activate', (evenement) => {
+  evenement.waitUntil((async () => {
+    try {
+      const noms = await caches.keys();
+      await Promise.all(noms.map((n) => caches.delete(n)));
+    } catch (e) {
+      // Un cache qu'on n'arrive pas à vider ne doit pas empêcher la suite.
+    }
+    try {
+      await self.registration.unregister();
+    } catch (e) {}
+    try {
+      const fenetres = await self.clients.matchAll({ type: 'window' });
+      for (const f of fenetres) {
+        // « navigate » recharge en passant par le réseau : la fenêtre ouverte
+        // reçoit le nouveau site sans que personne ait à y penser.
+        f.navigate(f.url);
+      }
+    } catch (e) {}
+  })());
 });
 
-self.addEventListener('fetch', function (e) {
-  var req = e.request;
-  if (req.method !== 'GET') return;
-  var url = new URL(req.url);
-  // On ne touche pas aux appels Supabase ni aux domaines externes
-  if (url.origin !== self.location.origin) return;
-
-  e.respondWith(
-    fetch(req).then(function (res) {
-      var copy = res.clone();
-      caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
-      return res;
-    }).catch(function () {
-      return caches.match(req).then(function (hit) {
-        return hit || caches.match('/');
-      });
-    })
-  );
-});
-
-
-/* ══════════════════════════════════════════════════════════
-   v9.336 — NOTIFICATIONS PUSH
-   Android reveille ce service worker meme application fermee.
-   ══════════════════════════════════════════════════════════ */
-self.addEventListener('push', function (e) {
-  var d = {};
-  try { d = e.data ? e.data.json() : {}; } catch (err) { d = {}; }
-  var titre = d.titre || 'AfriMoto GN';
-  var options = {
-    body: d.message || '',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    vibrate: [300, 120, 300, 120, 300],
-    tag: d.tag || 'afrimoto',
-    renotify: true,
-    requireInteraction: true,
-    data: { url: d.url || '/' }
-  };
-  e.waitUntil(self.registration.showNotification(titre, options));
-});
-
-self.addEventListener('notificationclick', function (e) {
-  e.notification.close();
-
-  // v9.354 : adresse COMPLETE. Avec une adresse relative (« / »), Android ne
-  // rattache pas toujours la notification a l'application installee et ouvre
-  // le navigateur a la place.
-  var brut = (e.notification.data && e.notification.data.url) || '/';
-  var cible;
-  try { cible = new URL(brut, self.location.origin).href; }
-  catch (err) { cible = self.location.origin + '/'; }
-
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(function (liste) {
-        // 1) Une fenetre de l'application est deja ouverte : on la ramene devant
-        for (var i = 0; i < liste.length; i++) {
-          var c = liste[i];
-          if (c.url && c.url.indexOf(self.location.origin) === 0 && 'focus' in c) {
-            return c.focus().then(function (fen) {
-              // On ne recharge que si l'on n'est pas deja au bon endroit,
-              // pour ne pas perdre ce que l'utilisateur avait a l'ecran.
-              if (fen && fen.navigate && fen.url !== cible) {
-                return fen.navigate(cible).catch(function () { return fen; });
-              }
-              return fen;
-            }).catch(function () {
-              return self.clients.openWindow ? self.clients.openWindow(cible) : null;
-            });
-          }
-        }
-        // 2) Application fermee : on l'ouvre
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(cible).catch(function () {
-            return self.clients.openWindow(self.location.origin + '/');
-          });
-        }
-      })
-      .catch(function () {
-        if (self.clients.openWindow) return self.clients.openWindow(self.location.origin + '/');
-      })
-  );
-});
+// Tant qu'il est encore là, il ne répond plus rien depuis la mémoire : tout
+// repart au réseau. Sans cette ligne, la page servie pendant la désinscription
+// serait encore l'ancienne.
+self.addEventListener('fetch', () => {});
