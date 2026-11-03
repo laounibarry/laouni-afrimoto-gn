@@ -15,7 +15,8 @@
       "namespace": "android_app",
       "package_name": "com.afrimoto.afrimoto_app",
       "sha256_cert_fingerprints": [
-        "FC:9B:2F:F2:B6:E2:45:A3:82:74:54:83:A5:2D:6F:D2:3D:0B:20:4A:5A:16:E0:AE:6E:E1:03:D1:97:45:CE:E5"
+        "FC:9B:2F:F2:B6:E2:45:A3:82:74:54:83:A5:2D:6F:D2:3D:0B:20:4A:5A:16:E0:AE:6E:E1:03:D1:97:45:CE:E5",
+        "45:66:B8:8E:AF:93:13:32:12:99:B8:69:36:49:99:FB:31:1E:36:9A:E0:1E:75:7B:74:70:91:58:01:7D:8B:E8"
       ]
     }
   }
