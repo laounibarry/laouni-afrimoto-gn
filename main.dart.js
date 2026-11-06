@@ -90255,12 +90255,12 @@ case 1:return A.j(q,r)
 case 2:return A.i(o.at(-1),r)}})
 return A.k($async$HN,r)},
 B2(a){return this.aZt(a)},
-aZt(a){var s=0,r=A.l(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h
+aZt(a){var s=0,r=A.l(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g
 var $async$B2=A.m(function(b,c){if(b===1){o.push(c)
-s=p}for(;;)switch(s){case 0:i=n.c
-i.toString
+s=p}for(;;)switch(s){case 0:h=n.c
+h.toString
 s=3
-return A.d(A.fX(null,new A.btI(n,a),i,!1,null,!1,t.CI),$async$B2)
+return A.d(A.fX(null,new A.btI(n,a),h,!1,null,!1,t.CI),$async$B2)
 case 3:m=c
 if(m==null){if(n.c!=null)n.k(new A.btJ(n,a))
 s=1
@@ -90278,9 +90278,10 @@ p=2
 s=7
 break
 case 5:p=4
-h=o.pop()
-i=n.c
-if(i!=null)A.R(i,"La photo n'a pas pu \xeatre lue.",!0)
+g=o.pop()
+j=A.aa(g)
+h=n.c
+if(h!=null)A.R(h,"La photo n'a pas pu \xeatre lue. R\xe9essayez ; si le message revient, donnez ceci : "+A.b(j),!0)
 s=7
 break
 case 4:s=2
