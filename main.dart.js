@@ -51304,7 +51304,7 @@ m=A.cq("https://www.laouni-securite-ultime.com/api/send-email",0,null)
 l=t.N
 k=A.F(["Content-Type","application/json"],l,l)
 s=7
-return A.d(A.qH(m,B.by.jB(A.F(["to","djoniwouri@gmail.com","subject",a,"text",b+"\n\n\u2014 envoy\xe9 depuis app 1.0.295 \xb7 08/11/2026"],l,l),null),k).fR(B.lW),$async$abD)
+return A.d(A.qH(m,B.by.jB(A.F(["to","djoniwouri@gmail.com","subject",a,"text",b+"\n\n\u2014 envoy\xe9 depuis app 1.0.296 \xb7 08/11/2026"],l,l),null),k).fR(B.lW),$async$abD)
 case 7:n=d
 m=n.b>=200&&n.b<300
 q=m
@@ -72837,7 +72837,7 @@ s=1
 break
 case 1:return A.j(q,r)}})
 return A.k($async$a0i,r)},
-F(a){var s=this,r=null,q=t.p,p=A.G(A.a([B.c48,A.f("app 1.0.295",r,r,r,B.bRI,r,r,r)],q),B.E,r,B.cU,B.q,0,B.w)
+F(a){var s=this,r=null,q=t.p,p=A.G(A.a([B.c48,A.f("app 1.0.296",r,r,r,B.bRI,r,r,r)],q),B.E,r,B.cU,B.q,0,B.w)
 p=A.cz(A.a([A.cG(r,r,B.tI,r,r,s.gb0w(),r,r,r,r)],q),B.aq,new A.Gp(A.D(r,A.pH(r,new A.bgc(s),12,B.Aj,B.bQ),B.u,B.aq,r,r,r,52,r,r,r,r,r),B.eE,r),0,B.t,r,p,r)
 q=A.a([],q)
 if(s.d===4)q.push(s.aF1())
@@ -103028,7 +103028,7 @@ return A.k($async$Yy,r)},
 F(a){var s=null,r=A.cwS(this.a.c)
 return A.ck(s,B.aq,A.eo(!0,A.G(A.a([this.aEW(),A.N(A.pD(new A.bEf(this,r)),1)],t.p),B.v,s,B.p,B.q,0,B.w),!1,B.aB,!0),s,s)},
 aEW(){var s=null,r=t.p
-return A.D(s,A.P(A.a([B.aor,B.as,A.N(A.G(A.a([B.bXP,A.f("1.0.295",1,s,s,A.ao(s,s,B.t.O(0.45),s,s,s,s,s,s,s,s,9.5,s,s,B.bv,s,s,!0,s,0.6,s,s,s,s,s,s),s,s,s)],r),B.E,s,B.p,B.ao,0,B.w),1),A.cG(s,s,B.anZ,s,s,new A.bDN(this),s,s,"Fermer",s)],r),B.v,B.p,B.q,0,s,s),B.u,s,s,B.adh,s,s,s,B.akh,s,s,1/0)},
+return A.D(s,A.P(A.a([B.aor,B.as,A.N(A.G(A.a([B.bXP,A.f("1.0.296",1,s,s,A.ao(s,s,B.t.O(0.45),s,s,s,s,s,s,s,s,9.5,s,s,B.bv,s,s,!0,s,0.6,s,s,s,s,s,s),s,s,s)],r),B.E,s,B.p,B.ao,0,B.w),1),A.cG(s,s,B.anZ,s,s,new A.bDN(this),s,s,"Fermer",s)],r),B.v,B.p,B.q,0,s,s),B.u,s,s,B.adh,s,s,s,B.akh,s,s,1/0)},
 aUS(a){var s,r,q,p,o,n=null,m=A.cvo(this.a.c),l=A.cvp(this.a.c),k=m.length===0
 if(k&&l.length===0)return B.ky
 s=B.ah.O(0.18)
@@ -199240,7 +199240,7 @@ B.byV=new A.I(B.lZ,B.bW4,null)
 B.afV=new A.fh(B.ad,null,null,B.byV,null)
 B.afW=new A.fh(B.ad,null,null,B.zq,null)
 B.br=new A.o(!0,B.I,null,null,null,null,11.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.bX9=new A.h("app 1.0.295 \xb7 08/11/2026",null,B.br,null,null,null,null,null,null,null)
+B.bX9=new A.h("app 1.0.296 \xb7 08/11/2026",null,B.br,null,null,null,null,null,null,null)
 B.afX=new A.fh(B.ad,null,null,B.bX9,null)
 B.bSu=new A.o(!0,null,null,null,null,null,42,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.c6G=new A.h("\u26a0\ufe0f",null,B.bSu,null,null,null,null,null,null,null)
@@ -208314,7 +208314,7 @@ B.aH=new A.c3(null,16,null,null)
 B.bPU=new A.o(!0,B.t,null,null,null,null,24,B.ac,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.c5H=new A.h("Laouni AfriMoto",null,B.bPU,null,null,null,null,null,null,null)
 B.Fv=new A.o(!0,B.b9,null,null,null,null,12.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.c36=new A.h("app 1.0.295 \xb7 08/11/2026",null,B.Fv,null,null,null,null,null,null,null)
+B.c36=new A.h("app 1.0.296 \xb7 08/11/2026",null,B.Fv,null,null,null,null,null,null,null)
 B.hO=new A.c3(null,24,null,null)
 B.ago=new A.is(2.5,null,null,null,null,B.N,null,null,null,null)
 B.bLt=new A.c3(26,26,B.ago,null)
