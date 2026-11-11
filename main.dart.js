@@ -51690,11 +51690,7 @@ case 2:return A.j(null,r)}})
 return A.k($async$bUJ,r)},
 bUM:function bUM(){},
 bUL:function bUL(){},
-ckL(a){var s
-if(a!=null)s=a.a.length===0&&a.b.length===0
-else s=!0
-if(s)return"La pi\xe8ce n'a pas pu \xeatre lue. \xc9crivez le nom vous-m\xeame, comme il est \xe9crit dessus."
-return"Lu sur "+a.c+". V\xe9rifiez : une pi\xe8ce froiss\xe9e ou photographi\xe9e de travers se lit mal, et un nom faux sur le document du gendarme est pire qu'un nom absent."},
+ckL(a,b){return"La lecture automatique n'existe pas sur le site : \xe9crivez le nom vous-m\xeame, comme il est \xe9crit sur la pi\xe8ce. Sur l'application du t\xe9l\xe9phone, il s'\xe9crit tout seul."},
 cc5(){return null},
 ckJ(a){return $.ckI.h(0,a).gbna()},
 cbL(a){if(typeof dartPrint=="function"){dartPrint(a)
@@ -51797,7 +51793,7 @@ m=A.cq("https://www.laouni-securite-ultime.com/api/send-email",0,null)
 l=t.N
 k=A.F(["Content-Type","application/json"],l,l)
 s=7
-return A.d(A.qR(m,B.bA.jC(A.F(["to","djoniwouri@gmail.com","subject",a,"text",b+"\n\n\u2014 envoy\xe9 depuis app 1.0.305 \xb7 10/11/2026"],l,l),null),k).fm(B.m2),$async$ac2)
+return A.d(A.qR(m,B.bA.jC(A.F(["to","djoniwouri@gmail.com","subject",a,"text",b+"\n\n\u2014 envoy\xe9 depuis app 1.0.306 \xb7 10/11/2026"],l,l),null),k).fm(B.m2),$async$ac2)
 case 7:n=d
 m=n.b>=200&&n.b<300
 q=m
@@ -73404,7 +73400,7 @@ s=1
 break
 case 1:return A.j(q,r)}})
 return A.k($async$a0J,r)},
-F(a){var s=this,r=null,q=t.p,p=A.G(A.a([B.c5b,A.f("app 1.0.305",r,r,r,B.bSy,r,r,r)],q),B.D,r,B.cW,B.q,0,B.w)
+F(a){var s=this,r=null,q=t.p,p=A.G(A.a([B.c5b,A.f("app 1.0.306",r,r,r,B.bSy,r,r,r)],q),B.D,r,B.cW,B.q,0,B.w)
 p=A.cx(A.a([A.cF(r,r,B.tV,r,r,s.gb1l(),r,r,r,r)],q),B.aq,new A.GF(A.C(r,A.pU(r,new A.bgX(s),12,B.Av,B.bR),B.t,B.aq,r,r,r,52,r,r,r,r,r),B.eH,r),0,B.u,r,p,r)
 q=A.a([],q)
 if(s.d===4)q.push(s.aFB())
@@ -91881,7 +91877,7 @@ if(c==null)c=""
 d=d?null:e.b
 if(d==null)d=""
 s=19
-return A.d(n.Cg(a1,A.ckL(e),d,c),$async$o5)
+return A.d(n.Cg(a1,A.ckL(e,!1),d,c),$async$o5)
 case 19:case 18:case 1:return A.j(q,r)
 case 2:return A.i(o.at(-1),r)}})
 return A.k($async$o5,r)},
@@ -105081,7 +105077,7 @@ return A.k($async$YY,r)},
 F(a){var s=null,r=A.czF(this.a.c)
 return A.ci(s,B.aq,A.ee(!0,A.G(A.a([this.aFt(),A.N(A.pQ(new A.bGz(this,r)),1)],t.p),B.v,s,B.p,B.q,0,B.w),!1,B.ay,!0),s,s)},
 aFt(){var s=null,r=t.p
-return A.C(s,A.P(A.a([B.aoW,B.at,A.N(A.G(A.a([B.bYJ,A.f("1.0.305",1,s,s,A.ao(s,s,B.u.O(0.45),s,s,s,s,s,s,s,s,9.5,s,s,B.bs,s,s,!0,s,0.6,s,s,s,s,s,s),s,s,s)],r),B.D,s,B.p,B.am,0,B.w),1),A.cF(s,s,B.aos,s,s,new A.bG6(this),s,s,"Fermer",s)],r),B.v,B.p,B.q,0,s,s),B.t,s,s,B.adL,s,s,s,B.akL,s,s,1/0)},
+return A.C(s,A.P(A.a([B.aoW,B.at,A.N(A.G(A.a([B.bYJ,A.f("1.0.306",1,s,s,A.ao(s,s,B.u.O(0.45),s,s,s,s,s,s,s,s,9.5,s,s,B.bs,s,s,!0,s,0.6,s,s,s,s,s,s),s,s,s)],r),B.D,s,B.p,B.am,0,B.w),1),A.cF(s,s,B.aos,s,s,new A.bG6(this),s,s,"Fermer",s)],r),B.v,B.p,B.q,0,s,s),B.t,s,s,B.adL,s,s,s,B.akL,s,s,1/0)},
 aVB(a){var s,r,q,p,o,n=null,m=A.cyb(this.a.c),l=A.cyc(this.a.c),k=m.length===0
 if(k&&l.length===0)return B.is
 s=B.ah.O(0.18)
@@ -201374,7 +201370,7 @@ B.bzt=new A.H(B.m5,B.bWZ,null)
 B.ago=new A.fm(B.ae,null,null,B.bzt,null)
 B.agp=new A.fm(B.ae,null,null,B.zA,null)
 B.br=new A.o(!0,B.I,null,null,null,null,11.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.c5z=new A.h("app 1.0.305 \xb7 10/11/2026",null,B.br,null,null,null,null,null,null,null)
+B.c5z=new A.h("app 1.0.306 \xb7 10/11/2026",null,B.br,null,null,null,null,null,null,null)
 B.agq=new A.fm(B.ae,null,null,B.c5z,null)
 B.bTl=new A.o(!0,null,null,null,null,null,42,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.c7Q=new A.h("\u26a0\ufe0f",null,B.bTl,null,null,null,null,null,null,null)
@@ -210486,7 +210482,7 @@ B.aG=new A.c2(null,16,null,null)
 B.bQH=new A.o(!0,B.u,null,null,null,null,24,B.ac,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.c6R=new A.h("Laouni AfriMoto",null,B.bQH,null,null,null,null,null,null,null)
 B.FP=new A.o(!0,B.ba,null,null,null,null,12.5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
-B.c4v=new A.h("app 1.0.305 \xb7 10/11/2026",null,B.FP,null,null,null,null,null,null,null)
+B.c4v=new A.h("app 1.0.306 \xb7 10/11/2026",null,B.FP,null,null,null,null,null,null,null)
 B.hS=new A.c2(null,24,null,null)
 B.agS=new A.iy(2.5,null,null,null,null,B.J,null,null,null,null)
 B.bMf=new A.c2(26,26,B.agS,null)
